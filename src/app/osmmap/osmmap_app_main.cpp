@@ -408,11 +408,11 @@ static bool osmmap_configure_watch_flash_source( double lon, double lat, uint32_
 #ifndef NATIVE_64BIT
     struct stat st;
 
-    if ( stat( tile_path_jpg, &st ) == 0 ) {
-        tile_path = tile_path_jpg;
-    }
-    else if ( stat( tile_path_png, &st ) == 0 ) {
+    if ( stat( tile_path_png, &st ) == 0 ) {
         tile_path = tile_path_png;
+    }
+    else if ( stat( tile_path_jpg, &st ) == 0 ) {
+        tile_path = tile_path_jpg;
     }
     else {
         OSMMAP_APP_ERROR_LOG( "watch basemap tile missing: %s or %s", tile_path_jpg, tile_path_png );
