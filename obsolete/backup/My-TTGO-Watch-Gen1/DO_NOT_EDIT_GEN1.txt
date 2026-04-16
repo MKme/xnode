@@ -1,0 +1,5 @@
+GEN1 is the frozen known-good baseline created on 2026-04-15.
+
+Do not edit this folder.
+Do all future work in:
+C:\GitHub\lilygo\My-TTGO-Watch-Gen2

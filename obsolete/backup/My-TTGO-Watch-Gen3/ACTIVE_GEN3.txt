@@ -1,0 +1,8 @@
+Gen3 is the active working copy.
+
+Use this folder for:
+- timeout/wake fixes
+- Meshtastic UI cleanup
+- position/map plotting work
+
+Do not continue development in Gen1 or Gen2.

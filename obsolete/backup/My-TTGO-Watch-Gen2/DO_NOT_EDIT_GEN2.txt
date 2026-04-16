@@ -1,0 +1,11 @@
+GEN2 is frozen as the current reference snapshot.
+
+Reason:
+- Boots
+- Sends Meshtastic messages
+- Contains current Meshtastic RX/map integration work
+- Still has unresolved screen-timeout behavior
+
+Rule:
+- Do not continue feature work here.
+- Start new work from Gen3.
