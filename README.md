@@ -6,6 +6,13 @@ Workspace paths:
 - Active project: `C:\GitHub\XNODE`
 - Archived legacy generations: `C:\GitHub\XNODE\obsolete\backup`
 
+## Buy the watch
+
+[![LILYGO T-Watch S3 Amazon listing](images/lilygo-t-watch-s3-amazon.jpg)](https://amzn.to/4sHfvgK)
+
+Hardware listing:
+- [LILYGO T-Watch S3 on Amazon](https://amzn.to/4sHfvgK)
+
 ## Current status
 
 Working now:
