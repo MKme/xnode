@@ -157,6 +157,55 @@
             return( true );
         }
 
+        bool xnode_base64url_decode_bytes( const char *input, uint8_t **output, size_t *output_len ) {
+            String normalized = input ? input : "";
+            uint8_t *decoded = NULL;
+            size_t decoded_capacity = 0;
+            size_t decoded_len = 0;
+
+            if ( output ) {
+                *output = NULL;
+            }
+            if ( output_len ) {
+                *output_len = 0;
+            }
+
+            normalized.replace( "-", "+" );
+            normalized.replace( "_", "/" );
+            while ( normalized.length() % 4 ) {
+                normalized += "=";
+            }
+
+            decoded_capacity = ( normalized.length() / 4 ) * 3 + 4;
+            decoded = (uint8_t *)malloc( decoded_capacity );
+
+            if ( !decoded ) {
+                return( false );
+            }
+
+            if ( mbedtls_base64_decode(
+                     decoded,
+                     decoded_capacity,
+                     &decoded_len,
+                     (const unsigned char *)normalized.c_str(),
+                     normalized.length()
+                 ) != 0 ) {
+                free( decoded );
+                return( false );
+            }
+
+            if ( output ) {
+                *output = decoded;
+            }
+            else {
+                free( decoded );
+            }
+            if ( output_len ) {
+                *output_len = decoded_len;
+            }
+            return( true );
+        }
+
         bool xnode_send_json_text( const String &json ) {
             if ( !xnode_link_ready() ) {
                 return( false );
@@ -250,42 +299,6 @@
             return( errno == EEXIST );
         }
 
-        bool xnode_ensure_parent_dirs( const char *filepath ) {
-            const size_t filepath_len = filepath ? strlen( filepath ) : 0;
-            char *mutable_path = NULL;
-
-            if ( !xnode_watch_path_valid( filepath ) || filepath_len < strlen( XNODE_OFFLINE_TILE_PREFIX ) + 5 ) {
-                return( false );
-            }
-
-            if ( !xnode_create_dir_if_missing( XNODE_OFFLINE_TILE_ROOT ) ) {
-                return( false );
-            }
-
-            mutable_path = (char *)malloc( filepath_len + 1 );
-            if ( !mutable_path ) {
-                return( false );
-            }
-
-            strcpy( mutable_path, filepath );
-
-            for ( char *cursor = mutable_path + strlen( XNODE_OFFLINE_TILE_PREFIX ); *cursor; cursor++ ) {
-                if ( *cursor != '/' ) {
-                    continue;
-                }
-
-                *cursor = '\0';
-                if ( !xnode_create_dir_if_missing( mutable_path ) ) {
-                    free( mutable_path );
-                    return( false );
-                }
-                *cursor = '/';
-            }
-
-            free( mutable_path );
-            return( true );
-        }
-
         bool xnode_seed_default_basemap_tile( void ) {
             struct stat st;
             FILE *file = NULL;
@@ -294,10 +307,6 @@
             if ( tile_len == 0 ) {
                 return( false );
             }
-
-            mkdir( "/spiffs/osmmap", 0777 );
-            mkdir( "/spiffs/osmmap/10", 0777 );
-            mkdir( "/spiffs/osmmap/10/279", 0777 );
 
             if ( stat( XNODE_SEED_TILE_PATH, &st ) == 0 && (size_t)st.st_size == tile_len ) {
                 osmmap_apply_watch_basemap( XNODE_OFFLINE_MAP_NAME, XNODE_SEED_TILE_LON, XNODE_SEED_TILE_LAT, XNODE_SEED_TILE_ZOOM );
@@ -318,9 +327,10 @@
             return( true );
         }
 
-        bool xnode_write_file_chunk( const char *filepath, const String &data, bool append, char *detail, size_t detail_size ) {
+        bool xnode_write_file_chunk( const char *filepath, const uint8_t *data, size_t data_len, bool append, size_t offset, char *detail, size_t detail_size ) {
             FILE *file = NULL;
             size_t written = 0;
+            struct stat st;
 
             if ( detail && detail_size ) {
                 detail[ 0 ] = '\0';
@@ -332,19 +342,32 @@
                 }
                 return( false );
             }
-            if ( data.length() == 0 ) {
+            if ( !data || data_len == 0 ) {
                 if ( detail && detail_size ) {
                     snprintf( detail, detail_size, "empty-payload %s", filepath );
                 }
                 return( false );
             }
-            if ( !xnode_ensure_parent_dirs( filepath ) ) {
+            if ( append ) {
+                if ( stat( filepath, &st ) != 0 ) {
+                    if ( detail && detail_size ) {
+                        snprintf( detail, detail_size, "offset-missing %s want=%u", filepath, (unsigned)offset );
+                    }
+                    return( false );
+                }
+                if ( (size_t)st.st_size != offset ) {
+                    if ( detail && detail_size ) {
+                        snprintf( detail, detail_size, "offset-mismatch %s have=%u want=%u", filepath, (unsigned)st.st_size, (unsigned)offset );
+                    }
+                    return( false );
+                }
+            }
+            else if ( offset != 0 ) {
                 if ( detail && detail_size ) {
-                    snprintf( detail, detail_size, "dir-create-error %s errno=%d", filepath, errno );
+                    snprintf( detail, detail_size, "offset-invalid %s want=0 have=%u", filepath, (unsigned)offset );
                 }
                 return( false );
             }
-
             if ( !append ) {
                 remove( filepath );
             }
@@ -357,12 +380,12 @@
                 return( false );
             }
 
-            written = fwrite( data.c_str(), 1, data.length(), file );
+            written = fwrite( data, 1, data_len, file );
             fclose( file );
-            if ( written != data.length() && detail && detail_size ) {
-                snprintf( detail, detail_size, "write-short %s %u/%u", filepath, (unsigned)written, (unsigned)data.length() );
+            if ( written != data_len && detail && detail_size ) {
+                snprintf( detail, detail_size, "write-short %s %u/%u", filepath, (unsigned)written, (unsigned)data_len );
             }
-            return( written == data.length() );
+            return( written == data_len );
         }
 
         bool xnode_apply_time_payload( JsonObjectConst payload ) {
@@ -613,7 +636,9 @@
                 const size_t offset = payload[ "offset" ] | 0;
                 const size_t total_bytes = payload[ "totalBytes" ] | 0;
                 char status_name[ 160 ] = { 0 };
-                String decoded_data;
+                uint8_t *decoded_data = NULL;
+                size_t decoded_len = 0;
+                struct stat st;
 
                 if ( !filepath[ 0 ] ) {
                     snprintf( status_name, sizeof( status_name ), "path-missing" );
@@ -627,19 +652,36 @@
                     return;
                 }
 
-                if ( !xnode_base64url_decode( encoded, decoded_data ) ) {
+                if ( !xnode_base64url_decode_bytes( encoded, &decoded_data, &decoded_len ) ) {
                     snprintf( status_name, sizeof( status_name ), "payload-decode-error %s len=%u", filepath, (unsigned)strlen( encoded ) );
                     xnode_send_status_event( "tile-write-error", status_name, XNODE_OFFLINE_TILE_ROOT );
                     return;
                 }
 
-                if ( xnode_write_file_chunk( filepath, decoded_data, append, status_name, sizeof( status_name ) ) ) {
-                    if ( total_bytes > 0 && ( offset + decoded_data.length() ) >= total_bytes ) {
+                if ( xnode_write_file_chunk( filepath, decoded_data, decoded_len, append, offset, status_name, sizeof( status_name ) ) ) {
+                    free( decoded_data );
+                    if ( total_bytes > 0 && ( offset + decoded_len ) >= total_bytes ) {
+                        const bool stat_ok = stat( filepath, &st ) == 0;
+                        const size_t stored_size = stat_ok ? (size_t)st.st_size : 0;
+
+                        if ( !stat_ok || stored_size != total_bytes ) {
+                            snprintf(
+                                status_name,
+                                sizeof( status_name ),
+                                "size-mismatch %s have=%u want=%u",
+                                filepath,
+                                (unsigned)stored_size,
+                                (unsigned)total_bytes
+                            );
+                            xnode_send_status_event( "tile-write-error", status_name, XNODE_OFFLINE_TILE_ROOT );
+                            return;
+                        }
                         snprintf( status_name, sizeof( status_name ), "%s bytes=%u", filepath, (unsigned)total_bytes );
                         xnode_send_status_event( "tile-stored", status_name, XNODE_OFFLINE_TILE_ROOT );
                     }
                     return;
                 }
+                free( decoded_data );
 
                 if ( status_name[ 0 ] == '\0' ) {
                     snprintf( status_name, sizeof( status_name ), "%s errno=%d", filepath, errno );
@@ -661,7 +703,12 @@
                 config.load();
                 strlcpy( config.osmmap, XNODE_OFFLINE_MAP_NAME, sizeof( config.osmmap ) );
                 config.save();
-                osmmap_apply_watch_basemap( XNODE_OFFLINE_MAP_NAME, center_lon, center_lat, center_zoom );
+                if ( !osmmap_apply_watch_basemap( XNODE_OFFLINE_MAP_NAME, center_lon, center_lat, center_zoom ) ) {
+                    snprintf( body, sizeof( body ), "profile failed: %s (%s)", name, XNODE_OFFLINE_TILE_ROOT );
+                    xnode_queue_notification( "Basemap", body );
+                    xnode_send_status_event( "profile-error", name, XNODE_OFFLINE_TILE_ROOT );
+                    return;
+                }
                 sdcard_block_unmounting( false );
 
                 snprintf( body, sizeof( body ), "profile staged: %s (%s)", name, XNODE_OFFLINE_TILE_ROOT );
@@ -716,11 +763,14 @@
 
             if ( xnode_rx_index == xnode_rx_total ) {
                 String decoded_json;
-                DynamicJsonDocument doc( 2048 );
+                DynamicJsonDocument doc( XNODE_MAX_JSON );
 
                 if ( xnode_base64url_decode( xnode_rx_encoded.c_str(), decoded_json ) &&
                      deserializeJson( doc, decoded_json ) == DeserializationError::Ok ) {
                     xnode_handle_command( doc );
+                }
+                else {
+                    xnode_send_status_event( "rx-json-error", "command-parse-failed", XNODE_OFFLINE_TILE_ROOT );
                 }
                 xnode_reset_rx();
             }

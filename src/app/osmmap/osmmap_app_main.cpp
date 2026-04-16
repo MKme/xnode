@@ -399,16 +399,27 @@ static bool osmmap_configure_watch_flash_source( double lon, double lat, uint32_
     const uint32_t clamped_zoom = zoom < 2 ? 2 : ( zoom > 18 ? 18 : zoom );
     const uint32_t tilex = osmmap_long2tilex( lon, clamped_zoom );
     const uint32_t tiley = osmmap_lat2tiley( lat, clamped_zoom );
-    char tile_path[ 160 ] = { 0 };
+    char tile_path_jpg[ 160 ] = { 0 };
+    char tile_path_png[ 160 ] = { 0 };
+    const char *tile_path = NULL;
 
-    snprintf( tile_path, sizeof( tile_path ), "/spiffs/osmmap/%u/%u/%u.png", clamped_zoom, tilex, tiley );
+    snprintf( tile_path_jpg, sizeof( tile_path_jpg ), "/spiffs/osmmap/%u/%u/%u.jpg", clamped_zoom, tilex, tiley );
+    snprintf( tile_path_png, sizeof( tile_path_png ), "/spiffs/osmmap/%u/%u/%u.png", clamped_zoom, tilex, tiley );
 #ifndef NATIVE_64BIT
     struct stat st;
 
-    if ( stat( tile_path, &st ) != 0 ) {
-        OSMMAP_APP_ERROR_LOG( "watch basemap tile missing: %s", tile_path );
+    if ( stat( tile_path_jpg, &st ) == 0 ) {
+        tile_path = tile_path_jpg;
+    }
+    else if ( stat( tile_path_png, &st ) == 0 ) {
+        tile_path = tile_path_png;
+    }
+    else {
+        OSMMAP_APP_ERROR_LOG( "watch basemap tile missing: %s or %s", tile_path_jpg, tile_path_png );
         return( false );
     }
+#else
+    tile_path = tile_path_jpg;
 #endif
 
     snprintf( osmmap_watch_flash_uri, sizeof( osmmap_watch_flash_uri ), "file://%s", tile_path );

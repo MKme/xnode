@@ -697,16 +697,15 @@ void osm_map_clear_cache( osm_location_t *osm_location ) {
     osm_map_take( osm_location );
     /**
      * clear cache
-     * leave the current used tile image in memory
      */
     for( int i = 0 ; i < DEFAULT_OSM_CACHE_SIZE ; i++ ) {
         if ( osm_location->uri_load_dsc[ i ] ) {
-            if ( osm_location->uri_load_dsc[ i ]->data != osm_location->osm_map_data.data ) {
-                uri_load_free_all( osm_location->uri_load_dsc[ i ] );
-                osm_location->uri_load_dsc[ i ] = NULL;
-            }
+            uri_load_free_all( osm_location->uri_load_dsc[ i ] );
+            osm_location->uri_load_dsc[ i ] = NULL;
         }
     }
+    osm_location->osm_map_data.data = NULL;
+    osm_location->osm_map_data.data_size = 0;
     /**
      * get cache size
      */
