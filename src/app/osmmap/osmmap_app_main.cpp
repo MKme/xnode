@@ -128,6 +128,58 @@ static int32_t osmmap_watch_flash_pan_x = 0;
 static int32_t osmmap_watch_flash_pan_y = 0;
 static char osmmap_watch_flash_uri[ 160 ] = { 0 };
 
+static const size_t OSMMAP_OVERLAY_MAX_ITEMS = 96;
+static const size_t OSMMAP_OVERLAY_KEY_LEN = 48;
+static const size_t OSMMAP_OVERLAY_LABEL_LEN = 32;
+
+typedef enum {
+    OSMMAP_OVERLAY_KIND_TEAM = 0,
+    OSMMAP_OVERLAY_KIND_MESH,
+    OSMMAP_OVERLAY_KIND_SITREP,
+    OSMMAP_OVERLAY_KIND_CONTACT,
+    OSMMAP_OVERLAY_KIND_TASK,
+    OSMMAP_OVERLAY_KIND_CHECKIN,
+    OSMMAP_OVERLAY_KIND_RESOURCE,
+    OSMMAP_OVERLAY_KIND_ASSET,
+    OSMMAP_OVERLAY_KIND_ZONE,
+    OSMMAP_OVERLAY_KIND_MISSION,
+    OSMMAP_OVERLAY_KIND_EVENT,
+    OSMMAP_OVERLAY_KIND_PHASELINE,
+    OSMMAP_OVERLAY_KIND_SENTINEL,
+    OSMMAP_OVERLAY_KIND_ROUTE,
+    OSMMAP_OVERLAY_KIND_COUNT,
+    OSMMAP_OVERLAY_KIND_UNKNOWN = -1
+} osmmap_overlay_kind_t;
+
+typedef struct {
+    bool used;
+    osmmap_overlay_kind_t kind;
+    double lon;
+    double lat;
+    uint32_t updated_at;
+    char key[ OSMMAP_OVERLAY_KEY_LEN ];
+    char label[ OSMMAP_OVERLAY_LABEL_LEN ];
+    lv_obj_t *marker_obj;
+} osmmap_overlay_item_t;
+
+static osmmap_overlay_item_t osmmap_overlay_items[ OSMMAP_OVERLAY_MAX_ITEMS ] = { 0 };
+static bool osmmap_overlay_layer_enabled[ OSMMAP_OVERLAY_KIND_COUNT ] = {
+    true,   /* team */
+    true,   /* mesh */
+    false,  /* sitrep */
+    false,  /* contact */
+    false,  /* task */
+    false,  /* checkin */
+    false,  /* resource */
+    false,  /* asset */
+    false,  /* zone */
+    false,  /* mission */
+    false,  /* event */
+    false,  /* phaseline */
+    false,  /* sentinel */
+    false   /* route */
+};
+
 LV_IMG_DECLARE(layers_dark_48px);
 LV_IMG_DECLARE(exit_dark_48px);
 LV_IMG_DECLARE(zoom_in_dark_48px);
@@ -174,6 +226,89 @@ static void osmmap_place_marker( lv_obj_t *marker_obj, uint16_t marker_x, uint16
 static void osmmap_refresh_marker_positions( void );
 static bool osmmap_adjust_watch_flash_zoom( int delta );
 static bool osmmap_adjust_watch_flash_pan( int32_t delta_x, int32_t delta_y );
+static const char *osmmap_overlay_menu_label( osmmap_overlay_kind_t kind );
+static osmmap_overlay_kind_t osmmap_overlay_kind_from_name( const char *name );
+static osmmap_overlay_kind_t osmmap_overlay_kind_from_menu_label( const char *label );
+static const void *osmmap_overlay_icon_for_kind( osmmap_overlay_kind_t kind );
+static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item );
+static void osmmap_hide_overlay_marker( osmmap_overlay_item_t *item );
+
+static const char *osmmap_overlay_menu_label( osmmap_overlay_kind_t kind ) {
+    switch ( kind ) {
+        case OSMMAP_OVERLAY_KIND_TEAM:      return( "Team members" );
+        case OSMMAP_OVERLAY_KIND_MESH:      return( "Mesh nodes" );
+        case OSMMAP_OVERLAY_KIND_SITREP:    return( "SITREPs" );
+        case OSMMAP_OVERLAY_KIND_CONTACT:   return( "CONTACTs" );
+        case OSMMAP_OVERLAY_KIND_TASK:      return( "TASKs" );
+        case OSMMAP_OVERLAY_KIND_CHECKIN:   return( "CHECKINs" );
+        case OSMMAP_OVERLAY_KIND_RESOURCE:  return( "Resource requests" );
+        case OSMMAP_OVERLAY_KIND_ASSET:     return( "Assets" );
+        case OSMMAP_OVERLAY_KIND_ZONE:      return( "Zones" );
+        case OSMMAP_OVERLAY_KIND_MISSION:   return( "Missions" );
+        case OSMMAP_OVERLAY_KIND_EVENT:     return( "Events" );
+        case OSMMAP_OVERLAY_KIND_PHASELINE: return( "Phase lines" );
+        case OSMMAP_OVERLAY_KIND_SENTINEL:  return( "Sentinel" );
+        case OSMMAP_OVERLAY_KIND_ROUTE:     return( "Routes" );
+        default:                            return( "" );
+    }
+}
+
+static osmmap_overlay_kind_t osmmap_overlay_kind_from_name( const char *name ) {
+    if ( !name ) {
+        return( OSMMAP_OVERLAY_KIND_UNKNOWN );
+    }
+    if ( !strcmp( name, "team" ) ) return( OSMMAP_OVERLAY_KIND_TEAM );
+    if ( !strcmp( name, "mesh" ) ) return( OSMMAP_OVERLAY_KIND_MESH );
+    if ( !strcmp( name, "sitrep" ) ) return( OSMMAP_OVERLAY_KIND_SITREP );
+    if ( !strcmp( name, "contact" ) ) return( OSMMAP_OVERLAY_KIND_CONTACT );
+    if ( !strcmp( name, "task" ) ) return( OSMMAP_OVERLAY_KIND_TASK );
+    if ( !strcmp( name, "checkin" ) ) return( OSMMAP_OVERLAY_KIND_CHECKIN );
+    if ( !strcmp( name, "resource" ) ) return( OSMMAP_OVERLAY_KIND_RESOURCE );
+    if ( !strcmp( name, "asset" ) ) return( OSMMAP_OVERLAY_KIND_ASSET );
+    if ( !strcmp( name, "zone" ) ) return( OSMMAP_OVERLAY_KIND_ZONE );
+    if ( !strcmp( name, "mission" ) ) return( OSMMAP_OVERLAY_KIND_MISSION );
+    if ( !strcmp( name, "event" ) ) return( OSMMAP_OVERLAY_KIND_EVENT );
+    if ( !strcmp( name, "phaseline" ) ) return( OSMMAP_OVERLAY_KIND_PHASELINE );
+    if ( !strcmp( name, "sentinel" ) ) return( OSMMAP_OVERLAY_KIND_SENTINEL );
+    if ( !strcmp( name, "route" ) ) return( OSMMAP_OVERLAY_KIND_ROUTE );
+    return( OSMMAP_OVERLAY_KIND_UNKNOWN );
+}
+
+static osmmap_overlay_kind_t osmmap_overlay_kind_from_menu_label( const char *label ) {
+    for ( int i = 0; i < (int)OSMMAP_OVERLAY_KIND_COUNT; i++ ) {
+        if ( !strcmp( label ? label : "", osmmap_overlay_menu_label( (osmmap_overlay_kind_t)i ) ) ) {
+            return( (osmmap_overlay_kind_t)i );
+        }
+    }
+    return( OSMMAP_OVERLAY_KIND_UNKNOWN );
+}
+
+static const void *osmmap_overlay_icon_for_kind( osmmap_overlay_kind_t kind ) {
+    if ( kind == OSMMAP_OVERLAY_KIND_TEAM ) {
+        return( &info_fail_16px );
+    }
+    return( &info_ok_16px );
+}
+
+static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item ) {
+    lv_obj_t *parent = osmmap_app_tile_img ? lv_obj_get_parent( osmmap_app_tile_img ) : NULL;
+
+    if ( !item || !parent ) {
+        return( NULL );
+    }
+    if ( !item->marker_obj ) {
+        item->marker_obj = lv_img_create( parent, NULL );
+        lv_obj_set_hidden( item->marker_obj, true );
+    }
+    lv_img_set_src( item->marker_obj, osmmap_overlay_icon_for_kind( item->kind ) );
+    return( item->marker_obj );
+}
+
+static void osmmap_hide_overlay_marker( osmmap_overlay_item_t *item ) {
+    if ( item && item->marker_obj ) {
+        lv_obj_set_hidden( item->marker_obj, true );
+    }
+}
 
 static bool osmmap_is_watch_flash_source_name( const char *name ) {
     return( name && !strcmp( name, "offline from watch flash" ) );
@@ -281,6 +416,7 @@ static void osmmap_apply_image_zoom( void ) {
     if ( !osmmap_watch_flash_mode ) {
         lv_img_set_zoom( osmmap_app_tile_img, 540 );
         lv_obj_align( osmmap_app_tile_img, lv_obj_get_parent( osmmap_app_tile_img ), LV_ALIGN_CENTER, 0, 0 );
+        osmmap_refresh_marker_positions();
         return;
     }
 #endif
@@ -292,6 +428,7 @@ static void osmmap_apply_image_zoom( void ) {
     }
     else {
         lv_obj_align( osmmap_app_tile_img, lv_obj_get_parent( osmmap_app_tile_img ), LV_ALIGN_CENTER, 0, 0 );
+        osmmap_refresh_marker_positions();
     }
 }
 
@@ -315,6 +452,9 @@ static void osmmap_place_marker( lv_obj_t *marker_obj, uint16_t marker_x, uint16
 
 static void osmmap_refresh_marker_positions( void ) {
     if ( !osmmap_location ) {
+        for ( size_t i = 0; i < OSMMAP_OVERLAY_MAX_ITEMS; i++ ) {
+            osmmap_hide_overlay_marker( &osmmap_overlay_items[ i ] );
+        }
         return;
     }
 
@@ -338,6 +478,32 @@ static void osmmap_refresh_marker_positions( void ) {
     }
     else if ( osmmap_ext_pos_img ) {
         lv_obj_set_hidden( osmmap_ext_pos_img, true );
+    }
+
+    for ( size_t i = 0; i < OSMMAP_OVERLAY_MAX_ITEMS; i++ ) {
+        osmmap_overlay_item_t *item = &osmmap_overlay_items[ i ];
+        uint16_t marker_x = 0;
+        uint16_t marker_y = 0;
+
+        if ( !item->used ) {
+            osmmap_hide_overlay_marker( item );
+            continue;
+        }
+        if ( item->kind < 0 || item->kind >= OSMMAP_OVERLAY_KIND_COUNT ) {
+            osmmap_hide_overlay_marker( item );
+            continue;
+        }
+        if ( !osmmap_overlay_layer_enabled[ item->kind ] ) {
+            osmmap_hide_overlay_marker( item );
+            continue;
+        }
+        if ( !osm_map_project_lon_lat( osmmap_location, item->lon, item->lat, &marker_x, &marker_y ) ) {
+            osmmap_hide_overlay_marker( item );
+            continue;
+        }
+        if ( osmmap_ensure_overlay_marker( item ) ) {
+            osmmap_place_marker( item->marker_obj, marker_x, marker_y );
+        }
     }
 }
 
@@ -626,6 +792,14 @@ void osmmap_app_set_setting_menu( lv_obj_t *menu ) {
         snprintf( cachestring, sizeof( cachestring ), "%dkB cached", osm_map_get_used_cache_size( osmmap_location ) / 1024 );
         menu_entry = lv_list_add_btn( menu, NULL, cachestring );
         lv_obj_set_event_cb( menu_entry, osmmap_app_get_setting_menu_cb );
+        for ( int i = 0; i < (int)OSMMAP_OVERLAY_KIND_COUNT; i++ ) {
+            menu_entry = lv_list_add_btn(
+                menu,
+                osmmap_overlay_layer_enabled[ i ] ? &checked_dark_16px : &unchecked_dark_16px,
+                osmmap_overlay_menu_label( (osmmap_overlay_kind_t)i )
+            );
+            lv_obj_set_event_cb( menu_entry, osmmap_app_get_setting_menu_cb );
+        }
     }
 }
 
@@ -660,6 +834,14 @@ static void osmmap_app_get_setting_menu_cb( lv_obj_t * obj, lv_event_t event ) {
                 osmmap_config.left_right_hand = !osmmap_config.left_right_hand;
                 osmmap_app_set_left_right_hand( osmmap_config.left_right_hand );
                 osmmap_config.save();
+            }
+            else {
+                const osmmap_overlay_kind_t kind = osmmap_overlay_kind_from_menu_label( lv_list_get_btn_text( obj ) );
+
+                if ( kind != OSMMAP_OVERLAY_KIND_UNKNOWN ) {
+                    osmmap_overlay_layer_enabled[ kind ] = !osmmap_overlay_layer_enabled[ kind ];
+                    osmmap_refresh_marker_positions();
+                }
             }
             osmmap_app_set_setting_menu( osmmap_sub_menu_setting );
             break;
@@ -1296,6 +1478,78 @@ void osmmap_clear_external_marker( void ) {
     if ( osmmap_app_active ) {
         osmmap_update_request();
     }
+}
+
+void osmmap_upsert_overlay_item( const char *key, const char *kind, double lon, double lat, const char *label, uint32_t updated_at ) {
+    osmmap_overlay_item_t *slot = NULL;
+    uint32_t oldest_at = UINT32_MAX;
+    size_t oldest_idx = 0;
+    const osmmap_overlay_kind_t overlay_kind = osmmap_overlay_kind_from_name( kind );
+
+    if ( overlay_kind == OSMMAP_OVERLAY_KIND_UNKNOWN ) {
+        return;
+    }
+    if ( !key || !key[ 0 ] || lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0 ) {
+        return;
+    }
+
+    for ( size_t i = 0; i < OSMMAP_OVERLAY_MAX_ITEMS; i++ ) {
+        if ( osmmap_overlay_items[ i ].used && !strcmp( osmmap_overlay_items[ i ].key, key ) ) {
+            slot = &osmmap_overlay_items[ i ];
+            break;
+        }
+        if ( !osmmap_overlay_items[ i ].used && !slot ) {
+            slot = &osmmap_overlay_items[ i ];
+        }
+        if ( osmmap_overlay_items[ i ].used && osmmap_overlay_items[ i ].updated_at <= oldest_at ) {
+            oldest_at = osmmap_overlay_items[ i ].updated_at;
+            oldest_idx = i;
+        }
+    }
+
+    if ( !slot ) {
+        slot = &osmmap_overlay_items[ oldest_idx ];
+        osmmap_hide_overlay_marker( slot );
+    }
+
+    slot->used = true;
+    slot->kind = overlay_kind;
+    slot->lon = lon;
+    slot->lat = lat;
+    slot->updated_at = updated_at ? updated_at : (uint32_t)millis();
+    strlcpy( slot->key, key, sizeof( slot->key ) );
+    strlcpy( slot->label, label ? label : "", sizeof( slot->label ) );
+    if ( slot->marker_obj ) {
+        lv_img_set_src( slot->marker_obj, osmmap_overlay_icon_for_kind( slot->kind ) );
+    }
+    if ( osmmap_app_active ) {
+        osmmap_refresh_marker_positions();
+    }
+}
+
+void osmmap_clear_overlay_items( void ) {
+    for ( size_t i = 0; i < OSMMAP_OVERLAY_MAX_ITEMS; i++ ) {
+        osmmap_overlay_items[ i ].used = false;
+        osmmap_overlay_items[ i ].kind = OSMMAP_OVERLAY_KIND_UNKNOWN;
+        osmmap_overlay_items[ i ].lon = 0.0;
+        osmmap_overlay_items[ i ].lat = 0.0;
+        osmmap_overlay_items[ i ].updated_at = 0;
+        osmmap_overlay_items[ i ].key[ 0 ] = '\0';
+        osmmap_overlay_items[ i ].label[ 0 ] = '\0';
+        osmmap_hide_overlay_marker( &osmmap_overlay_items[ i ] );
+    }
+    osmmap_refresh_marker_positions();
+}
+
+uint32_t osmmap_overlay_item_count( void ) {
+    uint32_t count = 0;
+
+    for ( size_t i = 0; i < OSMMAP_OVERLAY_MAX_ITEMS; i++ ) {
+        if ( osmmap_overlay_items[ i ].used ) {
+            count++;
+        }
+    }
+    return( count );
 }
 
 bool osmmap_apply_watch_basemap( const char *map_name, double lon, double lat, uint32_t zoom ) {

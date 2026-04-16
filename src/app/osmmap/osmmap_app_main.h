@@ -41,6 +41,9 @@
     void osmmap_app_main_setup( uint32_t tile_num );
     void osmmap_set_external_marker( double lon, double lat, const char *label );
     void osmmap_clear_external_marker( void );
+    void osmmap_upsert_overlay_item( const char *key, const char *kind, double lon, double lat, const char *label, uint32_t updated_at );
+    void osmmap_clear_overlay_items( void );
+    uint32_t osmmap_overlay_item_count( void );
     bool osmmap_apply_watch_basemap( const char *map_name, double lon, double lat, uint32_t zoom );
 
 #endif // _OSM_APP_MAIN_H

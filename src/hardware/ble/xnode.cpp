@@ -411,6 +411,7 @@
             capabilities.add( "location" );
             capabilities.add( "meshtastic" );
             capabilities.add( "basemap" );
+            capabilities.add( "mapOverlay" );
             capabilities.add( "ble" );
 
             return( xnode_send_event( "helloAck", payload ) );
@@ -437,6 +438,43 @@
             return( true );
         }
 
+        const char *xnode_overlay_kind_for_template( uint32_t template_id ) {
+            switch ( template_id ) {
+                case 1:  return( "sitrep" );
+                case 2:  return( "contact" );
+                case 3:  return( "task" );
+                case 4:  return( "checkin" );
+                case 5:  return( "resource" );
+                case 6:  return( "asset" );
+                case 7:  return( "zone" );
+                case 8:  return( "mission" );
+                case 9:  return( "event" );
+                case 10: return( "phaseline" );
+                case 11: return( "sentinel" );
+                case 12: return( "route" );
+                default: return( NULL );
+            }
+        }
+
+        bool xnode_apply_overlay_item_payload( JsonObjectConst item ) {
+            const char *key = item[ "key" ] | "";
+            const char *kind = item[ "kind" ] | "";
+            const char *label = item[ "label" ].isNull() ? ( item[ "summary" ] | ( kind ? kind : "" ) ) : ( item[ "label" ] | ( kind ? kind : "" ) );
+            const double lat = item[ "lat" ].isNull() ? ( item[ "latitude" ] | 999.0 ) : ( item[ "lat" ] | 999.0 );
+            const double lon = item[ "lon" ].isNull() ? ( item[ "longitude" ] | 999.0 ) : ( item[ "lon" ] | 999.0 );
+            const uint32_t updated_at = item[ "updatedAt" ].isNull() ? ( item[ "packetAt" ] | 0 ) : ( item[ "updatedAt" ] | 0 );
+
+            if ( !key[ 0 ] || !kind[ 0 ] ) {
+                return( false );
+            }
+            if ( lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0 ) {
+                return( false );
+            }
+
+            osmmap_upsert_overlay_item( key, kind, lon, lat, label, updated_at );
+            return( true );
+        }
+
         void xnode_handle_command( DynamicJsonDocument &doc ) {
             const char *type = doc[ "type" ] | "";
             JsonObjectConst payload = doc[ "payload" ].as<JsonObjectConst>();
@@ -452,6 +490,7 @@
 
             if ( strcmp( type, "syncState" ) == 0 ) {
                 StaticJsonDocument< 384 > reply;
+                const bool replace = payload[ "replace" ] | false;
 
                 if ( payload.containsKey( "location" ) ) {
                     JsonObjectConst location = payload[ "location" ].as<JsonObjectConst>();
@@ -462,19 +501,71 @@
                     JsonObjectConst basemap = payload[ "basemap" ].as<JsonObjectConst>();
                     xnode_send_status_event( "profile-staged", basemap[ "name" ] | "", XNODE_OFFLINE_TILE_ROOT );
                 }
+                if ( replace ) {
+                    osmmap_clear_overlay_items();
+                }
 
                 reply[ "packetCount" ] = payload[ "packetCount" ] | 0;
+                reply[ "overlayCount" ] = osmmap_overlay_item_count();
                 reply[ "meshCount" ] = payload[ "meshCount" ] | 0;
-                reply[ "replace" ] = payload[ "replace" ] | false;
+                reply[ "replace" ] = replace;
                 xnode_send_event( "syncAck", reply );
+                return;
+            }
+
+            if ( strcmp( type, "overlayBatch" ) == 0 ) {
+                StaticJsonDocument< 256 > reply;
+                JsonArrayConst items = payload[ "items" ].as<JsonArrayConst>();
+                size_t applied = 0;
+
+                if ( !items.isNull() ) {
+                    for ( JsonVariantConst raw_item : items ) {
+                        JsonObjectConst item = raw_item.as<JsonObjectConst>();
+
+                        if ( item.isNull() ) {
+                            continue;
+                        }
+                        if ( xnode_apply_overlay_item_payload( item ) ) {
+                            applied++;
+                        }
+                    }
+                }
+                reply[ "count" ] = applied;
+                reply[ "overlayCount" ] = osmmap_overlay_item_count();
+                xnode_send_event( "overlayBatchAck", reply );
                 return;
             }
 
             if ( strcmp( type, "packetBatch" ) == 0 ) {
                 StaticJsonDocument< 256 > reply;
                 JsonArrayConst packets = payload[ "packets" ].as<JsonArrayConst>();
+                size_t applied = 0;
 
-                reply[ "count" ] = packets.isNull() ? 0 : packets.size();
+                if ( !packets.isNull() ) {
+                    for ( JsonVariantConst raw_packet : packets ) {
+                        JsonObjectConst packet = raw_packet.as<JsonObjectConst>();
+                        const char *key = packet[ "key" ] | "";
+                        const char *kind = xnode_overlay_kind_for_template( packet[ "templateId" ] | 0 );
+                        const char *label = packet[ "summary" ] | ( kind ? kind : "" );
+                        const double lat = packet[ "lat" ].isNull() ? ( packet[ "latitude" ] | 999.0 ) : ( packet[ "lat" ] | 999.0 );
+                        const double lon = packet[ "lon" ].isNull() ? ( packet[ "longitude" ] | 999.0 ) : ( packet[ "lon" ] | 999.0 );
+                        const uint32_t packet_at = packet[ "packetAt" ] | 0;
+                        char overlay_key[ 64 ] = { 0 };
+
+                        if ( !kind || !key[ 0 ] ) {
+                            continue;
+                        }
+                        if ( lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0 ) {
+                            continue;
+                        }
+                        snprintf( overlay_key, sizeof( overlay_key ), "packet:%s", key );
+                        osmmap_upsert_overlay_item( overlay_key, kind, lon, lat, label, packet_at );
+                        applied++;
+                    }
+                }
+
+                reply[ "count" ] = applied;
+                reply[ "overlayCount" ] = osmmap_overlay_item_count();
                 xnode_send_event( "packetBatchAck", reply );
                 return;
             }
