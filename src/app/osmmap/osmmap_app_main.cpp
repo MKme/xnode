@@ -160,6 +160,7 @@ typedef struct {
     char key[ OSMMAP_OVERLAY_KEY_LEN ];
     char label[ OSMMAP_OVERLAY_LABEL_LEN ];
     lv_obj_t *marker_obj;
+    lv_obj_t *marker_label_obj;
 } osmmap_overlay_item_t;
 
 static osmmap_overlay_item_t osmmap_overlay_items[ OSMMAP_OVERLAY_MAX_ITEMS ] = { 0 };
@@ -229,7 +230,10 @@ static bool osmmap_adjust_watch_flash_pan( int32_t delta_x, int32_t delta_y );
 static const char *osmmap_overlay_menu_label( osmmap_overlay_kind_t kind );
 static osmmap_overlay_kind_t osmmap_overlay_kind_from_name( const char *name );
 static osmmap_overlay_kind_t osmmap_overlay_kind_from_menu_label( const char *label );
-static const void *osmmap_overlay_icon_for_kind( osmmap_overlay_kind_t kind );
+static const char *osmmap_overlay_badge_text( osmmap_overlay_kind_t kind );
+static lv_color_t osmmap_overlay_bg_color( osmmap_overlay_kind_t kind );
+static lv_color_t osmmap_overlay_text_color( osmmap_overlay_kind_t kind );
+static lv_color_t osmmap_overlay_border_color( osmmap_overlay_kind_t kind );
 static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item );
 static void osmmap_hide_overlay_marker( osmmap_overlay_item_t *item );
 
@@ -283,11 +287,63 @@ static osmmap_overlay_kind_t osmmap_overlay_kind_from_menu_label( const char *la
     return( OSMMAP_OVERLAY_KIND_UNKNOWN );
 }
 
-static const void *osmmap_overlay_icon_for_kind( osmmap_overlay_kind_t kind ) {
-    if ( kind == OSMMAP_OVERLAY_KIND_TEAM ) {
-        return( &info_fail_16px );
+static const char *osmmap_overlay_badge_text( osmmap_overlay_kind_t kind ) {
+    switch ( kind ) {
+        case OSMMAP_OVERLAY_KIND_TEAM:      return( "U" );
+        case OSMMAP_OVERLAY_KIND_MESH:      return( "M" );
+        case OSMMAP_OVERLAY_KIND_SITREP:    return( "S" );
+        case OSMMAP_OVERLAY_KIND_CONTACT:   return( "!" );
+        case OSMMAP_OVERLAY_KIND_TASK:      return( "T" );
+        case OSMMAP_OVERLAY_KIND_CHECKIN:   return( "C" );
+        case OSMMAP_OVERLAY_KIND_RESOURCE:  return( "B" );
+        case OSMMAP_OVERLAY_KIND_ASSET:     return( "A" );
+        case OSMMAP_OVERLAY_KIND_ZONE:      return( "Z" );
+        case OSMMAP_OVERLAY_KIND_MISSION:   return( "F" );
+        case OSMMAP_OVERLAY_KIND_EVENT:     return( "E" );
+        case OSMMAP_OVERLAY_KIND_PHASELINE: return( "L" );
+        case OSMMAP_OVERLAY_KIND_SENTINEL:  return( "N" );
+        case OSMMAP_OVERLAY_KIND_ROUTE:     return( "R" );
+        default:                            return( "?" );
     }
-    return( &info_ok_16px );
+}
+
+static lv_color_t osmmap_overlay_bg_color( osmmap_overlay_kind_t kind ) {
+    switch ( kind ) {
+        case OSMMAP_OVERLAY_KIND_TEAM:      return( lv_color_make( 255, 255, 255 ) );
+        case OSMMAP_OVERLAY_KIND_MESH:      return( lv_color_make( 0x5b, 0x7c, 0xfa ) );
+        case OSMMAP_OVERLAY_KIND_SITREP:    return( lv_color_make( 0xf6, 0xc9, 0x45 ) );
+        case OSMMAP_OVERLAY_KIND_CONTACT:   return( lv_color_make( 0xff, 0x6b, 0x6b ) );
+        case OSMMAP_OVERLAY_KIND_TASK:      return( lv_color_make( 0x7f, 0xe2, 0x6c ) );
+        case OSMMAP_OVERLAY_KIND_CHECKIN:   return( lv_color_make( 255, 255, 255 ) );
+        case OSMMAP_OVERLAY_KIND_RESOURCE:  return( lv_color_make( 0xff, 0x9f, 0x7c ) );
+        case OSMMAP_OVERLAY_KIND_ASSET:     return( lv_color_make( 0x7c, 0xe3, 0xff ) );
+        case OSMMAP_OVERLAY_KIND_ZONE:      return( lv_color_make( 0xf6, 0xc9, 0x45 ) );
+        case OSMMAP_OVERLAY_KIND_MISSION:   return( lv_color_make( 0xc5, 0x8b, 0xff ) );
+        case OSMMAP_OVERLAY_KIND_EVENT:     return( lv_color_make( 0x6c, 0xf0, 0xd0 ) );
+        case OSMMAP_OVERLAY_KIND_PHASELINE: return( lv_color_make( 0x7c, 0xc7, 0xff ) );
+        case OSMMAP_OVERLAY_KIND_SENTINEL:  return( lv_color_make( 0xff, 0x5b, 0xd4 ) );
+        case OSMMAP_OVERLAY_KIND_ROUTE:     return( lv_color_make( 0x7c, 0xc7, 0xff ) );
+        default:                            return( lv_color_make( 0x7b, 0x87, 0x94 ) );
+    }
+}
+
+static lv_color_t osmmap_overlay_text_color( osmmap_overlay_kind_t kind ) {
+    switch ( kind ) {
+        case OSMMAP_OVERLAY_KIND_MESH:
+        case OSMMAP_OVERLAY_KIND_CONTACT:
+        case OSMMAP_OVERLAY_KIND_MISSION:
+        case OSMMAP_OVERLAY_KIND_SENTINEL:
+            return( LV_COLOR_WHITE );
+        default:
+            return( LV_COLOR_BLACK );
+    }
+}
+
+static lv_color_t osmmap_overlay_border_color( osmmap_overlay_kind_t kind ) {
+    if ( kind == OSMMAP_OVERLAY_KIND_TEAM || kind == OSMMAP_OVERLAY_KIND_CHECKIN ) {
+        return( lv_color_make( 40, 40, 40 ) );
+    }
+    return( lv_color_make( 18, 24, 38 ) );
 }
 
 static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item ) {
@@ -297,10 +353,26 @@ static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item ) {
         return( NULL );
     }
     if ( !item->marker_obj ) {
-        item->marker_obj = lv_img_create( parent, NULL );
+        item->marker_obj = lv_obj_create( parent, NULL );
+        lv_obj_set_size( item->marker_obj, 18, 18 );
+        lv_obj_set_click( item->marker_obj, false );
+        lv_obj_set_style_local_radius( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, LV_RADIUS_CIRCLE );
+        lv_obj_set_style_local_border_width( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, 2 );
+        lv_obj_set_style_local_pad_all( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, 0 );
+        lv_obj_set_style_local_bg_opa( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, LV_OPA_COVER );
+        lv_obj_set_style_local_shadow_width( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, 0 );
+        item->marker_label_obj = lv_label_create( item->marker_obj, NULL );
+        lv_obj_set_style_local_bg_opa( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, LV_OPA_TRANSP );
+        lv_obj_set_style_local_text_font( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &Ubuntu_12px );
         lv_obj_set_hidden( item->marker_obj, true );
     }
-    lv_img_set_src( item->marker_obj, osmmap_overlay_icon_for_kind( item->kind ) );
+    lv_obj_set_style_local_bg_color( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_bg_color( item->kind ) );
+    lv_obj_set_style_local_border_color( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_border_color( item->kind ) );
+    if ( item->marker_label_obj ) {
+        lv_label_set_text( item->marker_label_obj, osmmap_overlay_badge_text( item->kind ) );
+        lv_obj_set_style_local_text_color( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_text_color( item->kind ) );
+        lv_obj_align( item->marker_label_obj, item->marker_obj, LV_ALIGN_CENTER, 0, 0 );
+    }
     return( item->marker_obj );
 }
 
@@ -446,7 +518,14 @@ static void osmmap_place_marker( lv_obj_t *marker_obj, uint16_t marker_x, uint16
         final_y = center_y + osmmap_watch_flash_pan_y + (int32_t)lround( ( (double)marker_y - center_y ) * zoom_factor );
     }
 
-    lv_obj_align( marker_obj, lv_obj_get_parent( marker_obj ), LV_ALIGN_IN_TOP_LEFT, final_x - 8, final_y - 8 );
+    const int32_t marker_width = lv_obj_get_width( marker_obj );
+    const int32_t marker_height = lv_obj_get_height( marker_obj );
+
+    lv_obj_align( marker_obj,
+                  lv_obj_get_parent( marker_obj ),
+                  LV_ALIGN_IN_TOP_LEFT,
+                  final_x - marker_width / 2,
+                  final_y - marker_height / 2 );
     lv_obj_set_hidden( marker_obj, false );
 }
 
@@ -1520,7 +1599,7 @@ void osmmap_upsert_overlay_item( const char *key, const char *kind, double lon, 
     strlcpy( slot->key, key, sizeof( slot->key ) );
     strlcpy( slot->label, label ? label : "", sizeof( slot->label ) );
     if ( slot->marker_obj ) {
-        lv_img_set_src( slot->marker_obj, osmmap_overlay_icon_for_kind( slot->kind ) );
+        osmmap_ensure_overlay_marker( slot );
     }
     if ( osmmap_app_active ) {
         osmmap_refresh_marker_positions();
