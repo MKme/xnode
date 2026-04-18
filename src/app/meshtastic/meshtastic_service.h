@@ -13,5 +13,7 @@
     uint32_t meshtastic_service_get_last_peer( void );
     int32_t meshtastic_service_get_last_rssi( void );
     float meshtastic_service_get_last_snr( void );
+    const char *meshtastic_service_get_last_message_sender( void );
+    const char *meshtastic_service_get_last_message_text( void );
 
 #endif

@@ -93,6 +93,8 @@
 
         char meshtastic_status[ 96 ] = "Meshtastic idle";
         char meshtastic_pending_text[ MESHTASTIC_MAX_TEXT_LEN + 1 ] = { 0 };
+        char meshtastic_last_message_sender[ 24 ] = "";
+        char meshtastic_last_message_text[ MESHTASTIC_MAX_TEXT_LEN + 1 ] = "";
 
         uint8_t meshtastic_xor_hash( const uint8_t *data, size_t len ) {
             uint8_t hash = 0;
@@ -134,6 +136,13 @@
             va_start( ap, fmt );
             vsnprintf( meshtastic_status, sizeof( meshtastic_status ), fmt, ap );
             va_end( ap );
+        }
+
+        void meshtastic_store_last_message( const char *sender, const char *text ) {
+            strncpy( meshtastic_last_message_sender, sender ? sender : "", sizeof( meshtastic_last_message_sender ) - 1 );
+            meshtastic_last_message_sender[ sizeof( meshtastic_last_message_sender ) - 1 ] = '\0';
+            strncpy( meshtastic_last_message_text, text ? text : "", sizeof( meshtastic_last_message_text ) - 1 );
+            meshtastic_last_message_text[ sizeof( meshtastic_last_message_text ) - 1 ] = '\0';
         }
 
         size_t meshtastic_write_varint( uint32_t value, uint8_t *buffer, size_t max_len ) {
@@ -472,6 +481,7 @@
             snprintf( sender, sizeof( sender ), "!%08" PRIX32, header->from );
 
             if ( meshtastic_decode_text_message( data, decoded ) ) {
+                meshtastic_store_last_message( sender, decoded.text );
                 meshtastic_queue_notification( sender, decoded.text );
                 xnode_send_meshtastic_rx( sender, decoded.text );
                 meshtastic_update_status( "RX text %s", sender );
@@ -492,6 +502,7 @@
                 else {
                     snprintf( body, sizeof( body ), "Pos %.5f %.5f", lat, lon );
                 }
+                meshtastic_store_last_message( sender, body );
                 meshtastic_queue_notification( sender, body );
                 meshtastic_update_status( "RX pos %s", sender );
                 return( true );
@@ -535,6 +546,7 @@
                 meshtastic_update_status( "TX sent" );
 
                 if ( meshtastic_pending_text[ 0 ] ) {
+                    meshtastic_store_last_message( "Me", meshtastic_pending_text );
                     meshtastic_queue_notification( "Me", meshtastic_pending_text );
                     meshtastic_pending_text[ 0 ] = '\0';
                 }
@@ -685,6 +697,14 @@
         return( meshtastic_last_snr );
     }
 
+    const char *meshtastic_service_get_last_message_sender( void ) {
+        return( meshtastic_last_message_sender );
+    }
+
+    const char *meshtastic_service_get_last_message_text( void ) {
+        return( meshtastic_last_message_text );
+    }
+
 #else
 
     void meshtastic_service_setup( void ) {
@@ -720,6 +740,14 @@
 
     float meshtastic_service_get_last_snr( void ) {
         return( 0.0f );
+    }
+
+    const char *meshtastic_service_get_last_message_sender( void ) {
+        return( "" );
+    }
+
+    const char *meshtastic_service_get_last_message_text( void ) {
+        return( "" );
     }
 
 #endif
