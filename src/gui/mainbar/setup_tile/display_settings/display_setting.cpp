@@ -68,6 +68,7 @@ static void display_rotation_event_handler(lv_obj_t * obj, lv_event_t event);
 static void display_vibe_setup_event_cb( lv_obj_t * obj, lv_event_t event );
 static void display_block_return_maintile_setup_event_cb( lv_obj_t * obj, lv_event_t event );
 static void display_background_image_setup_event_cb( lv_obj_t * obj, lv_event_t event );
+static void display_timeout_update_label( uint32_t timeout );
 
 void display_settings_tile_setup( void ) {
     lv_obj_t *header_1 = NULL;
@@ -155,18 +156,7 @@ void display_settings_tile_setup( void ) {
 
     lv_slider_set_value( display_brightness_slider, display_get_brightness(), LV_ANIM_OFF );
     lv_slider_set_value( display_timeout_slider, display_get_timeout(), LV_ANIM_OFF );
-
-    char temp[16]="";
-    if ( lv_slider_get_value( display_timeout_slider ) == DISPLAY_MAX_TIMEOUT ) {
-        snprintf( temp, sizeof( temp ), "no timeout" );
-        setup_set_indicator( display_setup_icon, ICON_INDICATOR_FAIL );
-    }
-    else {
-        snprintf( temp, sizeof( temp ), "%d seconds", lv_slider_get_value( display_timeout_slider ) );
-    }
-
-    lv_label_set_text( display_timeout_slider_label, temp );
-    lv_obj_align( display_timeout_slider_label, display_timeout_slider, LV_ALIGN_OUT_BOTTOM_MID, 0, 15 );
+    display_timeout_update_label( display_get_timeout() );
 
     lv_dropdown_set_selected( display_rotation_list, display_get_rotation() / 90 );
     lv_dropdown_set_selected( display_bg_img_list, display_get_background_image() );
@@ -180,7 +170,10 @@ bool display_displayctl_brightness_event_cb( EventBits_t event, void *arg ) {
             lv_slider_set_value( display_brightness_slider, display_get_brightness() , LV_ANIM_OFF );
             break;
         case DISPLAYCTL_TIMEOUT:
-            lv_slider_set_value( display_timeout_slider, display_get_timeout() , LV_ANIM_OFF );
+            if ( display_get_timeout() != DISPLAY_NO_TIMEOUT ) {
+                lv_slider_set_value( display_timeout_slider, display_get_timeout(), LV_ANIM_OFF );
+            }
+            display_timeout_update_label( display_get_timeout() );
             break;
     }
     return( true );
@@ -234,19 +227,24 @@ static void display_brightness_setup_event_cb( lv_obj_t * obj, lv_event_t event 
 static void display_timeout_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
         case( LV_EVENT_VALUE_CHANGED ):     display_set_timeout( lv_slider_get_value( obj ) );
-                                            char temp[16]="";
-                                            if ( lv_slider_get_value(obj) == DISPLAY_MAX_TIMEOUT ) {
-                                                snprintf( temp, sizeof( temp ), "no timeout" );
-                                                setup_set_indicator( display_setup_icon, ICON_INDICATOR_FAIL );
-                                            }
-                                            else {
-                                                snprintf( temp, sizeof( temp ), "%d seconds", lv_slider_get_value(obj) );
-                                                setup_hide_indicator( display_setup_icon );
-                                            }
-                                            lv_label_set_text( display_timeout_slider_label, temp );
-                                            lv_obj_align( display_timeout_slider_label, display_timeout_slider, LV_ALIGN_OUT_BOTTOM_MID, 0, 15 );
+                                            display_timeout_update_label( lv_slider_get_value( obj ) );
                                             break;
     }
+}
+
+static void display_timeout_update_label( uint32_t timeout ) {
+    char temp[16] = "";
+
+    if ( timeout == DISPLAY_NO_TIMEOUT ) {
+        snprintf( temp, sizeof( temp ), "app override" );
+    }
+    else {
+        snprintf( temp, sizeof( temp ), "%d seconds", timeout );
+    }
+
+    lv_label_set_text( display_timeout_slider_label, temp );
+    lv_obj_align( display_timeout_slider_label, display_timeout_slider, LV_ALIGN_OUT_BOTTOM_MID, 0, 15 );
+    setup_hide_indicator( display_setup_icon );
 }
 
 static void display_rotation_event_handler( lv_obj_t * obj, lv_event_t event ) {

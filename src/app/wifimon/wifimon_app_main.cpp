@@ -209,7 +209,7 @@ static void wifimon_activate_cb( void ) {
      * save display timeout time
      */
     wifimon_display_timeout = display_get_timeout();
-    display_set_timeout( DISPLAY_MAX_TIMEOUT );
+    display_set_timeout( DISPLAY_NO_TIMEOUT );
 }
 
 static void wifimon_app_task( lv_task_t * task ) {

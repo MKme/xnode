@@ -193,7 +193,7 @@ void gui_setup( void ) {
     /*
      * trigger an activity
      */
-    lv_disp_trig_activity( NULL );
+    display_trigger_activity();
     /*
      * setup background image
      */
@@ -272,7 +272,7 @@ bool gui_powermgm_event_cb( EventBits_t event, void *arg ) {
                                             hardware_attach_lvgl_ticker();
                                             lv_task_enable( true );
                                         #endif
-                                        lv_disp_trig_activity( NULL );
+                                        display_trigger_activity();
                                         break;
         case POWERMGM_SILENCE_WAKEUP:   /*
                                          * resume LVGL ticker
@@ -283,7 +283,7 @@ bool gui_powermgm_event_cb( EventBits_t event, void *arg ) {
                                             hardware_attach_lvgl_ticker();
                                             lv_task_enable( true );
                                         #endif
-                                        lv_disp_trig_activity( NULL );
+                                        display_trigger_activity();
                                         break;
         case POWERMGM_DISABLE_INTERRUPTS:
                                         /*
@@ -362,19 +362,14 @@ bool gui_powermgm_loop_event_cb( EventBits_t event, void *arg ) {
     #ifdef NATIVE_64BIT
 
     #else
+        const uint32_t timeout = display_get_timeout();
+
         switch ( event ) {
-            #if defined( LILYGO_WATCH_S3 )
             case POWERMGM_WAKEUP:
-            case POWERMGM_SILENCE_WAKEUP:
-                                            break;
-            #else
-            case POWERMGM_WAKEUP:           if ( lv_disp_get_inactive_time( NULL ) >= display_get_timeout() * 1000  && display_get_timeout() != DISPLAY_MAX_TIMEOUT )
+            case POWERMGM_SILENCE_WAKEUP:   if ( timeout != DISPLAY_NO_TIMEOUT && display_get_inactive_time_ms() >= timeout * 1000 ) {
                                                 powermgm_set_event( POWERMGM_STANDBY_REQUEST );
+                                            }
                                             break;
-            case POWERMGM_SILENCE_WAKEUP:   if ( lv_disp_get_inactive_time( NULL ) >= display_get_timeout() * 1000 )
-                                                powermgm_set_event( POWERMGM_STANDBY_REQUEST );
-                                            break;
-            #endif
         }
     #endif
 

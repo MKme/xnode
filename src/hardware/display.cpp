@@ -27,6 +27,7 @@
 #include "motion.h"
 
 #ifdef NATIVE_64BIT
+    #include "utils/millis.h"
     #include "utils/logging.h"
 #else
     #if defined( M5PAPER )
@@ -50,10 +51,14 @@ callback_t *display_callback = NULL;
 
 static uint8_t dest_brightness = 0;
 static uint8_t brightness = 0;
+static uint32_t display_timeout = DISPLAY_MIN_TIMEOUT;
+static uint32_t display_last_activity_ms = 0;
 
 static bool display_powermgm_event_cb( EventBits_t event, void *arg );
 static bool display_powermgm_loop_cb( EventBits_t event, void *arg );
 static bool display_send_event_cb( EventBits_t event, void *arg );
+static uint32_t display_sanitize_timeout( uint32_t timeout, bool allow_no_timeout );
+static void display_update_timeout_dimmer( void );
 static void display_standby( void );
 static void display_wakeup( bool silence );
 
@@ -62,6 +67,15 @@ void display_setup( void ) {
      * load config from json
      */
     display_config.load();
+    display_timeout = display_sanitize_timeout( display_config.timeout, false );
+    display_config.timeout = display_timeout;
+    if ( display_config.migrated_legacy_timeout ) {
+        log_i( "migrating legacy display timeout 300->%u seconds", display_timeout );
+        display_config.save();
+        display_config.migrated_legacy_timeout = false;
+    }
+    display_note_activity();
+    log_i( "display config: brightness=%u timeout=%u", display_config.brightness, display_timeout );
     /**
      * setup backlight and rotation
      */
@@ -138,22 +152,10 @@ static bool display_powermgm_loop_cb( EventBits_t event, void *arg ) {
                     M5.Axp.SetLcdVoltage( 2532 + brightness );
                 }
             }
-            /**
-             * check timeout
-             */
-            if ( display_get_timeout() != DISPLAY_MAX_TIMEOUT ) {
-                if ( lv_disp_get_inactive_time(NULL) > ( ( display_get_timeout() * 1000 ) - display_get_brightness() * 8 ) ) {
-                    dest_brightness = ( ( display_get_timeout() * 1000 ) - lv_disp_get_inactive_time( NULL ) ) / 8 ;
-                }
-                else {
-                    dest_brightness = display_get_brightness();
-                }
-            }
+            display_update_timeout_dimmer();
 
             retval = true;
         #elif defined( LILYGO_WATCH_S3 )
-            const uint32_t configured_brightness = display_get_brightness();
-
             if ( dest_brightness != brightness ) {
                 if ( brightness < dest_brightness ) {
                     brightness++;
@@ -163,26 +165,7 @@ static bool display_powermgm_loop_cb( EventBits_t event, void *arg ) {
                 }
                 watch.setBrightness( brightness );
             }
-
-            if ( display_get_timeout() != DISPLAY_MAX_TIMEOUT ) {
-                const uint32_t timeout_ms = display_get_timeout() * 1000;
-                const uint32_t inactive_ms = lv_disp_get_inactive_time( NULL );
-                const uint32_t fade_window_ms = configured_brightness * 8;
-                const uint32_t fade_start_ms = timeout_ms > fade_window_ms ? timeout_ms - fade_window_ms : 0;
-
-                if ( inactive_ms >= timeout_ms ) {
-                    dest_brightness = 0;
-                }
-                else if ( inactive_ms > fade_start_ms ) {
-                    dest_brightness = ( timeout_ms - inactive_ms ) / 8;
-                }
-                else {
-                    dest_brightness = configured_brightness;
-                }
-            }
-            else {
-                dest_brightness = configured_brightness;
-            }
+            display_update_timeout_dimmer();
 
             retval = true;
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -200,17 +183,7 @@ static bool display_powermgm_loop_cb( EventBits_t event, void *arg ) {
                     ttgo->bl->adjust( brightness );
                 }
             }
-            /**
-             * check timeout
-             */
-            if ( display_get_timeout() != DISPLAY_MAX_TIMEOUT ) {
-                if ( lv_disp_get_inactive_time(NULL) > ( ( display_get_timeout() * 1000 ) - display_get_brightness() * 8 ) ) {
-                    dest_brightness = ( ( display_get_timeout() * 1000 ) - lv_disp_get_inactive_time( NULL ) ) / 8 ;
-                }
-                else {
-                    dest_brightness = display_get_brightness();
-                }
-            }
+            display_update_timeout_dimmer();
 
             retval = true;
         #elif defined( LILYGO_WATCH_2021 )   
@@ -227,17 +200,7 @@ static bool display_powermgm_loop_cb( EventBits_t event, void *arg ) {
                     ledcWrite(0, brightness );
                 }
             }
-            /**
-             * check timeout
-             */
-            if ( display_get_timeout() != DISPLAY_MAX_TIMEOUT ) {
-                if ( lv_disp_get_inactive_time(NULL) > ( ( display_get_timeout() * 1000 ) - display_get_brightness() * 8 ) ) {
-                    dest_brightness = ( ( display_get_timeout() * 1000 ) - lv_disp_get_inactive_time( NULL ) ) / 8 ;
-                }
-                else {
-                    dest_brightness = display_get_brightness();
-                }
-            }
+            display_update_timeout_dimmer();
 
             retval = true;
         #elif defined( WT32_SC01 )
@@ -254,17 +217,7 @@ static bool display_powermgm_loop_cb( EventBits_t event, void *arg ) {
                     ledcWrite(0, brightness );
                 }
             }
-            /**
-             * check timeout
-             */
-            if ( display_get_timeout() != DISPLAY_MAX_TIMEOUT ) {
-                if ( lv_disp_get_inactive_time(NULL) > ( ( display_get_timeout() * 1000 ) - display_get_brightness() * 8 ) ) {
-                    dest_brightness = ( ( display_get_timeout() * 1000 ) - lv_disp_get_inactive_time( NULL ) ) / 8 ;
-                }
-                else {
-                    dest_brightness = display_get_brightness();
-                }
-            }
+            display_update_timeout_dimmer();
 
             retval = true;
         #else
@@ -288,6 +241,44 @@ bool display_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const 
 
 static bool display_send_event_cb( EventBits_t event, void *arg ) {
     return( callback_send( display_callback, event, arg ) );
+}
+
+static uint32_t display_sanitize_timeout( uint32_t timeout, bool allow_no_timeout ) {
+    if ( allow_no_timeout && timeout == DISPLAY_NO_TIMEOUT ) {
+        return( DISPLAY_NO_TIMEOUT );
+    }
+    if ( timeout < DISPLAY_MIN_TIMEOUT ) {
+        return( DISPLAY_MIN_TIMEOUT );
+    }
+    if ( timeout > DISPLAY_MAX_TIMEOUT ) {
+        return( DISPLAY_MAX_TIMEOUT );
+    }
+    return( timeout );
+}
+
+static void display_update_timeout_dimmer( void ) {
+    const uint32_t configured_brightness = display_get_brightness();
+    const uint32_t timeout = display_get_timeout();
+
+    if ( timeout == DISPLAY_NO_TIMEOUT ) {
+        dest_brightness = configured_brightness;
+        return;
+    }
+
+    const uint32_t timeout_ms = timeout * 1000;
+    const uint32_t inactive_ms = display_get_inactive_time_ms();
+    const uint32_t fade_window_ms = configured_brightness * 8;
+    const uint32_t fade_start_ms = timeout_ms > fade_window_ms ? timeout_ms - fade_window_ms : 0;
+
+    if ( inactive_ms >= timeout_ms ) {
+        dest_brightness = 0;
+    }
+    else if ( inactive_ms > fade_start_ms ) {
+        dest_brightness = ( timeout_ms - inactive_ms ) / 8;
+    }
+    else {
+        dest_brightness = configured_brightness;
+    }
 }
 
 static void display_standby( void ) {
@@ -326,6 +317,7 @@ static void display_standby( void ) {
 }
 
 static void display_wakeup( bool silence ) {
+    display_note_activity();
     /**
      * wakeup with or without display
      */
@@ -413,20 +405,39 @@ static void display_wakeup( bool silence ) {
 }
 
 void display_save_config( void ) {
+      display_config.timeout = display_sanitize_timeout( display_config.timeout, false );
       display_config.save();
 }
 
 void display_read_config( void ) {
     display_config.load();
+    display_timeout = display_sanitize_timeout( display_config.timeout, false );
+    display_config.timeout = display_timeout;
+}
+
+void display_note_activity( void ) {
+    display_last_activity_ms = millis();
+}
+
+void display_trigger_activity( void ) {
+    display_note_activity();
+    lv_disp_trig_activity( NULL );
+}
+
+uint32_t display_get_inactive_time_ms( void ) {
+    return( millis() - display_last_activity_ms );
 }
 
 uint32_t display_get_timeout( void ) {
-    return( display_config.timeout );
+    return( display_timeout );
 }
 
 void display_set_timeout( uint32_t timeout ) {
-    display_config.timeout = timeout;
-    display_send_event_cb( DISPLAYCTL_TIMEOUT, (void *)&display_config.timeout );
+    display_timeout = display_sanitize_timeout( timeout, true );
+    if ( display_timeout != DISPLAY_NO_TIMEOUT ) {
+        display_config.timeout = display_timeout;
+    }
+    display_send_event_cb( DISPLAYCTL_TIMEOUT, (void *)&display_timeout );
 }
 
 uint32_t display_get_brightness( void ) {

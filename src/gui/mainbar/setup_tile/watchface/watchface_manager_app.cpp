@@ -491,7 +491,7 @@ void watchface_manager_app_activate_cb ( void ) {
      * block display timeout
      */
     watchface_manager_display_timeout = display_get_timeout();
-    display_set_timeout( DISPLAY_MAX_TIMEOUT );
+    display_set_timeout( DISPLAY_NO_TIMEOUT );
     /**
      * start watchface manager background task
      */
@@ -525,7 +525,7 @@ void watchface_manager_app_hibernate_cb ( void ) {
     /*
      * trigger an activity
      */
-    lv_disp_trig_activity( NULL );
+    display_trigger_activity();
     /**
      * trigger background task to finish
      */

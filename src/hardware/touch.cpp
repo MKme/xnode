@@ -232,7 +232,23 @@ bool touch_powermgm_loop_event_cb( EventBits_t event, void *arg ) {
                     break;
             }
         #elif defined( LILYGO_WATCH_S3 )
-            retval = true;
+            switch( event ) {
+                case POWERMGM_STANDBY:
+                    if ( temp_pmu_irq_flag || watch.getTouched() ) {
+                        powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
+                    }
+                    retval = true;
+                    break;
+                case POWERMGM_WAKEUP:
+                    retval = true;
+                    break;
+                case POWERMGM_SILENCE_WAKEUP:
+                    if ( temp_pmu_irq_flag || watch.getTouched() ) {
+                        powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
+                    }
+                    retval = true;
+                    break;
+            }
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             retval = true;
         #elif defined( LILYGO_WATCH_2021 )
@@ -325,15 +341,18 @@ bool touch_powermgm_event_cb( EventBits_t event, void *arg ) {
             switch( event ) {
                 case POWERMGM_STANDBY:          log_d("go standby");
                                                 if ( touch_lock_take() ) {
+                                                    watch.interruptTrigger();
                                                     watch.setPowerMode( TouchDrvFT6X36::PMODE_MONITOR );
                                                     touch_lock_give();
                                                 }
+                                                esp_sleep_enable_ext1_wakeup( _BV( BOARD_TOUCH_INT ), ESP_EXT1_WAKEUP_ALL_LOW );
                                                 retval = true;
                                                 break;
                 case POWERMGM_WAKEUP:           log_d("go wakeup");
                                                 if ( touch_lock_take() ) {
                                                     watch.wakeup();
-                                                    watch.setPowerMode( TouchDrvFT6X36::PMODE_MONITOR );
+                                                    watch.interruptTrigger();
+                                                    watch.setPowerMode( TouchDrvFT6X36::PMODE_ACTIVE );
                                                     touch_lock_give();
                                                 }
                                                 retval = true;
@@ -451,6 +470,10 @@ bool touch_getXY( int16_t &x, int16_t &y ) {
             int16_t raw_x = 0;
             int16_t raw_y = 0;
             bool getTouchResult = false;
+            if ( !watch.getTouched() ) {
+                touched = false;
+                return( false );
+            }
             if ( touch_lock_take() ) {
                 getTouchResult = watch.getPoint( &raw_x, &raw_y ) > 0;
                 touch_lock_give();
@@ -645,6 +668,7 @@ static bool touch_read(lv_indev_drv_t * drv, lv_indev_data_t*data) {
         #endif
     #endif
     if( data->state == LV_INDEV_STATE_PR ) {
+        display_note_activity();
         /*
          * issue https://github.com/sharandac/My-TTGO-Watch/issues/18 fix
          */

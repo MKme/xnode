@@ -118,7 +118,7 @@ bool mainbar_button_event_cb( EventBits_t event, void *arg ) {
     /**
      * trigger activity
      */
-    lv_disp_trig_activity( NULL );
+    display_note_activity();
     
     return( true );
 }

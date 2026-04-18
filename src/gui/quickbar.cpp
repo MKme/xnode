@@ -31,6 +31,7 @@
 #include "hardware/blectl.h"
 #include "hardware/wifictl.h"
 #include "hardware/button.h"
+#include "hardware/display.h"
 #include "hardware/powermgm.h"
 #include "hardware/motor.h"
 #include "hardware/timesync.h"
@@ -290,7 +291,7 @@ static bool quickbar_button_event_cb( EventBits_t event, void *arg ) {
     switch ( event ) {
         case BUTTON_QUICKBAR:
             motor_vibe(3);
-            lv_disp_trig_activity( NULL );
+            display_trigger_activity();
             if( lv_obj_get_hidden( quickbar ) ) {
                 timesync_get_current_timestring( time, sizeof( time ) );
                 lv_label_set_text( quickbar_time_label, time );
@@ -386,7 +387,7 @@ static void quickbar_screenshot_event_cb( lv_obj_t *obj, lv_event_t event ) {
     switch ( event ) {
         case ( LV_EVENT_CLICKED ):
             quickbar_hide( true );
-            lv_disp_trig_activity( NULL );
+            display_trigger_activity();
             lv_task_handler();
             quickbar_counter = 3;
             quickbar_task = lv_task_create( quickbar_counter_task, 1000, LV_TASK_PRIO_MID, NULL );

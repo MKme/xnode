@@ -24,6 +24,7 @@
 #include "powermgm.h"
 #include "callback.h"
 #include "button.h"
+#include "display.h"
 
 #ifdef NATIVE_64BIT 
     #include <unistd.h>
@@ -117,7 +118,7 @@ void powermgm_loop( void ) {
      * when we are in wakeup and get an wakeup request, reset activity timer
      */
     if ( powermgm_get_event( POWERMGM_WAKEUP_REQUEST ) && powermgm_get_event( POWERMGM_WAKEUP ) ) {
-        // lv_disp_trig_activity( NULL );
+        display_note_activity();
         powermgm_clear_event( POWERMGM_WAKEUP_REQUEST );
     }
 
@@ -246,14 +247,20 @@ void powermgm_loop( void ) {
                 /**
                  * check wakeup source
                  */
-                switch( esp_sleep_get_wakeup_cause() ) {
+                esp_sleep_wakeup_cause_t wakeup_cause = esp_sleep_get_wakeup_cause();
+                switch( wakeup_cause ) {
                     case ESP_SLEEP_WAKEUP_TIMER:
                         log_d("timer wakeup");
                         powermgm_set_event( POWERMGM_SILENCE_WAKEUP_REQUEST );
                         esp_sleep_disable_wakeup_source( ESP_SLEEP_WAKEUP_TIMER );
                         log_d("disable wakeup timer");
                         break;
+                    case ESP_SLEEP_WAKEUP_UNDEFINED:
+                        log_w("standby exited without a wakeup cause");
+                        break;
                     default:
+                        log_d("wakeup cause: %d", wakeup_cause );
+                        powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
                         break;
                 }
                 /**

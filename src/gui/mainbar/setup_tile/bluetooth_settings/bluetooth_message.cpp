@@ -38,6 +38,7 @@
 #include "hardware/motor.h"
 #include "hardware/sound.h"
 #include "hardware/button.h"
+#include "hardware/display.h"
 
 #include "utils/alloc.h"
 #include "utils/msg_chain.h"
@@ -583,7 +584,7 @@ bool bluetooth_message_queue_msg( const char *msg ) {
      */
     if( blectl_get_wakeup_on_notification() ) {
         powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
-        lv_disp_trig_activity( NULL );
+        display_trigger_activity();
     }
     /**
      * sound on notification if enabled

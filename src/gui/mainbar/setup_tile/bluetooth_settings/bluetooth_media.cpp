@@ -31,6 +31,7 @@
 #include "gui/widget_styles.h"
 
 #include "hardware/blectl.h"
+#include "hardware/display.h"
 #include "hardware/powermgm.h"
 
 #include "hardware/ble/gadgetbridge.h"
@@ -273,7 +274,7 @@ static bool bluetooth_media_queue_msg( BluetoothJsonRequest &doc ) {
     if( retval && bluetooth_media_play_state ) {
         if( blectl_get_media_notification() ) {
             powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
-            lv_disp_trig_activity( NULL );
+            display_trigger_activity();
             mainbar_jump_to_tilenumber( bluetooth_media_tile_num, LV_ANIM_OFF, true );
         }        
     }

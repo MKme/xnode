@@ -327,7 +327,7 @@ void update_Task( void * pvParameters ) {
     }
 
     update_event = update_event & ~( UPDATE_REQUEST | UPDATE_GET_VERSION_REQUEST );
-    lv_disp_trig_activity(NULL);
+    display_trigger_activity();
     lv_obj_invalidate( lv_scr_act() );
 #else
     log_i("start update task, heap: %d", ESP.getFreeHeap() );
@@ -365,7 +365,7 @@ void update_Task( void * pvParameters ) {
         if( ( WiFi.status() == WL_CONNECTED ) ) {
 
             uint32_t display_timeout = display_get_timeout();
-            display_set_timeout( DISPLAY_MAX_TIMEOUT );
+            display_set_timeout( DISPLAY_NO_TIMEOUT );
 
             if ( http_ota_start( update_get_url(), update_get_md5(), update_get_size() ) ) {
                 reset = true;
@@ -409,7 +409,7 @@ void update_Task( void * pvParameters ) {
     }
     xEventGroupClearBits( update_event, UPDATE_REQUEST | UPDATE_GET_VERSION_REQUEST );
     gui_take();
-    lv_disp_trig_activity(NULL);
+    display_trigger_activity();
     lv_obj_invalidate( lv_scr_act() );
     gui_give();
     log_i("finish update task, heap: %d", ESP.getFreeHeap() );

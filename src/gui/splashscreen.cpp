@@ -94,7 +94,7 @@ void splash_screen_stage_one( void ) {
     lv_obj_add_style( preload_label, LV_OBJ_PART_MAIN, SYSTEM_ICON_LABEL_STYLE );
     lv_obj_align( preload_label, preload, LV_ALIGN_OUT_BOTTOM_MID, 0, 5 );
 
-    lv_disp_trig_activity( NULL );
+    display_trigger_activity();
 
     lv_obj_move_foreground( preload_label );
 
@@ -126,7 +126,7 @@ void splash_screen_stage_one( void ) {
 
 void splash_screen_stage_update( const char* msg, int value ) {
     lv_obj_move_foreground( preload );
-    lv_disp_trig_activity( NULL );
+    display_trigger_activity();
     lv_task_handler();
     delay(100);
     lv_bar_set_value( preload, 0, LV_ANIM_ON );

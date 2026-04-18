@@ -73,7 +73,7 @@ void sailing_setup_setup( uint32_t tile_num ) {
 static void sailing_foobar_switch_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
         case( LV_EVENT_VALUE_CHANGED ): SAILING_INFO_LOG( "switch value = %d", lv_switch_get_state( obj ) );
-                                        if( lv_switch_get_state( obj ) == 1 ) display_set_timeout( 300 );
+                                        if( lv_switch_get_state( obj ) == 1 ) display_set_timeout( DISPLAY_NO_TIMEOUT );
                                         else display_set_timeout( 15 );
                                         break;
     }

@@ -25,6 +25,7 @@ display_config_t::display_config_t() : BaseJsonConfig(DISPLAY_JSON_CONFIG_FILE) 
 }
 
 bool display_config_t::onSave(JsonDocument& doc) {
+    doc["config_version"] = DISPLAY_CONFIG_VERSION;
     doc["brightness"] = brightness;
     doc["rotation"] = rotation;
     doc["timeout"] = timeout;
@@ -38,9 +39,25 @@ bool display_config_t::onSave(JsonDocument& doc) {
 }
 
 bool display_config_t::onLoad(JsonDocument& doc) {
+    config_version = doc["config_version"] | 0;
+    migrated_legacy_timeout = false;
     brightness = doc["brightness"] | DISPLAY_MAX_BRIGHTNESS / 2;
     rotation = doc["rotation"] | DISPLAY_MIN_ROTATE;
     timeout = doc["timeout"] | DISPLAY_MIN_TIMEOUT;
+
+    if ( config_version < DISPLAY_CONFIG_VERSION && timeout == DISPLAY_MAX_TIMEOUT ) {
+        timeout = DISPLAY_MIN_TIMEOUT;
+        migrated_legacy_timeout = true;
+    }
+
+    if ( timeout < DISPLAY_MIN_TIMEOUT ) {
+        timeout = DISPLAY_MIN_TIMEOUT;
+    }
+    else if ( timeout > DISPLAY_MAX_TIMEOUT ) {
+        timeout = DISPLAY_MAX_TIMEOUT;
+    }
+
+    config_version = DISPLAY_CONFIG_VERSION;
     block_return_maintile = doc["block_return_maintile"] | false;
     background_image = doc["background_image"] | 4;
     use_dma = doc["use_dma"] | true;

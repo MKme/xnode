@@ -26,6 +26,7 @@
     #include "hardware/config/displayconfig.h"
     #include "utils/io.h"
 
+    #define DISPLAY_NO_TIMEOUT        0               /** @brief internal timeout override, keep display awake */
     #define DISPLAYCTL_BRIGHTNESS       _BV(0)          /** @brief event mask display brightness, callback arg is (uint32_t*) */
     #define DISPLAYCTL_TIMEOUT          _BV(1)          /** @brief event mask display timeout, callback arg is (bool*) */
     #define DISPLAYCTL_SCREENSHOT       _BV(2)          /** @brief event mask display screenshot, callback arg is (bool*) */
@@ -44,6 +45,20 @@
      * @brief read config for display from spiffs
      */
     void display_read_config( void );
+    /**
+     * @brief reset the firmware display activity timer
+     */
+    void display_note_activity( void );
+    /**
+     * @brief reset the firmware display activity timer and LVGL activity timer
+     */
+    void display_trigger_activity( void );
+    /**
+     * @brief get inactive time tracked by firmware in milliseconds
+     *
+     * @return inactive time in ms
+     */
+    uint32_t display_get_inactive_time_ms( void );
     /**
      * @brief read the timeout from config
      * 

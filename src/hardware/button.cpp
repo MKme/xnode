@@ -21,6 +21,7 @@
 #include "config.h"
 #include "powermgm.h"
 #include "button.h"
+#include "display.h"
 #include "callback.h"
 #include "utils/alloc.h"
 
@@ -506,6 +507,7 @@ bool button_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const c
 
 bool button_send_cb( EventBits_t event, void *arg ) {
     log_d("send button cb");
+    display_note_activity();
     /*
      * call all callbacks with her event mask
      */

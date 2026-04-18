@@ -123,7 +123,7 @@ static void alarm_task_function(lv_task_t * task){
 
     if (in_progress){
         highlighted = !highlighted;
-        lv_disp_trig_activity( NULL ); //to stay display on
+        display_trigger_activity(); //to stay display on
     }
     else{
         display_set_brightness(brightness);

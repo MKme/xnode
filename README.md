@@ -18,6 +18,9 @@ Hardware listing:
 Working now:
 - Builds for `t-watch2020-v3-s3`.
 - Flashes to the LilyGO Watch Gen3 / ESP32-S3 target.
+- Inactivity timeout now returns the T-Watch S3 build to standby instead of leaving it awake indefinitely.
+- T-Watch S3 standby now uses the LilyGo `ext1` touch wake path on `BOARD_TOUCH_INT`.
+- Display timeout settings now use a real `15..300` second range again. `300` is five minutes, not a hidden never-sleep mode.
 - Accepts one installed XNODE basemap tile in watch flash.
 - Shows that installed tile in the map app without switching to stale old tiles.
 - Zoom buttons scale the same installed image instead of loading another map.
@@ -29,6 +32,102 @@ Known limits:
 - Watch-flash mode is a single installed raster tile, not a multi-tile slippy engine.
 - Zoom is image scaling around the installed tile center.
 - Panning is constrained by the visible image bounds.
+
+## Power management audit (2026-04-18)
+
+Scope:
+- Board/environment: `t-watch2020-v3-s3`
+- Problem reported: the watch stayed awake, the screen did not time out reliably, and the battery drained quickly.
+
+Root cause found:
+- `src/gui/gui.cpp` had a `LILYGO_WATCH_S3` special case that skipped the normal timeout-to-standby request path entirely.
+- `src/hardware/touch.cpp` put the S3 touch controller into monitor mode for standby, but used a custom GPIO light-sleep wake path instead of the LilyGo S3 `ext1` touch wake path.
+- The S3 touch path also read touch coordinates without first checking the touch interrupt state, which increased the chance of false activity and unnecessary polling.
+- The saved display timeout still treated `300` as a hidden "no timeout" value, so older settings could keep the watch awake forever even after the standby path was restored.
+- Activity resets relied too much on LVGL inactivity tracking, which did not consistently follow every wake source on the S3 build.
+
+Fix applied:
+- Re-enabled timeout-driven `POWERMGM_STANDBY_REQUEST` handling for the S3 build in `src/gui/gui.cpp`.
+- Changed S3 standby wake to match the LilyGo library path in `lib/twatchs3_core/src/LilyGoLib.cpp`: `esp_sleep_enable_ext1_wakeup(_BV(BOARD_TOUCH_INT), ESP_EXT1_WAKEUP_ALL_LOW)`.
+- Gated S3 touch reads on `watch.getTouched()` before reading coordinates in `src/hardware/touch.cpp`.
+- Added a firmware-side display activity timer that is reset by touch, button presses, wake requests, alarms, notifications, and explicit keep-awake flows.
+- Changed timeout handling so the persisted user setting is always `15..300` seconds. Temporary keep-awake behavior now uses the internal `DISPLAY_NO_TIMEOUT` override instead of the old magic `300` value.
+- Added a legacy config migration so pre-fix `/display.json` files that stored `300` as the old never-sleep value are converted once to `15` seconds on boot and then rewritten.
+- Fixed S3 standby wake handoff so a touch wake from light sleep becomes a normal `POWERMGM_WAKEUP_REQUEST` and the display comes back without a reboot.
+
+Files changed for this fix:
+- `src/gui/gui.cpp`
+- `src/hardware/touch.cpp`
+- `src/hardware/display.cpp`
+- `src/hardware/display.h`
+- `src/hardware/config/displayconfig.cpp`
+- `src/hardware/button.cpp`
+- `src/hardware/powermgm.cpp`
+- `src/gui/splashscreen.cpp`
+- `src/gui/quickbar.cpp`
+- `src/gui/mainbar/mainbar.cpp`
+- `src/gui/mainbar/setup_tile/display_settings/display_setting.cpp`
+- `src/gui/mainbar/setup_tile/watchface/watchface_manager_app.cpp`
+- `src/gui/mainbar/setup_tile/update/update.cpp`
+- `src/gui/mainbar/setup_tile/bluetooth_settings/bluetooth_message.cpp`
+- `src/gui/mainbar/setup_tile/bluetooth_settings/bluetooth_media.cpp`
+- `src/app/alarm_clock/alarm_in_progress.cpp`
+- `src/app/wifimon/wifimon_app_main.cpp`
+- `src/app/sailing/sailing_setup.cpp`
+
+Build verification:
+- Confirmed with:
+
+```powershell
+pio run -e t-watch2020-v3-s3
+```
+
+Flash verification:
+- Last confirmed upload after this fix:
+
+```powershell
+pio run -e t-watch2020-v3-s3 -t upload --upload-port COM8
+```
+
+## Expected sleep / wake behavior
+
+Display timeout:
+- User setting range: `15` to `300` seconds in Display settings.
+- `300` means `300 seconds` / `5 minutes`.
+- There is no normal hidden never-sleep slider value anymore.
+
+What happens when idle:
+- The firmware starts fading the backlight during the last `brightness * 8 ms` before timeout.
+- At the default mid brightness that fade is about `1 second`.
+- At max brightness that fade is about `2.0 seconds`.
+- When the timeout expires, the watch requests standby, turns the display off, and then enters ESP32-S3 light sleep if no other subsystem blocks it.
+
+What counts as activity:
+- Touch press.
+- Side / power button press.
+- Wake requests from notifications, media updates, alarms, splash/update UI, and other explicit wake paths.
+
+Wake methods:
+- Touch interrupt on `BOARD_TOUCH_INT` using ESP32 `ext1` wake, matching the LilyGo S3 library.
+- Power / side button.
+- Motion wake paths already wired through the BMA callback flow.
+- RTC alarm / silence wake paths.
+- PMU / charger related interrupts.
+- Bluetooth notification/media wake when those options are enabled.
+
+Touch wake interaction:
+- One touch should wake the watch from standby.
+- After wake, the normal next touch interaction should be able to scroll or change screens without forcing a full reboot.
+
+Temporary no-timeout cases:
+- Internal app flows can still keep the display awake with `DISPLAY_NO_TIMEOUT`.
+- Current users are OTA update, watchface manager, Wi-Fi monitor, and the sailing app's explicit "Always on display" toggle.
+- Those are runtime overrides, not saved Display settings.
+
+Follow-up risk still open:
+- `powermgm_set_lightsleep(false)` is called in `src/utils/http_ota/http_ota.cpp` and `src/gui/mainbar/setup_tile/battery_settings/battery_calibration.cpp`.
+- Those paths do not currently show a matching release call in the same flow, so light sleep can remain disabled until reboot after those operations.
+- That does not explain the idle timeout bug on a clean boot, but it is another battery-life issue worth fixing next.
 
 ## Repo layout
 
