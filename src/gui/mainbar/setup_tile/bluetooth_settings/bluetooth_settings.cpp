@@ -25,6 +25,8 @@
 #include "bluetooth_call.h"
 #include "bluetooth_message.h"
 #include "bluetooth_media.h"
+#include "app/meshtastic/meshtastic_app.h"
+#include "app/osmmap/osmmap_app.h"
 
 #include "gui/mainbar/mainbar.h"
 #include "gui/mainbar/setup_tile/setup_tile.h"
@@ -130,6 +132,8 @@ void bluetooth_settings_tile_setup( void ) {
     bluetooth_pairing_tile_setup();
     bluetooth_call_tile_setup();
     bluetooth_message_tile_setup();
+    meshtastic_app_setup();
+    osmmap_app_setup();
     bluetooth_media_tile_setup();
 
     blectl_register_cb( BLECTL_ON | BLECTL_OFF, blectl_onoff_event_cb, "bluetooth settings");

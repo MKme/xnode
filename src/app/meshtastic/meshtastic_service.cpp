@@ -1,5 +1,6 @@
 #include "config.h"
 #include "meshtastic_service.h"
+#include "meshtastic_channels_config.h"
 
 #if defined( USING_TWATCH_S3 )
 
@@ -10,12 +11,17 @@
     #include <RadioLib.h>
     #include <inttypes.h>
     #include <mbedtls/aes.h>
+    #include <mbedtls/base64.h>
     #include <stdarg.h>
 
     #include "app/osmmap/osmmap_app_main.h"
     #include "gui/mainbar/setup_tile/bluetooth_settings/bluetooth_message.h"
     #include "hardware/ble/xnode.h"
     #include "hardware/powermgm.h"
+
+    #if !defined( NATIVE_64BIT )
+        #include <SPIFFS.h>
+    #endif
 
     namespace {
         constexpr uint32_t MESHTASTIC_BROADCAST = 0xFFFFFFFFUL;
@@ -33,7 +39,10 @@
         constexpr uint16_t MESHTASTIC_PREAMBLE = 16;
         constexpr int8_t MESHTASTIC_TX_POWER = 22;
         constexpr float MESHTASTIC_TCXO_VOLTAGE = 3.0f;
-        constexpr const char *MESHTASTIC_CHANNEL_NAME = "LongFast";
+        constexpr const char *MESHTASTIC_DEFAULT_PRIMARY_CHANNEL = "LongFast";
+        constexpr const char *MESHTASTIC_DEFAULT_PRIMARY_PSK = "AQ==";
+        constexpr uint8_t MESHTASTIC_PRIMARY_CHANNEL_SLOT = 0;
+        constexpr size_t MESHTASTIC_MAX_RUNTIME_PSK_LEN = 32;
         constexpr uint8_t meshtastic_default_psk[ 16 ] = {
             0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59,
             0xf0, 0xbc, 0xff, 0xab, 0xcf, 0x4e, 0x69, 0x01
@@ -75,6 +84,14 @@
             int32_t altitude = 0;
         };
 
+        struct meshtastic_runtime_channel_t {
+            bool enabled = false;
+            char name[ MESHTASTIC_CHANNEL_NAME_LEN ] = { 0 };
+            size_t psk_len = 0;
+            uint8_t psk[ MESHTASTIC_MAX_RUNTIME_PSK_LEN ] = { 0 };
+            uint8_t hash = 0;
+        };
+
         static_assert( sizeof( meshtastic_packet_header_t ) == 16, "unexpected meshtastic header size" );
 
         SX1262 meshtastic_radio = newModule();
@@ -93,8 +110,16 @@
 
         char meshtastic_status[ 96 ] = "Meshtastic idle";
         char meshtastic_pending_text[ MESHTASTIC_MAX_TEXT_LEN + 1 ] = { 0 };
+        char meshtastic_pending_channel_name[ MESHTASTIC_CHANNEL_NAME_LEN ] = "";
         char meshtastic_last_message_sender[ 24 ] = "";
         char meshtastic_last_message_text[ MESHTASTIC_MAX_TEXT_LEN + 1 ] = "";
+
+        meshtastic_channels_config_t meshtastic_channels_config;
+        meshtastic_runtime_channel_t meshtastic_channels[ MESHTASTIC_CHANNEL_COUNT ];
+        uint8_t meshtastic_enabled_channel_slots[ MESHTASTIC_CHANNEL_COUNT ] = { 0 };
+        uint8_t meshtastic_enabled_channel_count = 0;
+        uint8_t meshtastic_active_channel_slot = MESHTASTIC_PRIMARY_CHANNEL_SLOT;
+        meshtastic_service_text_rx_cb_t meshtastic_text_rx_callback = NULL;
 
         uint8_t meshtastic_xor_hash( const uint8_t *data, size_t len ) {
             uint8_t hash = 0;
@@ -115,9 +140,308 @@
             return( hash );
         }
 
-        uint8_t meshtastic_channel_hash( void ) {
-            return( meshtastic_xor_hash( (const uint8_t *)MESHTASTIC_CHANNEL_NAME, strlen( MESHTASTIC_CHANNEL_NAME ) ) ^
-                    meshtastic_xor_hash( meshtastic_default_psk, sizeof( meshtastic_default_psk ) ) );
+        size_t meshtastic_expand_psk( const uint8_t *input, size_t input_len, uint8_t *output, size_t max_len ) {
+            if ( !output || max_len < sizeof( meshtastic_default_psk ) ) {
+                return( 0 );
+            }
+
+            if ( input_len == 0 ) {
+                return( 0 );
+            }
+
+            if ( input_len == 1 ) {
+                const uint8_t psk_index = input[ 0 ];
+
+                if ( psk_index == 0 ) {
+                    return( 0 );
+                }
+
+                memcpy( output, meshtastic_default_psk, sizeof( meshtastic_default_psk ) );
+                output[ sizeof( meshtastic_default_psk ) - 1 ] =
+                    output[ sizeof( meshtastic_default_psk ) - 1 ] + psk_index - 1;
+                return( sizeof( meshtastic_default_psk ) );
+            }
+
+            if ( input_len < 16 ) {
+                memset( output, 0, 16 );
+                memcpy( output, input, input_len );
+                return( 16 );
+            }
+
+            if ( input_len == 16 || input_len == 32 ) {
+                memcpy( output, input, input_len );
+                return( input_len );
+            }
+
+            if ( input_len < 32 ) {
+                memset( output, 0, 32 );
+                memcpy( output, input, input_len );
+                return( 32 );
+            }
+
+            if ( input_len > max_len ) {
+                return( 0 );
+            }
+
+            memcpy( output, input, input_len );
+            return( input_len );
+        }
+
+        bool meshtastic_decode_base64_raw( const char *encoded, uint8_t *output, size_t &output_len ) {
+            size_t decoded_len = 0;
+
+            output_len = 0;
+            if ( !output ) {
+                return( false );
+            }
+            if ( !encoded || encoded[ 0 ] == '\0' ) {
+                return( true );
+            }
+
+            const int rc = mbedtls_base64_decode(
+                output,
+                MESHTASTIC_CHANNEL_PSK_B64_LEN,
+                &decoded_len,
+                (const unsigned char *)encoded,
+                strlen( encoded )
+            );
+
+            if ( rc != 0 ) {
+                return( false );
+            }
+
+            output_len = decoded_len;
+            return( true );
+        }
+
+        bool meshtastic_decode_psk( const char *encoded, uint8_t *output, size_t &output_len ) {
+            uint8_t decoded[ MESHTASTIC_CHANNEL_PSK_B64_LEN ] = { 0 };
+            size_t decoded_len = 0;
+
+            output_len = 0;
+            if ( !encoded || encoded[ 0 ] == '\0' ) {
+                return( true );
+            }
+
+            if ( !meshtastic_decode_base64_raw( encoded, decoded, decoded_len ) ) {
+                return( false );
+            }
+
+            output_len = meshtastic_expand_psk( decoded, decoded_len, output, MESHTASTIC_MAX_RUNTIME_PSK_LEN );
+            return( decoded_len == 0 || output_len > 0 );
+        }
+
+        bool meshtastic_encode_base64_raw( const uint8_t *input, size_t input_len, char *output, size_t output_len ) {
+            size_t encoded_len = 0;
+
+            if ( !output || output_len == 0 ) {
+                return( false );
+            }
+
+            output[ 0 ] = '\0';
+            if ( !input || input_len == 0 ) {
+                return( true );
+            }
+
+            const int rc = mbedtls_base64_encode(
+                (unsigned char *)output,
+                output_len,
+                &encoded_len,
+                input,
+                input_len
+            );
+
+            if ( rc != 0 || encoded_len >= output_len ) {
+                return( false );
+            }
+
+            output[ encoded_len ] = '\0';
+            return( true );
+        }
+
+        uint8_t meshtastic_channel_hash( const char *channel_name, const uint8_t *psk, size_t psk_len ) {
+            return( meshtastic_xor_hash( (const uint8_t *)channel_name, strlen( channel_name ) ) ^
+                    meshtastic_xor_hash( psk, psk_len ) );
+        }
+
+        const char *meshtastic_primary_channel_name( void ) {
+            if ( meshtastic_channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].enabled &&
+                 meshtastic_channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].name[ 0 ] ) {
+                return( meshtastic_channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].name );
+            }
+            return( MESHTASTIC_DEFAULT_PRIMARY_CHANNEL );
+        }
+
+        int8_t meshtastic_slot_for_list_index( uint8_t channel_index ) {
+            if ( channel_index >= meshtastic_enabled_channel_count ) {
+                return( -1 );
+            }
+            return( meshtastic_enabled_channel_slots[ channel_index ] );
+        }
+
+        int8_t meshtastic_list_index_for_slot( uint8_t slot ) {
+            for ( uint8_t i = 0; i < meshtastic_enabled_channel_count; i++ ) {
+                if ( meshtastic_enabled_channel_slots[ i ] == slot ) {
+                    return( i );
+                }
+            }
+            return( -1 );
+        }
+
+        const meshtastic_runtime_channel_t *meshtastic_active_channel( void ) {
+            if ( meshtastic_active_channel_slot < MESHTASTIC_CHANNEL_COUNT &&
+                 meshtastic_channels[ meshtastic_active_channel_slot ].enabled ) {
+                return( &meshtastic_channels[ meshtastic_active_channel_slot ] );
+            }
+            return( &meshtastic_channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ] );
+        }
+
+        int8_t meshtastic_find_channel_slot_for_hash( uint8_t channel_hash ) {
+            for ( uint8_t i = 0; i < meshtastic_enabled_channel_count; i++ ) {
+                const uint8_t slot = meshtastic_enabled_channel_slots[ i ];
+
+                if ( meshtastic_channels[ slot ].enabled && meshtastic_channels[ slot ].hash == channel_hash ) {
+                    return( slot );
+                }
+            }
+            return( -1 );
+        }
+
+        void meshtastic_load_channels( void ) {
+            bool dirty = false;
+
+            #if !defined( NATIVE_64BIT )
+                const bool config_exists = SPIFFS.exists( MESHTASTIC_CHANNELS_JSON_CONFIG_FILE );
+            #else
+                const bool config_exists = true;
+            #endif
+
+            meshtastic_channels_config.load();
+
+            if ( !config_exists ) {
+                dirty = true;
+            }
+
+            if ( !meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].enabled ) {
+                meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].enabled = true;
+                dirty = true;
+            }
+            if ( !meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].name[ 0 ] ) {
+                strlcpy(
+                    meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].name,
+                    MESHTASTIC_DEFAULT_PRIMARY_CHANNEL,
+                    sizeof( meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].name )
+                );
+                dirty = true;
+            }
+            if ( !meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].psk[ 0 ] ) {
+                strlcpy(
+                    meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].psk,
+                    MESHTASTIC_DEFAULT_PRIMARY_PSK,
+                    sizeof( meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].psk )
+                );
+                dirty = true;
+            }
+
+            memset( meshtastic_channels, 0, sizeof( meshtastic_channels ) );
+            memset( meshtastic_enabled_channel_slots, 0, sizeof( meshtastic_enabled_channel_slots ) );
+            meshtastic_enabled_channel_count = 0;
+
+            for ( uint8_t slot = 0; slot < MESHTASTIC_CHANNEL_COUNT; slot++ ) {
+                meshtastic_channel_config_entry_t &config_entry = meshtastic_channels_config.channels[ slot ];
+                meshtastic_runtime_channel_t &runtime_entry = meshtastic_channels[ slot ];
+                size_t psk_len = 0;
+
+                if ( !config_entry.enabled ) {
+                    continue;
+                }
+
+                if ( !config_entry.name[ 0 ] ) {
+                    if ( slot == MESHTASTIC_PRIMARY_CHANNEL_SLOT ) {
+                        strlcpy( config_entry.name, MESHTASTIC_DEFAULT_PRIMARY_CHANNEL, sizeof( config_entry.name ) );
+                    }
+                    else {
+                        config_entry.enabled = false;
+                    }
+                    dirty = true;
+                }
+
+                if ( !config_entry.enabled ) {
+                    continue;
+                }
+
+                if ( !meshtastic_decode_psk( config_entry.psk, runtime_entry.psk, psk_len ) ) {
+                    if ( slot == MESHTASTIC_PRIMARY_CHANNEL_SLOT ) {
+                        strlcpy( config_entry.psk, MESHTASTIC_DEFAULT_PRIMARY_PSK, sizeof( config_entry.psk ) );
+                        dirty = true;
+                        if ( !meshtastic_decode_psk( config_entry.psk, runtime_entry.psk, psk_len ) ) {
+                            psk_len = 0;
+                        }
+                    }
+                    else {
+                        config_entry.enabled = false;
+                        dirty = true;
+                        continue;
+                    }
+                }
+
+                runtime_entry.enabled = true;
+                runtime_entry.psk_len = psk_len;
+                strlcpy( runtime_entry.name, config_entry.name, sizeof( runtime_entry.name ) );
+                runtime_entry.hash = meshtastic_channel_hash( runtime_entry.name, runtime_entry.psk, runtime_entry.psk_len );
+                meshtastic_enabled_channel_slots[ meshtastic_enabled_channel_count++ ] = slot;
+            }
+
+            if ( meshtastic_enabled_channel_count == 0 ) {
+                meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].enabled = true;
+                strlcpy(
+                    meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].name,
+                    MESHTASTIC_DEFAULT_PRIMARY_CHANNEL,
+                    sizeof( meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].name )
+                );
+                strlcpy(
+                    meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].psk,
+                    MESHTASTIC_DEFAULT_PRIMARY_PSK,
+                    sizeof( meshtastic_channels_config.channels[ MESHTASTIC_PRIMARY_CHANNEL_SLOT ].psk )
+                );
+                meshtastic_channels_config.active_channel = MESHTASTIC_PRIMARY_CHANNEL_SLOT;
+                dirty = true;
+                meshtastic_load_channels();
+                return;
+            }
+
+            if ( meshtastic_channels_config.active_channel >= MESHTASTIC_CHANNEL_COUNT ||
+                 !meshtastic_channels[ meshtastic_channels_config.active_channel ].enabled ) {
+                meshtastic_channels_config.active_channel = MESHTASTIC_PRIMARY_CHANNEL_SLOT;
+                dirty = true;
+            }
+
+            meshtastic_active_channel_slot = meshtastic_channels_config.active_channel;
+
+            if ( dirty ) {
+                meshtastic_channels_config.save();
+            }
+        }
+
+        float meshtastic_frequency( void );
+        bool meshtastic_start_receive( void );
+        void meshtastic_update_status( const char *fmt, ... );
+
+        bool meshtastic_apply_primary_frequency( void ) {
+            if ( !meshtastic_radio_ready ) {
+                return( false );
+            }
+
+            const int state = meshtastic_radio.setFrequency( meshtastic_frequency() );
+            if ( state != RADIOLIB_ERR_NONE ) {
+                meshtastic_update_status( "Freq update failed %d", state );
+                return( false );
+            }
+
+            if ( !meshtastic_tx_active ) {
+                meshtastic_start_receive();
+            }
+            return( true );
         }
 
         float meshtastic_frequency( void ) {
@@ -125,7 +449,7 @@
             const float freq_end = 928.0f;
             const float spacing = MESHTASTIC_BW_KHZ / 1000.0f;
             const uint32_t num_channels = (uint32_t)floor( ( freq_end - freq_start ) / spacing );
-            const uint32_t channel_num = meshtastic_djb2_hash( MESHTASTIC_CHANNEL_NAME ) % num_channels;
+            const uint32_t channel_num = meshtastic_djb2_hash( meshtastic_primary_channel_name() ) % num_channels;
 
             return( freq_start + ( MESHTASTIC_BW_KHZ / 2000.0f ) + ( channel_num * spacing ) );
         }
@@ -382,18 +706,22 @@
             return( decoded.valid );
         }
 
-        void meshtastic_crypt_payload( uint32_t from_node, uint32_t packet_id, uint8_t *data, size_t len ) {
+        void meshtastic_crypt_payload( uint32_t from_node, uint32_t packet_id, uint8_t *data, size_t len, const uint8_t *psk, size_t psk_len ) {
             mbedtls_aes_context aes;
             uint8_t nonce[ 16 ] = { 0 };
             uint8_t stream_block[ 16 ] = { 0 };
             size_t nc_off = 0;
             const uint64_t packet_id_64 = packet_id;
 
+            if ( !data || len == 0 || psk_len == 0 ) {
+                return;
+            }
+
             memcpy( nonce, &packet_id_64, sizeof( packet_id_64 ) );
             memcpy( nonce + sizeof( packet_id_64 ), &from_node, sizeof( from_node ) );
 
             mbedtls_aes_init( &aes );
-            mbedtls_aes_setkey_enc( &aes, meshtastic_default_psk, sizeof( meshtastic_default_psk ) * 8 );
+            mbedtls_aes_setkey_enc( &aes, psk, psk_len * 8 );
             mbedtls_aes_crypt_ctr( &aes, len, &nc_off, nonce, stream_block, data, data );
             mbedtls_aes_free( &aes );
         }
@@ -443,6 +771,7 @@
             meshtastic_decoded_text_t decoded;
             meshtastic_decoded_position_t position;
             char sender[ 24 ];
+            const meshtastic_runtime_channel_t *rx_channel = NULL;
 
             const size_t packet_len = meshtastic_radio.getPacketLength();
             if ( packet_len < sizeof( meshtastic_packet_header_t ) || packet_len > sizeof( packet ) ) {
@@ -456,15 +785,21 @@
             }
 
             const meshtastic_packet_header_t *header = (const meshtastic_packet_header_t *)packet;
-            if ( header->from == 0 || header->from == meshtastic_node_id || header->channel != meshtastic_channel_hash() ) {
+            if ( header->from == 0 || header->from == meshtastic_node_id ) {
                 return( false );
             }
+
+            const int8_t channel_slot = meshtastic_find_channel_slot_for_hash( header->channel );
+            if ( channel_slot < 0 ) {
+                return( false );
+            }
+            rx_channel = &meshtastic_channels[ channel_slot ];
 
             const size_t payload_len = packet_len - sizeof( meshtastic_packet_header_t );
             uint8_t payload[ MESHTASTIC_MAX_PACKET_LEN ] = { 0 };
 
             memcpy( payload, packet + sizeof( meshtastic_packet_header_t ), payload_len );
-            meshtastic_crypt_payload( header->from, header->id, payload, payload_len );
+            meshtastic_crypt_payload( header->from, header->id, payload, payload_len, rx_channel->psk, rx_channel->psk_len );
 
             if ( !meshtastic_decode_data_message( payload, payload_len, data ) ) {
                 return( false );
@@ -484,7 +819,18 @@
                 meshtastic_store_last_message( sender, decoded.text );
                 meshtastic_queue_notification( sender, decoded.text );
                 xnode_send_meshtastic_rx( sender, decoded.text );
-                meshtastic_update_status( "RX text %s", sender );
+                if ( meshtastic_text_rx_callback ) {
+                    meshtastic_text_rx_callback(
+                        header->from,
+                        data.dest ? data.dest : header->to,
+                        (uint8_t)channel_slot,
+                        header->id,
+                        meshtastic_last_rssi,
+                        meshtastic_last_snr,
+                        decoded.text
+                    );
+                }
+                meshtastic_update_status( "RX %s %s", rx_channel->name, sender );
                 return( true );
             }
 
@@ -504,11 +850,11 @@
                 }
                 meshtastic_store_last_message( sender, body );
                 meshtastic_queue_notification( sender, body );
-                meshtastic_update_status( "RX pos %s", sender );
+                meshtastic_update_status( "RX %s %s", rx_channel->name, sender );
                 return( true );
             }
 
-            meshtastic_update_status( "RX port %lu", (unsigned long)data.portnum );
+            meshtastic_update_status( "RX %s port %lu", rx_channel->name, (unsigned long)data.portnum );
             return( false );
         }
 
@@ -526,7 +872,7 @@
                     if ( meshtastic_radio_ready && !meshtastic_tx_active ) {
                         meshtastic_radio.standby();
                         meshtastic_start_receive();
-                        meshtastic_update_status( "Public mesh ready" );
+                        meshtastic_update_status( "Mesh ready" );
                     }
                     break;
             }
@@ -543,13 +889,14 @@
             if ( meshtastic_tx_active ) {
                 meshtastic_radio.finishTransmit();
                 meshtastic_tx_active = false;
-                meshtastic_update_status( "TX sent" );
+                meshtastic_update_status( "TX sent %s", meshtastic_pending_channel_name[ 0 ] ? meshtastic_pending_channel_name : "mesh" );
 
                 if ( meshtastic_pending_text[ 0 ] ) {
                     meshtastic_store_last_message( "Me", meshtastic_pending_text );
                     meshtastic_queue_notification( "Me", meshtastic_pending_text );
                     meshtastic_pending_text[ 0 ] = '\0';
                 }
+                meshtastic_pending_channel_name[ 0 ] = '\0';
                 meshtastic_start_receive();
             }
             else {
@@ -567,6 +914,7 @@
         }
 
         meshtastic_service_started = true;
+        meshtastic_load_channels();
         meshtastic_node_id = (uint32_t)( ESP.getEfuseMac() & 0xFFFFFFFFULL );
         if ( meshtastic_node_id == 0 || meshtastic_node_id == MESHTASTIC_BROADCAST ) {
             meshtastic_node_id ^= 0x5A5A1234UL;
@@ -598,7 +946,7 @@
             meshtastic_radio.setDio2AsRfSwitch( true );
             meshtastic_radio.setDio1Action( meshtastic_radio_isr );
             meshtastic_start_receive();
-            meshtastic_update_status( "Public mesh ready" );
+            meshtastic_update_status( "Mesh ready" );
         }
 
         powermgm_register_cb(
@@ -613,10 +961,11 @@
         );
     }
 
-    bool meshtastic_service_send_text( const char *text ) {
+    static bool meshtastic_service_send_text_internal( const char *text, uint32_t dest, uint8_t channel_slot ) {
         uint8_t payload[ MESHTASTIC_MAX_PACKET_LEN ] = { 0 };
         uint8_t packet[ MESHTASTIC_MAX_PACKET_LEN ] = { 0 };
         meshtastic_packet_header_t *header = (meshtastic_packet_header_t *)packet;
+        const meshtastic_runtime_channel_t *tx_channel = NULL;
 
         if ( !meshtastic_radio_ready ) {
             meshtastic_update_status( "Radio unavailable" );
@@ -628,11 +977,19 @@
             return( false );
         }
 
+        if ( channel_slot >= MESHTASTIC_CHANNEL_COUNT ||
+             !meshtastic_channels[ channel_slot ].enabled ) {
+            meshtastic_update_status( "Channel unavailable" );
+            return( false );
+        }
+
+        tx_channel = &meshtastic_channels[ channel_slot ];
+
         const size_t payload_len = meshtastic_encode_text_message(
             payload,
             sizeof( payload ),
             text,
-            MESHTASTIC_BROADCAST,
+            dest,
             meshtastic_node_id
         );
 
@@ -641,32 +998,42 @@
             return( false );
         }
 
-        header->to = MESHTASTIC_BROADCAST;
+        header->to = dest;
         header->from = meshtastic_node_id;
         header->id = meshtastic_generate_packet_id();
         header->flags = MESHTASTIC_HOP_RELIABLE |
                         ( ( MESHTASTIC_HOP_RELIABLE << MESHTASTIC_FLAG_HOP_START_SHIFT ) & MESHTASTIC_FLAG_HOP_START_MASK );
-        header->channel = meshtastic_channel_hash();
+        header->channel = tx_channel->hash;
         header->next_hop = 0;
         header->relay_node = 0;
 
-        meshtastic_crypt_payload( header->from, header->id, payload, payload_len );
+        meshtastic_crypt_payload( header->from, header->id, payload, payload_len, tx_channel->psk, tx_channel->psk_len );
         memcpy( packet + sizeof( meshtastic_packet_header_t ), payload, payload_len );
 
         strncpy( meshtastic_pending_text, text, sizeof( meshtastic_pending_text ) - 1 );
         meshtastic_pending_text[ sizeof( meshtastic_pending_text ) - 1 ] = '\0';
+        strlcpy( meshtastic_pending_channel_name, tx_channel->name, sizeof( meshtastic_pending_channel_name ) );
 
         const int state = meshtastic_radio.startTransmit( packet, sizeof( meshtastic_packet_header_t ) + payload_len );
         if ( state != RADIOLIB_ERR_NONE ) {
             meshtastic_pending_text[ 0 ] = '\0';
+            meshtastic_pending_channel_name[ 0 ] = '\0';
             meshtastic_update_status( "TX start failed %d", state );
             return( false );
         }
 
         meshtastic_tx_active = true;
         meshtastic_radio_receiving = false;
-        meshtastic_update_status( "Sending..." );
+        meshtastic_update_status( "Sending %s...", tx_channel->name );
         return( true );
+    }
+
+    bool meshtastic_service_send_text( const char *text ) {
+        return( meshtastic_service_send_text_internal( text, MESHTASTIC_BROADCAST, meshtastic_active_channel_slot ) );
+    }
+
+    bool meshtastic_service_send_text_to( const char *text, uint32_t dest, uint8_t channel_slot ) {
+        return( meshtastic_service_send_text_internal( text, dest, channel_slot ) );
     }
 
     bool meshtastic_service_is_ready( void ) {
@@ -679,6 +1046,50 @@
 
     const char *meshtastic_service_get_status( void ) {
         return( meshtastic_status );
+    }
+
+    uint8_t meshtastic_service_get_channel_count( void ) {
+        return( meshtastic_enabled_channel_count );
+    }
+
+    const char *meshtastic_service_get_channel_name( uint8_t channel_index ) {
+        const int8_t slot = meshtastic_slot_for_list_index( channel_index );
+
+        if ( slot < 0 ) {
+            return( "" );
+        }
+        return( meshtastic_channels[ slot ].name );
+    }
+
+    uint8_t meshtastic_service_get_active_channel( void ) {
+        const int8_t channel_index = meshtastic_list_index_for_slot( meshtastic_active_channel_slot );
+
+        return( channel_index >= 0 ? (uint8_t)channel_index : 0 );
+    }
+
+    bool meshtastic_service_set_active_channel( uint8_t channel_index ) {
+        const int8_t slot = meshtastic_slot_for_list_index( channel_index );
+
+        if ( slot < 0 ) {
+            return( false );
+        }
+
+        meshtastic_active_channel_slot = slot;
+        meshtastic_channels_config.active_channel = (uint8_t)slot;
+        meshtastic_channels_config.save();
+        return( true );
+    }
+
+    const char *meshtastic_service_get_active_channel_name( void ) {
+        return( meshtastic_active_channel()->name );
+    }
+
+    const char *meshtastic_service_get_primary_channel_name( void ) {
+        return( meshtastic_primary_channel_name() );
+    }
+
+    float meshtastic_service_get_frequency_mhz( void ) {
+        return( meshtastic_frequency() );
     }
 
     uint32_t meshtastic_service_get_node_id( void ) {
@@ -705,12 +1116,113 @@
         return( meshtastic_last_message_text );
     }
 
+    bool meshtastic_service_get_channel_info( uint8_t channel_slot, meshtastic_service_channel_info_t *info ) {
+        uint8_t raw_psk[ MESHTASTIC_CHANNEL_PSK_B64_LEN ] = { 0 };
+        size_t raw_psk_len = 0;
+
+        if ( !info || channel_slot >= MESHTASTIC_CHANNEL_COUNT ) {
+            return( false );
+        }
+
+        memset( info, 0, sizeof( *info ) );
+
+        if ( !meshtastic_decode_base64_raw(
+                 meshtastic_channels_config.channels[ channel_slot ].psk,
+                 raw_psk,
+                 raw_psk_len
+             ) ) {
+            return( false );
+        }
+
+        info->enabled = meshtastic_channels_config.channels[ channel_slot ].enabled;
+        info->role = info->enabled
+                         ? ( channel_slot == MESHTASTIC_PRIMARY_CHANNEL_SLOT
+                                 ? MESHTASTIC_SERVICE_CHANNEL_ROLE_PRIMARY
+                                 : MESHTASTIC_SERVICE_CHANNEL_ROLE_SECONDARY )
+                         : MESHTASTIC_SERVICE_CHANNEL_ROLE_DISABLED;
+        strlcpy( info->name, meshtastic_channels_config.channels[ channel_slot ].name, sizeof( info->name ) );
+        info->psk_len = raw_psk_len <= sizeof( info->psk ) ? (uint8_t)raw_psk_len : sizeof( info->psk );
+        memcpy( info->psk, raw_psk, info->psk_len );
+        return( true );
+    }
+
+    bool meshtastic_service_set_channel_info( uint8_t channel_slot, const meshtastic_service_channel_info_t *info ) {
+        const float old_frequency = meshtastic_frequency();
+        bool changed = false;
+
+        if ( !info || channel_slot >= MESHTASTIC_CHANNEL_COUNT ) {
+            return( false );
+        }
+
+        if ( channel_slot == MESHTASTIC_PRIMARY_CHANNEL_SLOT &&
+             ( !info->enabled || info->role == MESHTASTIC_SERVICE_CHANNEL_ROLE_DISABLED ) ) {
+            return( false );
+        }
+
+        if ( info->psk_len > MESHTASTIC_SERVICE_MAX_PSK_LEN ) {
+            return( false );
+        }
+
+        meshtastic_channels_config.channels[ channel_slot ].enabled =
+            info->enabled && info->role != MESHTASTIC_SERVICE_CHANNEL_ROLE_DISABLED;
+        strlcpy(
+            meshtastic_channels_config.channels[ channel_slot ].name,
+            info->name,
+            sizeof( meshtastic_channels_config.channels[ channel_slot ].name )
+        );
+
+        if ( !meshtastic_encode_base64_raw(
+                 info->psk,
+                 info->psk_len,
+                 meshtastic_channels_config.channels[ channel_slot ].psk,
+                 sizeof( meshtastic_channels_config.channels[ channel_slot ].psk )
+             ) ) {
+            return( false );
+        }
+
+        if ( !meshtastic_channels_config.channels[ channel_slot ].enabled ) {
+            meshtastic_channels_config.channels[ channel_slot ].name[ 0 ] = '\0';
+            meshtastic_channels_config.channels[ channel_slot ].psk[ 0 ] = '\0';
+        }
+
+        changed = true;
+
+        if ( changed ) {
+            meshtastic_channels_config.save();
+            meshtastic_load_channels();
+
+            if ( meshtastic_active_channel_slot >= MESHTASTIC_CHANNEL_COUNT ||
+                 !meshtastic_channels[ meshtastic_active_channel_slot ].enabled ) {
+                meshtastic_active_channel_slot = MESHTASTIC_PRIMARY_CHANNEL_SLOT;
+                meshtastic_channels_config.active_channel = MESHTASTIC_PRIMARY_CHANNEL_SLOT;
+                meshtastic_channels_config.save();
+            }
+
+            if ( meshtastic_radio_ready && fabsf( old_frequency - meshtastic_frequency() ) > 0.0001f ) {
+                meshtastic_apply_primary_frequency();
+            }
+        }
+
+        return( true );
+    }
+
+    void meshtastic_service_set_text_rx_callback( meshtastic_service_text_rx_cb_t callback ) {
+        meshtastic_text_rx_callback = callback;
+    }
+
 #else
 
     void meshtastic_service_setup( void ) {
     }
 
     bool meshtastic_service_send_text( const char *text ) {
+        return( false );
+    }
+
+    bool meshtastic_service_send_text_to( const char *text, uint32_t dest, uint8_t channel_slot ) {
+        (void)text;
+        (void)dest;
+        (void)channel_slot;
         return( false );
     }
 
@@ -724,6 +1236,36 @@
 
     const char *meshtastic_service_get_status( void ) {
         return( "Meshtastic requires T-Watch S3 hardware" );
+    }
+
+    uint8_t meshtastic_service_get_channel_count( void ) {
+        return( 0 );
+    }
+
+    const char *meshtastic_service_get_channel_name( uint8_t channel_index ) {
+        (void)channel_index;
+        return( "" );
+    }
+
+    uint8_t meshtastic_service_get_active_channel( void ) {
+        return( 0 );
+    }
+
+    bool meshtastic_service_set_active_channel( uint8_t channel_index ) {
+        (void)channel_index;
+        return( false );
+    }
+
+    const char *meshtastic_service_get_active_channel_name( void ) {
+        return( "" );
+    }
+
+    const char *meshtastic_service_get_primary_channel_name( void ) {
+        return( "" );
+    }
+
+    float meshtastic_service_get_frequency_mhz( void ) {
+        return( 0.0f );
     }
 
     uint32_t meshtastic_service_get_node_id( void ) {
@@ -748,6 +1290,22 @@
 
     const char *meshtastic_service_get_last_message_text( void ) {
         return( "" );
+    }
+
+    bool meshtastic_service_get_channel_info( uint8_t channel_slot, meshtastic_service_channel_info_t *info ) {
+        (void)channel_slot;
+        (void)info;
+        return( false );
+    }
+
+    bool meshtastic_service_set_channel_info( uint8_t channel_slot, const meshtastic_service_channel_info_t *info ) {
+        (void)channel_slot;
+        (void)info;
+        return( false );
+    }
+
+    void meshtastic_service_set_text_rx_callback( meshtastic_service_text_rx_cb_t callback ) {
+        (void)callback;
     }
 
 #endif

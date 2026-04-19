@@ -46,19 +46,9 @@ LV_IMG_DECLARE(osm_64px);
  */
 static void enter_osmmap_app_event_cb( lv_obj_t * obj, lv_event_t event );
 /*
- * automatic register the app setup function with explicit call in main.cpp
- */
-static int registed = app_autocall_function( &osmmap_app_setup, 16 );           /** @brief app autocall function */
-/*
  * setup routine for example app
  */
 void osmmap_app_setup( void ) {
-    /*
-     * check if app already registered for autocall
-     */
-    if( !registed ) {
-        return;
-    }
     /*
      * register 2 vertical tiles and get the first tile number and save it for later use
      */

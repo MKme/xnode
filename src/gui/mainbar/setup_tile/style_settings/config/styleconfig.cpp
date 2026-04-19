@@ -33,6 +33,8 @@ style_config_t::style_config_t() : BaseJsonConfig( STYLE_JSON_COFIG_FILE ) {}
 bool style_config_t::onSave(JsonDocument& doc) {
     doc["theme"] = theme;
     doc["anim"] = anim;
+    doc["theme_migrated"] = true;
+    needs_save = false;
     return true;
 }
 
@@ -44,6 +46,12 @@ bool style_config_t::onLoad(JsonDocument& doc) {
         theme = doc["theme"] | 2;
         anim = doc["anim"] | true;
     #endif
+    bool theme_migrated = doc["theme_migrated"] | false;
+    needs_save = false;
+    if ( !theme_migrated && theme == 3 ) {
+        theme = 2;
+        needs_save = true;
+    }
     return true;
 }
 
@@ -55,5 +63,6 @@ bool style_config_t::onDefault( void ) {
         theme = 2;
         anim = true;
     #endif
+    needs_save = false;
     return true;
 }

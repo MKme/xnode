@@ -48,6 +48,9 @@ static void exit_style_setup_event_cb( lv_obj_t * obj, lv_event_t event );
 void style_settings_tile_setup( void ) {
     // get an app tile and copy mainstyle
     style_config.load();
+    if ( style_config.needs_save ) {
+        style_config.save();
+    }
 
     style_tile_num = mainbar_add_setup_tile( 1, 1, "style settings" );
     style_settings_tile = mainbar_get_tile_obj( style_tile_num );

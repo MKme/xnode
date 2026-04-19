@@ -64,20 +64,8 @@ void splash_screen_stage_one( void ) {
     lv_obj_align( background, NULL, LV_ALIGN_CENTER, 0, 0 );
 
     logo = lv_img_create( background , NULL );
-
-    // load boot logo from spiffs if exsist
-    FILE* file;
-    file = fopen( SPLASHSCREENLOGO, "rb" );
-
-    if ( file ) {
-        log_i("use custom boot logo from spiffs");
-        fclose( file );
-        lv_img_set_src( logo, SPLASHSCREENLOGO );
-    }
-    else {
-        log_i("use default boot logo");
-        lv_img_set_src( logo, &hedgehog );
-    }
+    log_i("use built-in boot logo");
+    lv_img_set_src( logo, &hedgehog );
     lv_obj_align( logo, NULL, LV_ALIGN_CENTER, 0, 0 );
     lv_obj_add_style( logo, LV_OBJ_PART_MAIN, SYSTEM_ICON_STYLE );
 

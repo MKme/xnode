@@ -38,6 +38,7 @@
             int theme = 2;
             bool anim = true;
         #endif
+        bool needs_save = false;
 
         protected:
         ////////////// Available for overloading: //////////////
