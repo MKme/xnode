@@ -1167,9 +1167,19 @@
         class MeshtasticFromRadioCallbacks : public NimBLECharacteristicCallbacks {
             void onRead( NimBLECharacteristic *pCharacteristic ) {
                 meshtastic_ble_frame_t frame = { 0 };
+                TickType_t wait_ticks = 0;
+
+                /*
+                 * The official Meshtastic NimBLE transport blocks the initial read during
+                 * config because some clients disconnect if they see a 0-byte response
+                 * before the first FromRadio packet is ready.
+                 */
+                if ( meshtastic_ble_from_radio_num == 0 ) {
+                    wait_ticks = pdMS_TO_TICKS( 3000 );
+                }
 
                 if ( meshtastic_from_radio_queue &&
-                     xQueueReceive( meshtastic_from_radio_queue, &frame, 0 ) == pdTRUE ) {
+                     xQueueReceive( meshtastic_from_radio_queue, &frame, wait_ticks ) == pdTRUE ) {
                     pCharacteristic->setValue( frame.data, frame.len );
                 } else {
                     pCharacteristic->setValue( meshtastic_ble_empty_value, 0 );
@@ -1245,10 +1255,7 @@
             return( false );
         }
 
-        advertising->stop();
         advertising->reset();
-        advertising->removeServices();
-        advertising->setName( device_get_name() );
         advertising->addServiceUUID( MESHTASTIC_BLE_SERVICE_UUID );
         advertising->addServiceUUID( NimBLEUUID( MESHTASTIC_BATTERY_SERVICE_UUID ) );
         return( advertising->start( 0 ) );

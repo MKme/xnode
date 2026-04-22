@@ -103,22 +103,30 @@ static bool blectl_powermgm_event_cb( EventBits_t event, void *arg );
 
         void onConnect(NimBLEServer* pServer, ble_gap_conn_desc* desc) {
             pServer->updateConnParams(desc->conn_handle, blectl_config.minInterval, blectl_config.maxInterval, blectl_config.latency, blectl_config.timeout );
-            blectl_set_event( BLECTL_CONNECT );
-            blectl_clear_event( BLECTL_DISCONNECT | BLECTL_AUTHWAIT );
+            if ( meshtastic_ble_pairing_enabled() ) {
+                blectl_set_event( BLECTL_AUTHWAIT );
+                blectl_clear_event( BLECTL_CONNECT | BLECTL_DISCONNECT | BLECTL_PIN_AUTH );
+            }
+            else {
+                blectl_set_event( BLECTL_CONNECT );
+                blectl_clear_event( BLECTL_DISCONNECT | BLECTL_AUTHWAIT | BLECTL_PIN_AUTH );
+                blectl_send_event_cb( BLECTL_CONNECT, (void *)"connected" );
+            }
             powermgm_resume_from_ISR();
             log_d("BLE connected");
-            blectl_send_event_cb( BLECTL_CONNECT, (void *)"connected" );
-            if ( meshtastic_ble_pairing_enabled() ) {
-                blectl_show_pair_passkey( blectl_prepare_pair_passkey() );
-            }
             log_i("Client address: %s", NimBLEAddress(desc->peer_ota_addr).toString().c_str() );
         };
 
         void onDisconnect(NimBLEServer* pServer) {
+            const bool pairing_pending = blectl_get_event( BLECTL_PIN_AUTH );
+
             log_d("BLE disconnected");
             blectl_set_event( BLECTL_DISCONNECT );
-            blectl_clear_event( BLECTL_CONNECT | BLECTL_AUTHWAIT );
+            blectl_clear_event( BLECTL_CONNECT | BLECTL_AUTHWAIT | BLECTL_PIN_AUTH );
             blectl_send_event_cb( BLECTL_DISCONNECT, (void *)"disconnected" );
+            if ( pairing_pending ) {
+                blectl_send_event_cb( BLECTL_PAIRING_ABORT, (void *)"abort" );
+            }
             powermgm_resume_from_ISR();
             meshtastic_ble_on_disconnect();
             blectl_pair_passkey = 0;
@@ -155,19 +163,12 @@ static bool blectl_powermgm_event_cb( EventBits_t event, void *arg );
         };
 
         void onAuthenticationComplete(ble_gap_conn_desc* desc){
-            if ( desc->sec_state.encrypted ) {
-                if ( blectl_get_event( BLECTL_PIN_AUTH ) ) {
-                    log_d("BLECTL pairing successful");
-                    blectl_clear_event( BLECTL_PIN_AUTH );
-                    blectl_send_event_cb( BLECTL_PAIRING_SUCCESS, (void *)"success" );
-                }
-            }
-            else if ( blectl_get_event( BLECTL_PIN_AUTH ) ) {
-                log_d("BLECTL pairing abort");
+            log_i("BLE authentication complete");
+
+            if ( blectl_get_event( BLECTL_PIN_AUTH ) ) {
+                log_d("BLECTL pairing successful");
                 blectl_clear_event( BLECTL_PIN_AUTH );
-                blectl_send_event_cb( BLECTL_PAIRING_ABORT, (void *)"abort" );
-                NimBLEDevice::getServer()->disconnect( desc->conn_handle );
-                return;
+                blectl_send_event_cb( BLECTL_PAIRING_SUCCESS, (void *)"success" );
             }
 
             if ( !blectl_get_event( BLECTL_CONNECT ) ) {
@@ -219,9 +220,8 @@ void blectl_setup( void ) {
          * Create the BLE Server
          */
         pServer = NimBLEDevice::createServer();
-        pServer->setCallbacks( new ServerCallbacks() );
+        pServer->setCallbacks( new ServerCallbacks(), true );
         pAdvertising = NimBLEDevice::getAdvertising();
-        pAdvertising->setAppearance( 0x00c0 );
         /**
          * add services
          */
