@@ -51,6 +51,7 @@
     #include <string.h>
     #include <unistd.h>
     #include <sys/types.h>
+    #include <sys/stat.h>
     #include <pwd.h>
     #include "utils/logging.h"
     #include "utils/millis.h"
@@ -127,6 +128,7 @@ static uint32_t osmmap_watch_flash_render_zoom = 10;
 static int32_t osmmap_watch_flash_pan_x = 0;
 static int32_t osmmap_watch_flash_pan_y = 0;
 static char osmmap_watch_flash_uri[ 160 ] = { 0 };
+static constexpr const char *OSMMAP_WATCH_CURRENT_TILE_PATH = "/spiffs/osmmap/current.png";
 
 static const size_t OSMMAP_OVERLAY_MAX_ITEMS = 96;
 static const size_t OSMMAP_OVERLAY_KEY_LEN = 48;
@@ -157,6 +159,10 @@ typedef struct {
     double lon;
     double lat;
     uint32_t updated_at;
+    bool has_color;
+    uint8_t color_r;
+    uint8_t color_g;
+    uint8_t color_b;
     char key[ OSMMAP_OVERLAY_KEY_LEN ];
     char label[ OSMMAP_OVERLAY_LABEL_LEN ];
     lv_obj_t *marker_obj;
@@ -167,18 +173,18 @@ static osmmap_overlay_item_t osmmap_overlay_items[ OSMMAP_OVERLAY_MAX_ITEMS ] = 
 static bool osmmap_overlay_layer_enabled[ OSMMAP_OVERLAY_KIND_COUNT ] = {
     true,   /* team */
     true,   /* mesh */
-    false,  /* sitrep */
-    false,  /* contact */
-    false,  /* task */
-    false,  /* checkin */
-    false,  /* resource */
-    false,  /* asset */
-    false,  /* zone */
-    false,  /* mission */
-    false,  /* event */
-    false,  /* phaseline */
-    false,  /* sentinel */
-    false   /* route */
+    true,   /* sitrep */
+    true,   /* contact */
+    true,   /* task */
+    true,   /* checkin */
+    true,   /* resource */
+    true,   /* asset */
+    true,   /* zone */
+    true,   /* mission */
+    true,   /* event */
+    true,   /* phaseline */
+    true,   /* sentinel */
+    true    /* route */
 };
 
 LV_IMG_DECLARE(layers_dark_48px);
@@ -219,6 +225,7 @@ static bool osmmap_is_watch_flash_source_name( const char *name );
 static uint32_t osmmap_long2tilex( double lon, uint32_t z );
 static uint32_t osmmap_lat2tiley( double lat, uint32_t z );
 static bool osmmap_configure_watch_flash_source( double lon, double lat, uint32_t zoom, bool persist );
+static void osmmap_reset_active_tile_image( void );
 static uint32_t osmmap_get_watch_flash_min_render_zoom( void );
 static void osmmap_clamp_watch_flash_pan( void );
 static uint16_t osmmap_get_watch_flash_lvgl_zoom( void );
@@ -234,6 +241,11 @@ static const char *osmmap_overlay_badge_text( osmmap_overlay_kind_t kind );
 static lv_color_t osmmap_overlay_bg_color( osmmap_overlay_kind_t kind );
 static lv_color_t osmmap_overlay_text_color( osmmap_overlay_kind_t kind );
 static lv_color_t osmmap_overlay_border_color( osmmap_overlay_kind_t kind );
+static bool osmmap_overlay_parse_color( const char *value, uint8_t *r, uint8_t *g, uint8_t *b );
+static lv_color_t osmmap_overlay_item_bg_color( const osmmap_overlay_item_t *item );
+static lv_color_t osmmap_overlay_item_text_color( const osmmap_overlay_item_t *item );
+static lv_color_t osmmap_overlay_item_border_color( const osmmap_overlay_item_t *item );
+static uint16_t osmmap_overlay_marker_size( osmmap_overlay_kind_t kind );
 static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item );
 static void osmmap_hide_overlay_marker( osmmap_overlay_item_t *item );
 
@@ -346,17 +358,92 @@ static lv_color_t osmmap_overlay_border_color( osmmap_overlay_kind_t kind ) {
     return( lv_color_make( 18, 24, 38 ) );
 }
 
+static int osmmap_overlay_hex_nibble( char c ) {
+    if ( c >= '0' && c <= '9' ) return( c - '0' );
+    if ( c >= 'a' && c <= 'f' ) return( c - 'a' + 10 );
+    if ( c >= 'A' && c <= 'F' ) return( c - 'A' + 10 );
+    return( -1 );
+}
+
+static bool osmmap_overlay_parse_color( const char *value, uint8_t *r, uint8_t *g, uint8_t *b ) {
+    const char *p = value;
+    int n[ 6 ];
+
+    if ( !p || !r || !g || !b ) {
+        return( false );
+    }
+    if ( p[ 0 ] == '#' ) {
+        p++;
+    }
+    if ( strlen( p ) != 6 ) {
+        return( false );
+    }
+
+    for ( int i = 0; i < 6; i++ ) {
+        n[ i ] = osmmap_overlay_hex_nibble( p[ i ] );
+        if ( n[ i ] < 0 ) {
+            return( false );
+        }
+    }
+
+    *r = (uint8_t)( ( n[ 0 ] << 4 ) | n[ 1 ] );
+    *g = (uint8_t)( ( n[ 2 ] << 4 ) | n[ 3 ] );
+    *b = (uint8_t)( ( n[ 4 ] << 4 ) | n[ 5 ] );
+    return( true );
+}
+
+static lv_color_t osmmap_overlay_item_bg_color( const osmmap_overlay_item_t *item ) {
+    if ( item && item->has_color ) {
+        return( lv_color_make( item->color_r, item->color_g, item->color_b ) );
+    }
+    return( osmmap_overlay_bg_color( item ? item->kind : OSMMAP_OVERLAY_KIND_UNKNOWN ) );
+}
+
+static bool osmmap_overlay_item_color_is_dark( const osmmap_overlay_item_t *item ) {
+    uint16_t luminance = 255;
+
+    if ( !item || !item->has_color ) {
+        return( false );
+    }
+    luminance = (uint16_t)( ( (uint16_t)item->color_r * 299 + (uint16_t)item->color_g * 587 + (uint16_t)item->color_b * 114 ) / 1000 );
+    return( luminance < 145 );
+}
+
+static lv_color_t osmmap_overlay_item_text_color( const osmmap_overlay_item_t *item ) {
+    if ( item && item->has_color ) {
+        return( osmmap_overlay_item_color_is_dark( item ) ? LV_COLOR_WHITE : LV_COLOR_BLACK );
+    }
+    return( osmmap_overlay_text_color( item ? item->kind : OSMMAP_OVERLAY_KIND_UNKNOWN ) );
+}
+
+static lv_color_t osmmap_overlay_item_border_color( const osmmap_overlay_item_t *item ) {
+    if ( item && item->has_color ) {
+        return( osmmap_overlay_item_color_is_dark( item ) ? LV_COLOR_WHITE : LV_COLOR_BLACK );
+    }
+    return( osmmap_overlay_border_color( item ? item->kind : OSMMAP_OVERLAY_KIND_UNKNOWN ) );
+}
+
+static uint16_t osmmap_overlay_marker_size( osmmap_overlay_kind_t kind ) {
+    switch ( kind ) {
+        case OSMMAP_OVERLAY_KIND_ZONE:
+        case OSMMAP_OVERLAY_KIND_PHASELINE:
+        case OSMMAP_OVERLAY_KIND_ROUTE:
+            return( 14 );
+        default:
+            return( 16 );
+    }
+}
+
 static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item ) {
     lv_obj_t *parent = osmmap_app_tile_img ? lv_obj_get_parent( osmmap_app_tile_img ) : NULL;
+    uint16_t marker_size = item ? osmmap_overlay_marker_size( item->kind ) : 16;
 
     if ( !item || !parent ) {
         return( NULL );
     }
     if ( !item->marker_obj ) {
         item->marker_obj = lv_obj_create( parent, NULL );
-        lv_obj_set_size( item->marker_obj, 18, 18 );
         lv_obj_set_click( item->marker_obj, false );
-        lv_obj_set_style_local_radius( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, LV_RADIUS_CIRCLE );
         lv_obj_set_style_local_border_width( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, 2 );
         lv_obj_set_style_local_pad_all( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, 0 );
         lv_obj_set_style_local_bg_opa( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, LV_OPA_COVER );
@@ -366,11 +453,18 @@ static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item ) {
         lv_obj_set_style_local_text_font( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &Ubuntu_12px );
         lv_obj_set_hidden( item->marker_obj, true );
     }
-    lv_obj_set_style_local_bg_color( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_bg_color( item->kind ) );
-    lv_obj_set_style_local_border_color( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_border_color( item->kind ) );
+    lv_obj_set_size( item->marker_obj, marker_size, marker_size );
+    lv_obj_set_style_local_radius(
+        item->marker_obj,
+        LV_OBJ_PART_MAIN,
+        LV_STATE_DEFAULT,
+        marker_size <= 14 ? 3 : LV_RADIUS_CIRCLE
+    );
+    lv_obj_set_style_local_bg_color( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_item_bg_color( item ) );
+    lv_obj_set_style_local_border_color( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_item_border_color( item ) );
     if ( item->marker_label_obj ) {
         lv_label_set_text( item->marker_label_obj, osmmap_overlay_badge_text( item->kind ) );
-        lv_obj_set_style_local_text_color( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_text_color( item->kind ) );
+        lv_obj_set_style_local_text_color( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_item_text_color( item ) );
         lv_obj_align( item->marker_label_obj, item->marker_obj, LV_ALIGN_CENTER, 0, 0 );
     }
     return( item->marker_obj );
@@ -399,16 +493,21 @@ static bool osmmap_configure_watch_flash_source( double lon, double lat, uint32_
     const uint32_t clamped_zoom = zoom < 2 ? 2 : ( zoom > 18 ? 18 : zoom );
     const uint32_t tilex = osmmap_long2tilex( lon, clamped_zoom );
     const uint32_t tiley = osmmap_lat2tiley( lat, clamped_zoom );
+    char tile_path_current[ 160 ] = { 0 };
     char tile_path_jpg[ 160 ] = { 0 };
     char tile_path_png[ 160 ] = { 0 };
     const char *tile_path = NULL;
 
+    strlcpy( tile_path_current, OSMMAP_WATCH_CURRENT_TILE_PATH, sizeof( tile_path_current ) );
     snprintf( tile_path_jpg, sizeof( tile_path_jpg ), "/spiffs/osmmap/%u/%u/%u.jpg", clamped_zoom, tilex, tiley );
     snprintf( tile_path_png, sizeof( tile_path_png ), "/spiffs/osmmap/%u/%u/%u.png", clamped_zoom, tilex, tiley );
 #ifndef NATIVE_64BIT
     struct stat st;
 
-    if ( stat( tile_path_png, &st ) == 0 ) {
+    if ( stat( tile_path_current, &st ) == 0 ) {
+        tile_path = tile_path_current;
+    }
+    else if ( stat( tile_path_png, &st ) == 0 ) {
         tile_path = tile_path_png;
     }
     else if ( stat( tile_path_jpg, &st ) == 0 ) {
@@ -430,10 +529,14 @@ static bool osmmap_configure_watch_flash_source( double lon, double lat, uint32_
     osmmap_watch_flash_pan_y = 0;
 
     if ( osmmap_location ) {
+        if ( osmmap_app_active ) {
+            osmmap_reset_active_tile_image();
+        }
         osm_map_set_tile_server( osmmap_location, osmmap_watch_flash_uri );
         osm_map_clear_cache( osmmap_location );
         osm_map_set_zoom( osmmap_location, clamped_zoom );
         osm_map_set_lon_lat( osmmap_location, lon, lat );
+        osm_map_center_location( osmmap_location );
     }
 
     if ( persist ) {
@@ -446,6 +549,18 @@ static bool osmmap_configure_watch_flash_source( double lon, double lat, uint32_
 
     osmmap_apply_image_zoom();
     return( true );
+}
+
+static void osmmap_reset_active_tile_image( void ) {
+    if ( !osmmap_app_active ) {
+        return;
+    }
+
+    lv_img_cache_invalidate_src( NULL );
+    if ( osmmap_app_tile_img ) {
+        lv_img_set_src( osmmap_app_tile_img, osm_map_get_no_data_image() );
+        lv_obj_invalidate( osmmap_app_tile_img );
+    }
 }
 
 static uint32_t osmmap_get_watch_flash_min_render_zoom( void ) {
@@ -1570,11 +1685,15 @@ void osmmap_clear_external_marker( void ) {
     }
 }
 
-void osmmap_upsert_overlay_item( const char *key, const char *kind, double lon, double lat, const char *label, uint32_t updated_at ) {
+void osmmap_upsert_overlay_item( const char *key, const char *kind, double lon, double lat, const char *label, uint32_t updated_at, const char *color ) {
     osmmap_overlay_item_t *slot = NULL;
     uint32_t oldest_at = UINT32_MAX;
     size_t oldest_idx = 0;
     const osmmap_overlay_kind_t overlay_kind = osmmap_overlay_kind_from_name( kind );
+    uint8_t color_r = 0;
+    uint8_t color_g = 0;
+    uint8_t color_b = 0;
+    const bool has_color = osmmap_overlay_parse_color( color, &color_r, &color_g, &color_b );
 
     if ( overlay_kind == OSMMAP_OVERLAY_KIND_UNKNOWN ) {
         return;
@@ -1607,6 +1726,10 @@ void osmmap_upsert_overlay_item( const char *key, const char *kind, double lon, 
     slot->lon = lon;
     slot->lat = lat;
     slot->updated_at = updated_at ? updated_at : (uint32_t)millis();
+    slot->has_color = has_color;
+    slot->color_r = color_r;
+    slot->color_g = color_g;
+    slot->color_b = color_b;
     strlcpy( slot->key, key, sizeof( slot->key ) );
     strlcpy( slot->label, label ? label : "", sizeof( slot->label ) );
     if ( slot->marker_obj ) {
@@ -1624,6 +1747,10 @@ void osmmap_clear_overlay_items( void ) {
         osmmap_overlay_items[ i ].lon = 0.0;
         osmmap_overlay_items[ i ].lat = 0.0;
         osmmap_overlay_items[ i ].updated_at = 0;
+        osmmap_overlay_items[ i ].has_color = false;
+        osmmap_overlay_items[ i ].color_r = 0;
+        osmmap_overlay_items[ i ].color_g = 0;
+        osmmap_overlay_items[ i ].color_b = 0;
         osmmap_overlay_items[ i ].key[ 0 ] = '\0';
         osmmap_overlay_items[ i ].label[ 0 ] = '\0';
         osmmap_hide_overlay_marker( &osmmap_overlay_items[ i ] );
@@ -1673,9 +1800,48 @@ bool osmmap_apply_watch_basemap( const char *map_name, double lon, double lat, u
     }
 
     if ( osmmap_app_active ) {
+        osmmap_reset_active_tile_image();
         osmmap_update_request();
-        lv_img_cache_invalidate_src( osmmap_app_tile_img );
     }
 
     return( true );
+}
+
+bool osmmap_get_watch_basemap_info( char *path, size_t path_size, size_t *bytes ) {
+    const char *file_path = NULL;
+
+    if ( path && path_size ) {
+        path[ 0 ] = '\0';
+    }
+    if ( bytes ) {
+        *bytes = 0;
+    }
+
+    if ( strncmp( osmmap_watch_flash_uri, "file://", 7 ) == 0 ) {
+        file_path = osmmap_watch_flash_uri + 7;
+    }
+    else if ( osmmap_watch_flash_uri[ 0 ] ) {
+        file_path = osmmap_watch_flash_uri;
+    }
+
+    if ( !file_path || !file_path[ 0 ] ) {
+        return( false );
+    }
+    if ( path && path_size ) {
+        strlcpy( path, file_path, path_size );
+    }
+
+#ifndef NATIVE_64BIT
+    struct stat st;
+
+    if ( stat( file_path, &st ) == 0 ) {
+        if ( bytes ) {
+            *bytes = (size_t)st.st_size;
+        }
+        return( true );
+    }
+    return( false );
+#else
+    return( true );
+#endif
 }

@@ -52,11 +52,11 @@ void osmmap_app_setup( void ) {
     /*
      * register 2 vertical tiles and get the first tile number and save it for later use
      */
-    osmmap_app_main_tile_num = mainbar_add_app_tile( 1, 1, "OsmMap App" );
+    osmmap_app_main_tile_num = mainbar_add_app_tile( 1, 1, "Tac Map" );
     /*
      * register an app icon and the app enter function
      */
-    osmmap_app = app_register( "OsmMap", &osm_64px, enter_osmmap_app_event_cb );
+    osmmap_app = app_register( "Tac\nMap", &osm_64px, enter_osmmap_app_event_cb );
     /*
      * init main tile, see example_app_main.cpp and example_app_setup.cpp
      */

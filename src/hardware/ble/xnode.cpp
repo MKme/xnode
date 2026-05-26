@@ -15,6 +15,7 @@
     #include "app/osmmap/osmmap_app_main.h"
     #include "app/osmmap/config/osmmap_config.h"
     #include "app/meshtastic/meshtastic_service.h"
+    #include "gui/mainbar/app_tile/xnode_notifications/xnode_notifications.h"
     #include "gui/mainbar/setup_tile/bluetooth_settings/bluetooth_message.h"
     #include "hardware/blectl.h"
     #include "hardware/device.h"
@@ -28,6 +29,7 @@
         constexpr const char *XNODE_OFFLINE_TILE_ROOT = "/spiffs/osmmap";
         constexpr const char *XNODE_OFFLINE_TILE_PREFIX = "/spiffs/osmmap/";
         constexpr const char *XNODE_OFFLINE_MAP_NAME = "offline from watch flash";
+        constexpr const char *XNODE_CURRENT_TILE_PATH = "/spiffs/osmmap/current.png";
         constexpr const char *XNODE_SEED_TILE_PATH = "/spiffs/osmmap/10/279/373.png";
         constexpr double XNODE_SEED_TILE_LAT = 43.74623;
         constexpr double XNODE_SEED_TILE_LON = -81.70749;
@@ -35,7 +37,7 @@
         constexpr size_t XNODE_FRAME_CHUNK = 140;
         constexpr size_t XNODE_MAX_ENCODED = 4096;
         constexpr size_t XNODE_MAX_JSON = 3072;
-        constexpr size_t XNODE_QUEUE_DEPTH = 48;
+        constexpr size_t XNODE_QUEUE_DEPTH = 96;
         constexpr size_t XNODE_FRAME_BUFFER = 256;
 
         extern const uint8_t xnode_seed_tile_start[] asm("_binary_src_assets_xnode_seed_tile_10_279_373_png_start");
@@ -55,6 +57,11 @@
         uint16_t xnode_rx_total = 0;
         uint16_t xnode_rx_index = 0;
         String xnode_rx_encoded;
+        char xnode_file_path[ 160 ] = { 0 };
+        size_t xnode_file_total = 0;
+        size_t xnode_file_offset = 0;
+        size_t xnode_file_next_status = 0;
+        bool xnode_file_active = false;
 
         bool xnode_link_ready( void ) {
             return( pXnodeTXCharacteristic && blectl_get_event( BLECTL_CONNECT | BLECTL_AUTHWAIT ) );
@@ -252,8 +259,8 @@
             return( xnode_send_json_text( json ) );
         }
 
-        bool xnode_send_status_event( const char *status, const char *name, const char *tile_root ) {
-            StaticJsonDocument< 384 > payload;
+        bool xnode_send_status_event( const char *status, const char *name, const char *tile_root, size_t bytes = 0, size_t total = 0, const char *path = NULL ) {
+            StaticJsonDocument< 512 > payload;
 
             payload[ "status" ] = status ? status : "unknown";
             if ( name && name[ 0 ] ) {
@@ -261,6 +268,13 @@
             }
             if ( tile_root && tile_root[ 0 ] ) {
                 payload[ "tileRoot" ] = tile_root;
+            }
+            if ( path && path[ 0 ] ) {
+                payload[ "path" ] = path;
+            }
+            if ( total > 0 ) {
+                payload[ "bytes" ] = (uint32_t)bytes;
+                payload[ "totalBytes" ] = (uint32_t)total;
             }
             return( xnode_send_event( "basemapStatus", payload ) );
         }
@@ -303,13 +317,18 @@
             struct stat st;
             FILE *file = NULL;
             const size_t tile_len = (size_t)( xnode_seed_tile_end - xnode_seed_tile_start );
+            osmmap_config_t config;
+
+            config.load();
+            if ( !strcmp( config.osmmap, XNODE_OFFLINE_MAP_NAME ) && config.watch_flash_basemap_valid ) {
+                return( true );
+            }
 
             if ( tile_len == 0 ) {
                 return( false );
             }
 
             if ( stat( XNODE_SEED_TILE_PATH, &st ) == 0 && (size_t)st.st_size == tile_len ) {
-                osmmap_apply_watch_basemap( XNODE_OFFLINE_MAP_NAME, XNODE_SEED_TILE_LON, XNODE_SEED_TILE_LAT, XNODE_SEED_TILE_ZOOM );
                 return( true );
             }
 
@@ -323,7 +342,6 @@
                 return( false );
             }
             fclose( file );
-            osmmap_apply_watch_basemap( XNODE_OFFLINE_MAP_NAME, XNODE_SEED_TILE_LON, XNODE_SEED_TILE_LAT, XNODE_SEED_TILE_ZOOM );
             return( true );
         }
 
@@ -388,6 +406,160 @@
             return( written == data_len );
         }
 
+        void xnode_reset_file_transfer( void ) {
+            xnode_file_path[ 0 ] = '\0';
+            xnode_file_total = 0;
+            xnode_file_offset = 0;
+            xnode_file_next_status = 0;
+            xnode_file_active = false;
+        }
+
+        bool xnode_begin_file_transfer( const char *filepath, size_t total_bytes, char *detail, size_t detail_size ) {
+            if ( detail && detail_size ) {
+                detail[ 0 ] = '\0';
+            }
+
+            if ( !xnode_watch_path_valid( filepath ) ) {
+                if ( detail && detail_size ) {
+                    snprintf( detail, detail_size, "path-invalid %s", filepath ? filepath : "" );
+                }
+                return( false );
+            }
+            if ( total_bytes == 0 || total_bytes > 512000 ) {
+                if ( detail && detail_size ) {
+                    snprintf( detail, detail_size, "size-invalid %u", (unsigned)total_bytes );
+                }
+                return( false );
+            }
+            remove( filepath );
+            strlcpy( xnode_file_path, filepath, sizeof( xnode_file_path ) );
+            xnode_file_total = total_bytes;
+            xnode_file_offset = 0;
+            xnode_file_next_status = 4096;
+            xnode_file_active = true;
+            return( true );
+        }
+
+        bool xnode_handle_file_stream_frame( const char *frame ) {
+            const char *offset_start = frame ? frame + 2 : NULL;
+            const char *first = offset_start ? strchr( offset_start, ':' ) : NULL;
+            const char *second = first ? strchr( first + 1, ':' ) : NULL;
+            char offset_text[ 16 ] = { 0 };
+            char total_text[ 16 ] = { 0 };
+            char detail[ 160 ] = { 0 };
+            uint8_t *decoded_data = NULL;
+            size_t decoded_len = 0;
+            struct stat st;
+
+            if ( !frame || strncmp( frame, "T:", 2 ) != 0 ) {
+                return( false );
+            }
+            if ( !first || !second || second[ 1 ] == '\0' ) {
+                xnode_send_status_event( "tile-write-error", "stream-frame-invalid", XNODE_OFFLINE_TILE_ROOT );
+                xnode_reset_file_transfer();
+                return( true );
+            }
+
+            const size_t offset_len = min( (size_t)( first - offset_start ), sizeof( offset_text ) - 1 );
+            const size_t total_len = min( (size_t)( second - first - 1 ), sizeof( total_text ) - 1 );
+            memcpy( offset_text, offset_start, offset_len );
+            memcpy( total_text, first + 1, total_len );
+
+            const size_t offset = (size_t)strtoul( offset_text, NULL, 10 );
+            const size_t total_bytes = (size_t)strtoul( total_text, NULL, 10 );
+            const char *encoded = second + 1;
+
+            if ( !xnode_file_active || !xnode_file_path[ 0 ] || total_bytes != xnode_file_total ) {
+                snprintf(
+                    detail,
+                    sizeof( detail ),
+                    "stream-offset-mismatch %s have=%u want=%u",
+                    xnode_file_path,
+                    (unsigned)xnode_file_offset,
+                    (unsigned)offset
+                );
+                xnode_send_status_event( "tile-write-error", detail, XNODE_OFFLINE_TILE_ROOT, xnode_file_offset, xnode_file_total );
+                xnode_reset_file_transfer();
+                return( true );
+            }
+
+            if ( !xnode_base64url_decode_bytes( encoded, &decoded_data, &decoded_len ) || !decoded_data || decoded_len == 0 ) {
+                xnode_send_status_event( "tile-write-error", "stream-decode-error", XNODE_OFFLINE_TILE_ROOT, xnode_file_offset, xnode_file_total );
+                xnode_reset_file_transfer();
+                if ( decoded_data ) {
+                    free( decoded_data );
+                }
+                return( true );
+            }
+
+            if ( offset < xnode_file_offset && offset + decoded_len <= xnode_file_offset ) {
+                free( decoded_data );
+                xnode_send_status_event( "tile-progress", xnode_file_path, XNODE_OFFLINE_TILE_ROOT, xnode_file_offset, xnode_file_total );
+                return( true );
+            }
+
+            if ( offset != xnode_file_offset ) {
+                free( decoded_data );
+                snprintf(
+                    detail,
+                    sizeof( detail ),
+                    "stream-offset-mismatch %s have=%u want=%u",
+                    xnode_file_path,
+                    (unsigned)xnode_file_offset,
+                    (unsigned)offset
+                );
+                xnode_send_status_event( "tile-write-error", detail, XNODE_OFFLINE_TILE_ROOT, xnode_file_offset, xnode_file_total );
+                xnode_reset_file_transfer();
+                return( true );
+            }
+
+            if ( !xnode_write_file_chunk( xnode_file_path, decoded_data, decoded_len, offset > 0, offset, detail, sizeof( detail ) ) ) {
+                free( decoded_data );
+                if ( detail[ 0 ] == '\0' ) {
+                    snprintf( detail, sizeof( detail ), "%s errno=%d", xnode_file_path, errno );
+                }
+                xnode_send_status_event( "tile-write-error", detail, XNODE_OFFLINE_TILE_ROOT, xnode_file_offset, xnode_file_total );
+                xnode_reset_file_transfer();
+                return( true );
+            }
+            free( decoded_data );
+
+            xnode_file_offset += decoded_len;
+            if ( xnode_file_offset >= xnode_file_total ) {
+                const bool stat_ok = stat( xnode_file_path, &st ) == 0;
+                const size_t stored_size = stat_ok ? (size_t)st.st_size : 0;
+
+                if ( !stat_ok || stored_size != xnode_file_total ) {
+                    snprintf(
+                        detail,
+                        sizeof( detail ),
+                        "size-mismatch %s have=%u want=%u",
+                        xnode_file_path,
+                        (unsigned)stored_size,
+                        (unsigned)xnode_file_total
+                    );
+                    xnode_send_status_event( "tile-write-error", detail, XNODE_OFFLINE_TILE_ROOT, stored_size, xnode_file_total );
+                    xnode_reset_file_transfer();
+                    return( true );
+                }
+                snprintf( detail, sizeof( detail ), "%s bytes=%u", xnode_file_path, (unsigned)xnode_file_total );
+                xnode_send_status_event( "tile-stored", detail, XNODE_OFFLINE_TILE_ROOT, xnode_file_offset, xnode_file_total );
+                if ( !strcmp( xnode_file_path, XNODE_CURRENT_TILE_PATH ) ) {
+                    remove( XNODE_SEED_TILE_PATH );
+                }
+                xnode_reset_file_transfer();
+                return( true );
+            }
+
+            if ( xnode_file_offset >= xnode_file_next_status ) {
+                xnode_send_status_event( "tile-progress", xnode_file_path, XNODE_OFFLINE_TILE_ROOT, xnode_file_offset, xnode_file_total );
+                while ( xnode_file_next_status <= xnode_file_offset ) {
+                    xnode_file_next_status += 4096;
+                }
+            }
+            return( true );
+        }
+
         bool xnode_apply_time_payload( JsonObjectConst payload ) {
             if ( payload[ "ts" ].isNull() ) {
                 return( false );
@@ -435,6 +607,7 @@
             capabilities.add( "meshtastic" );
             capabilities.add( "basemap" );
             capabilities.add( "mapOverlay" );
+            capabilities.add( "newsNotifications" );
             capabilities.add( "ble" );
 
             return( xnode_send_event( "helloAck", payload ) );
@@ -483,6 +656,7 @@
             const char *key = item[ "key" ] | "";
             const char *kind = item[ "kind" ] | "";
             const char *label = item[ "label" ].isNull() ? ( item[ "summary" ] | ( kind ? kind : "" ) ) : ( item[ "label" ] | ( kind ? kind : "" ) );
+            const char *color = item[ "color" ] | "";
             const double lat = item[ "lat" ].isNull() ? ( item[ "latitude" ] | 999.0 ) : ( item[ "lat" ] | 999.0 );
             const double lon = item[ "lon" ].isNull() ? ( item[ "longitude" ] | 999.0 ) : ( item[ "lon" ] | 999.0 );
             const uint32_t updated_at = item[ "updatedAt" ].isNull() ? ( item[ "packetAt" ] | 0 ) : ( item[ "updatedAt" ] | 0 );
@@ -494,7 +668,7 @@
                 return( false );
             }
 
-            osmmap_upsert_overlay_item( key, kind, lon, lat, label, updated_at );
+            osmmap_upsert_overlay_item( key, kind, lon, lat, label, updated_at, color );
             return( true );
         }
 
@@ -570,6 +744,7 @@
                         const char *key = packet[ "key" ] | "";
                         const char *kind = xnode_overlay_kind_for_template( packet[ "templateId" ] | 0 );
                         const char *label = packet[ "summary" ] | ( kind ? kind : "" );
+                        const char *color = packet[ "color" ] | "";
                         const double lat = packet[ "lat" ].isNull() ? ( packet[ "latitude" ] | 999.0 ) : ( packet[ "lat" ] | 999.0 );
                         const double lon = packet[ "lon" ].isNull() ? ( packet[ "longitude" ] | 999.0 ) : ( packet[ "lon" ] | 999.0 );
                         const uint32_t packet_at = packet[ "packetAt" ] | 0;
@@ -582,7 +757,7 @@
                             continue;
                         }
                         snprintf( overlay_key, sizeof( overlay_key ), "packet:%s", key );
-                        osmmap_upsert_overlay_item( overlay_key, kind, lon, lat, label, packet_at );
+                        osmmap_upsert_overlay_item( overlay_key, kind, lon, lat, label, packet_at, color );
                         applied++;
                     }
                 }
@@ -612,6 +787,37 @@
                 return;
             }
 
+            if ( strcmp( type, "newsItem" ) == 0 ) {
+                StaticJsonDocument< 256 > reply;
+                const char *source = payload[ "source" ].isNull() ? ( payload[ "src" ] | xnode_last_host_name ) : ( payload[ "source" ] | xnode_last_host_name );
+                const char *title = payload[ "title" ] | "News";
+                const char *body = payload[ "body" ].isNull() ? ( payload[ "text" ] | "" ) : ( payload[ "body" ] | "" );
+                double ts_value = payload[ "ts" ] | 0.0;
+
+                if ( ts_value > 2000000000.0 ) {
+                    ts_value /= 1000.0;
+                }
+
+                const bool stored = xnode_notifications_push( source, title, body, (uint32_t)ts_value );
+                reply[ "id" ] = payload[ "id" ] | "";
+                reply[ "stored" ] = stored;
+                reply[ "enabled" ] = xnode_notifications_get_enabled();
+                reply[ "count" ] = xnode_notifications_get_count();
+                xnode_send_event( "newsItemAck", reply );
+                return;
+            }
+
+            if ( strcmp( type, "setNewsNotifications" ) == 0 ) {
+                StaticJsonDocument< 128 > reply;
+                const bool enabled = payload[ "enabled" ] | true;
+
+                xnode_notifications_set_enabled( enabled );
+                reply[ "enabled" ] = xnode_notifications_get_enabled();
+                reply[ "count" ] = xnode_notifications_get_count();
+                xnode_send_event( "newsNotificationsConfig", reply );
+                return;
+            }
+
             if ( strcmp( type, "location" ) == 0 ) {
                 StaticJsonDocument< 256 > reply;
                 const double lat = payload[ "lat" ].isNull() ? ( payload[ "latitude" ] | 0.0 ) : ( payload[ "lat" ] | 0.0 );
@@ -625,6 +831,24 @@
                     reply[ "label" ] = label;
                     reply[ "timeUpdated" ] = time_updated;
                     xnode_send_event( "locationAck", reply );
+                }
+                return;
+            }
+
+            if ( strcmp( type, "mapTileBegin" ) == 0 ) {
+                const char *filepath = payload[ "path" ] | "";
+                const size_t total_bytes = payload[ "totalBytes" ] | 0;
+                char status_name[ 160 ] = { 0 };
+
+                if ( xnode_begin_file_transfer( filepath, total_bytes, status_name, sizeof( status_name ) ) ) {
+                    xnode_send_status_event( "tile-ready", filepath, XNODE_OFFLINE_TILE_ROOT, 0, total_bytes );
+                }
+                else {
+                    if ( status_name[ 0 ] == '\0' ) {
+                        snprintf( status_name, sizeof( status_name ), "begin-failed %s", filepath );
+                    }
+                    xnode_send_status_event( "tile-write-error", status_name, XNODE_OFFLINE_TILE_ROOT );
+                    xnode_reset_file_transfer();
                 }
                 return;
             }
@@ -678,6 +902,9 @@
                         }
                         snprintf( status_name, sizeof( status_name ), "%s bytes=%u", filepath, (unsigned)total_bytes );
                         xnode_send_status_event( "tile-stored", status_name, XNODE_OFFLINE_TILE_ROOT );
+                        if ( !strcmp( filepath, XNODE_CURRENT_TILE_PATH ) ) {
+                            remove( XNODE_SEED_TILE_PATH );
+                        }
                     }
                     return;
                 }
@@ -699,6 +926,8 @@
                 const uint32_t center_zoom = center[ "zoom" ] | ( manifest[ "minZoom" ] | 10 );
                 osmmap_config_t config;
                 char body[ 160 ];
+                char active_path[ 160 ] = { 0 };
+                size_t active_bytes = 0;
 
                 config.load();
                 strlcpy( config.osmmap, XNODE_OFFLINE_MAP_NAME, sizeof( config.osmmap ) );
@@ -710,15 +939,21 @@
                     return;
                 }
                 sdcard_block_unmounting( false );
+                osmmap_get_watch_basemap_info( active_path, sizeof( active_path ), &active_bytes );
 
-                snprintf( body, sizeof( body ), "profile staged: %s (%s)", name, XNODE_OFFLINE_TILE_ROOT );
+                snprintf( body, sizeof( body ), "profile active: %s (%s %u bytes)", name, active_path[ 0 ] ? active_path : "unknown", (unsigned)active_bytes );
                 xnode_queue_notification( "Basemap", body );
-                xnode_send_status_event( "profile-active", name, XNODE_OFFLINE_TILE_ROOT );
+                xnode_send_status_event( "profile-active", name, XNODE_OFFLINE_TILE_ROOT, active_bytes, active_bytes, active_path );
                 return;
             }
         }
 
         void xnode_handle_frame( const char *frame ) {
+            if ( frame && strncmp( frame, "T:", 2 ) == 0 ) {
+                xnode_handle_file_stream_frame( frame );
+                return;
+            }
+
             const char *first = strchr( frame, ':' );
             const char *second = first ? strchr( first + 1, ':' ) : NULL;
             const char *third = second ? strchr( second + 1, ':' ) : NULL;
