@@ -692,44 +692,7 @@ static void osmmap_update_watch_flash_status_label( void ) {
         return;
     }
 
-    uint32_t used = 0;
-    uint32_t pixel = 0;
-    int16_t min_x = 255;
-    int16_t min_y = 255;
-    int16_t max_x = 0;
-    int16_t max_y = 0;
-    for ( size_t i = 0; i < OSMMAP_OVERLAY_MAX_ITEMS; i++ ) {
-        if ( !osmmap_overlay_items[ i ].used ) {
-            continue;
-        }
-        used++;
-        if ( osmmap_overlay_items[ i ].has_pixel ) {
-            pixel++;
-            if ( osmmap_overlay_items[ i ].pixel_x < min_x ) min_x = osmmap_overlay_items[ i ].pixel_x;
-            if ( osmmap_overlay_items[ i ].pixel_y < min_y ) min_y = osmmap_overlay_items[ i ].pixel_y;
-            if ( osmmap_overlay_items[ i ].pixel_x > max_x ) max_x = osmmap_overlay_items[ i ].pixel_x;
-            if ( osmmap_overlay_items[ i ].pixel_y > max_y ) max_y = osmmap_overlay_items[ i ].pixel_y;
-        }
-    }
-
-    char label[ 48 ] = { 0 };
-    if ( pixel > 0 ) {
-        snprintf(
-            label,
-            sizeof( label ),
-            "X3 %c%u %d,%d-%d,%d",
-            osmmap_watch_flash_uses_current_tile() ? 'C' : 'T',
-            (unsigned)pixel,
-            (int)min_x,
-            (int)min_y,
-            (int)max_x,
-            (int)max_y
-        );
-    }
-    else {
-        snprintf( label, sizeof( label ), "X3 %c0/%u", osmmap_watch_flash_uses_current_tile() ? 'C' : 'T', (unsigned)used );
-    }
-    lv_label_set_text( osmmap_lonlat_label, label );
+    lv_label_set_text( osmmap_lonlat_label, "" );
 }
 
 static void osmmap_clamp_watch_flash_pan( void ) {
