@@ -5,6 +5,7 @@
 
     #include <Arduino.h>
     #include <ArduinoJson.h>
+    #include <cmath>
     #include <errno.h>
     #include <math.h>
     #include <sys/time.h>
@@ -36,8 +37,8 @@
         constexpr double XNODE_SEED_TILE_LON = -81.70749;
         constexpr uint32_t XNODE_SEED_TILE_ZOOM = 10;
         constexpr size_t XNODE_FRAME_CHUNK = 140;
-        constexpr size_t XNODE_MAX_ENCODED = 4096;
-        constexpr size_t XNODE_MAX_JSON = 3072;
+        constexpr size_t XNODE_MAX_ENCODED = 8192;
+        constexpr size_t XNODE_MAX_JSON = 6144;
         constexpr size_t XNODE_QUEUE_DEPTH = 96;
         constexpr size_t XNODE_FRAME_BUFFER = 256;
 
@@ -260,7 +261,7 @@
             return( xnode_send_json_text( json ) );
         }
 
-        bool xnode_send_status_event( const char *status, const char *name, const char *tile_root, size_t bytes = 0, size_t total = 0, const char *path = NULL ) {
+        bool xnode_send_status_event( const char *status, const char *name, const char *tile_root, size_t bytes = 0, size_t total = 0, const char *path = NULL, const char *hash = NULL ) {
             StaticJsonDocument< 512 > payload;
 
             payload[ "status" ] = status ? status : "unknown";
@@ -277,7 +278,18 @@
                 payload[ "bytes" ] = (uint32_t)bytes;
                 payload[ "totalBytes" ] = (uint32_t)total;
             }
+            if ( hash && hash[ 0 ] ) {
+                payload[ "hash" ] = hash;
+            }
             return( xnode_send_event( "basemapStatus", payload ) );
+        }
+
+        bool xnode_send_request_sync( const char *reason ) {
+            StaticJsonDocument< 128 > payload;
+
+            payload[ "reason" ] = reason && reason[ 0 ] ? reason : "watch-request";
+            payload[ "overlayCount" ] = osmmap_overlay_item_count();
+            return( xnode_send_event( "requestSync", payload ) );
         }
 
         bool xnode_watch_path_valid( const char *watch_path ) {
@@ -314,11 +326,83 @@
             return( errno == EEXIST );
         }
 
+        bool xnode_ensure_watch_parent_dirs( const char *filepath, char *detail, size_t detail_size ) {
+            if ( !xnode_watch_path_valid( filepath ) ) {
+                if ( detail && detail_size ) {
+                    snprintf( detail, detail_size, "path-invalid %s", filepath ? filepath : "" );
+                }
+                return( false );
+            }
+            if ( detail && detail_size ) {
+                detail[ 0 ] = '\0';
+            }
+            /*
+             * ESP32 SPIFFS has no real directory tree. Paths with slashes are valid
+             * filenames in the mounted namespace, but mkdir("/spiffs/osmmap") fails
+             * on device and blocks map install before the first write.
+             */
+            return( true );
+        }
+
+        bool xnode_file_hash32( const char *filepath, uint32_t *hash, size_t *bytes ) {
+            FILE *file = NULL;
+            uint8_t buffer[ 512 ];
+            size_t total = 0;
+            uint32_t next_hash = 2166136261UL;
+
+            if ( hash ) {
+                *hash = 0;
+            }
+            if ( bytes ) {
+                *bytes = 0;
+            }
+            if ( !filepath || !filepath[ 0 ] ) {
+                return( false );
+            }
+
+            file = fopen( filepath, "rb" );
+            if ( !file ) {
+                return( false );
+            }
+
+            while ( true ) {
+                const size_t read_len = fread( buffer, 1, sizeof( buffer ), file );
+                for ( size_t i = 0; i < read_len; i++ ) {
+                    next_hash ^= buffer[ i ];
+                    next_hash *= 16777619UL;
+                }
+                total += read_len;
+                if ( read_len < sizeof( buffer ) ) {
+                    break;
+                }
+            }
+
+            const bool ok = ferror( file ) == 0;
+            fclose( file );
+            if ( !ok ) {
+                return( false );
+            }
+            if ( hash ) {
+                *hash = next_hash;
+            }
+            if ( bytes ) {
+                *bytes = total;
+            }
+            return( true );
+        }
+
+        void xnode_hash32_hex( uint32_t hash, char *out, size_t out_size ) {
+            if ( out && out_size ) {
+                snprintf( out, out_size, "%08lx", (unsigned long)hash );
+            }
+        }
+
         bool xnode_seed_default_basemap_tile( void ) {
             struct stat st;
             FILE *file = NULL;
             const size_t tile_len = (size_t)( xnode_seed_tile_end - xnode_seed_tile_start );
             osmmap_config_t config;
+            char detail[ 160 ] = { 0 };
 
             config.load();
             if ( !strcmp( config.osmmap, XNODE_OFFLINE_MAP_NAME ) && config.watch_flash_basemap_valid ) {
@@ -333,6 +417,9 @@
                 return( true );
             }
 
+            if ( !xnode_ensure_watch_parent_dirs( XNODE_SEED_TILE_PATH, detail, sizeof( detail ) ) ) {
+                return( false );
+            }
             remove( XNODE_SEED_TILE_PATH );
             file = fopen( XNODE_SEED_TILE_PATH, "wb" );
             if ( !file ) {
@@ -387,7 +474,11 @@
                 }
                 return( false );
             }
+            if ( !xnode_ensure_watch_parent_dirs( filepath, detail, detail_size ) ) {
+                return( false );
+            }
             if ( !append ) {
+                osmmap_prepare_watch_basemap_file_replace( filepath );
                 remove( filepath );
             }
 
@@ -432,6 +523,10 @@
                 }
                 return( false );
             }
+            if ( !xnode_ensure_watch_parent_dirs( filepath, detail, detail_size ) ) {
+                return( false );
+            }
+            osmmap_prepare_watch_basemap_file_replace( filepath );
             remove( filepath );
             strlcpy( xnode_file_path, filepath, sizeof( xnode_file_path ) );
             xnode_file_total = total_bytes;
@@ -543,8 +638,14 @@
                     xnode_reset_file_transfer();
                     return( true );
                 }
+                uint32_t hash_value = 0;
+                char hash_text[ 12 ] = { 0 };
+
                 snprintf( detail, sizeof( detail ), "%s bytes=%u", xnode_file_path, (unsigned)xnode_file_total );
-                xnode_send_status_event( "tile-stored", detail, XNODE_OFFLINE_TILE_ROOT, xnode_file_offset, xnode_file_total );
+                if ( xnode_file_hash32( xnode_file_path, &hash_value, NULL ) ) {
+                    xnode_hash32_hex( hash_value, hash_text, sizeof( hash_text ) );
+                }
+                xnode_send_status_event( "tile-stored", detail, XNODE_OFFLINE_TILE_ROOT, xnode_file_offset, xnode_file_total, xnode_file_path, hash_text );
                 if ( !strcmp( xnode_file_path, XNODE_CURRENT_TILE_PATH ) ) {
                     remove( XNODE_SEED_TILE_PATH );
                 }
@@ -663,9 +764,9 @@
             const uint32_t updated_at = item[ "updatedAt" ].isNull() ? ( item[ "packetAt" ] | 0 ) : ( item[ "updatedAt" ] | 0 );
             const double map_x = item[ "mapX" ].isNull() ? ( item[ "px" ] | 999999.0 ) : ( item[ "mapX" ] | 999999.0 );
             const double map_y = item[ "mapY" ].isNull() ? ( item[ "py" ] | 999999.0 ) : ( item[ "mapY" ] | 999999.0 );
-            const bool has_pixel = isfinite( map_x ) && isfinite( map_y ) && map_x > -32768.0 && map_x < 32767.0 && map_y > -32768.0 && map_y < 32767.0;
-            const int16_t pixel_x = has_pixel ? (int16_t)lround( map_x ) : 0;
-            const int16_t pixel_y = has_pixel ? (int16_t)lround( map_y ) : 0;
+            const bool has_pixel = std::isfinite( map_x ) && std::isfinite( map_y ) && map_x >= 0.0 && map_x < 256.0 && map_y >= 0.0 && map_y < 256.0;
+            const int16_t pixel_x = has_pixel ? (int16_t)lround( fmax( 0.0, fmin( 255.0, map_x ) ) ) : 0;
+            const int16_t pixel_y = has_pixel ? (int16_t)lround( fmax( 0.0, fmin( 255.0, map_y ) ) ) : 0;
 
             if ( !key[ 0 ] || !kind[ 0 ] ) {
                 return( false );
@@ -910,8 +1011,14 @@
                             xnode_send_status_event( "tile-write-error", status_name, XNODE_OFFLINE_TILE_ROOT );
                             return;
                         }
+                        uint32_t hash_value = 0;
+                        char hash_text[ 12 ] = { 0 };
+
                         snprintf( status_name, sizeof( status_name ), "%s bytes=%u", filepath, (unsigned)total_bytes );
-                        xnode_send_status_event( "tile-stored", status_name, XNODE_OFFLINE_TILE_ROOT );
+                        if ( xnode_file_hash32( filepath, &hash_value, NULL ) ) {
+                            xnode_hash32_hex( hash_value, hash_text, sizeof( hash_text ) );
+                        }
+                        xnode_send_status_event( "tile-stored", status_name, XNODE_OFFLINE_TILE_ROOT, stored_size, total_bytes, filepath, hash_text );
                         if ( !strcmp( filepath, XNODE_CURRENT_TILE_PATH ) ) {
                             remove( XNODE_SEED_TILE_PATH );
                         }
@@ -927,22 +1034,45 @@
                 return;
             }
 
+            if ( strcmp( type, "clearBasemap" ) == 0 ) {
+                char status_name[ 160 ] = { 0 };
+
+                xnode_reset_file_transfer();
+                if ( !xnode_ensure_watch_parent_dirs( XNODE_CURRENT_TILE_PATH, status_name, sizeof( status_name ) ) ) {
+                    xnode_send_status_event( "tile-write-error", status_name, XNODE_OFFLINE_TILE_ROOT );
+                    return;
+                }
+                osmmap_prepare_watch_basemap_file_replace( XNODE_CURRENT_TILE_PATH );
+                remove( XNODE_CURRENT_TILE_PATH );
+                remove( XNODE_SEED_TILE_PATH );
+                osmmap_clear_overlay_items();
+                xnode_send_status_event( "tile-cleared", XNODE_CURRENT_TILE_PATH, XNODE_OFFLINE_TILE_ROOT, 0, 0, XNODE_CURRENT_TILE_PATH );
+                return;
+            }
+
             if ( strcmp( type, "installBasemap" ) == 0 ) {
                 JsonObjectConst manifest = payload[ "manifest" ].as<JsonObjectConst>();
                 const char *name = manifest[ "name" ] | "Watch Basemap";
                 JsonObjectConst center = manifest[ "center" ].as<JsonObjectConst>();
+                JsonObjectConst projection = manifest[ "projection" ].as<JsonObjectConst>();
                 const double center_lat = center[ "lat" ] | 999.0;
                 const double center_lon = center[ "lon" ] | 999.0;
                 const uint32_t center_zoom = center[ "zoom" ] | ( manifest[ "minZoom" ] | 10 );
+                const double projection_zoom_raw = projection[ "zoom" ] | -1.0;
+                const uint32_t projection_zoom = projection_zoom_raw >= 0.0 && projection_zoom_raw <= 22.0
+                    ? (uint32_t)lround( projection_zoom_raw )
+                    : 0xffffffffUL;
                 osmmap_config_t config;
                 char body[ 160 ];
                 char active_path[ 160 ] = { 0 };
+                char active_hash[ 12 ] = { 0 };
                 size_t active_bytes = 0;
+                uint32_t active_hash_value = 0;
 
                 config.load();
                 strlcpy( config.osmmap, XNODE_OFFLINE_MAP_NAME, sizeof( config.osmmap ) );
                 config.save();
-                if ( !osmmap_apply_watch_basemap( XNODE_OFFLINE_MAP_NAME, center_lon, center_lat, center_zoom ) ) {
+                if ( !osmmap_apply_watch_basemap( XNODE_OFFLINE_MAP_NAME, center_lon, center_lat, center_zoom, projection_zoom ) ) {
                     snprintf( body, sizeof( body ), "profile failed: %s (%s)", name, XNODE_OFFLINE_TILE_ROOT );
                     xnode_queue_notification( "Basemap", body );
                     xnode_send_status_event( "profile-error", name, XNODE_OFFLINE_TILE_ROOT );
@@ -950,10 +1080,14 @@
                 }
                 sdcard_block_unmounting( false );
                 osmmap_get_watch_basemap_info( active_path, sizeof( active_path ), &active_bytes );
+                if ( active_path[ 0 ] && xnode_file_hash32( active_path, &active_hash_value, NULL ) ) {
+                    xnode_hash32_hex( active_hash_value, active_hash, sizeof( active_hash ) );
+                }
 
                 snprintf( body, sizeof( body ), "profile active: %s (%s %u bytes)", name, active_path[ 0 ] ? active_path : "unknown", (unsigned)active_bytes );
                 xnode_queue_notification( "Basemap", body );
-                xnode_send_status_event( "profile-active", name, XNODE_OFFLINE_TILE_ROOT, active_bytes, active_bytes, active_path );
+                xnode_send_status_event( "profile-active", name, XNODE_OFFLINE_TILE_ROOT, active_bytes, active_bytes, active_path, active_hash );
+                xnode_send_request_sync( "basemap-active" );
                 return;
             }
         }

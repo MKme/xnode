@@ -25,6 +25,8 @@
 #include "utils/alloc.h"
 #include "utils/uri_load/uri_load.h"
 
+#include <cmath>
+
 #ifdef NATIVE_64BIT
     #include "utils/logging.h"
     #include "utils/millis.h"
@@ -164,7 +166,7 @@ bool osm_map_project_lon_lat_locked( osm_location_t *osm_location, double lon, d
     const double tile_px_x = global_px_x - tile_origin_x;
     const double tile_px_y = global_px_y - tile_origin_y;
 
-    if ( !isfinite( tile_px_x ) || !isfinite( tile_px_y ) ) {
+    if ( !std::isfinite( tile_px_x ) || !std::isfinite( tile_px_y ) ) {
         return( false );
     }
 

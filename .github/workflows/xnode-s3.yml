@@ -1,0 +1,43 @@
+on:
+  push:
+    branches:
+      - main
+      - master
+      - experimental
+  pull_request:
+    branches:
+      - main
+      - master
+      - experimental
+  workflow_dispatch:
+
+name: XNODE T-Watch S3 Build
+
+jobs:
+  build:
+    name: Build T-Watch S3 Firmware
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Cache pip
+      uses: actions/cache@v2
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    - name: Cache PlatformIO
+      uses: actions/cache@v2
+      with:
+        path: ~/.platformio
+        key: ${{ runner.os }}-platformio-${{ hashFiles('platformio.ini') }}
+        restore-keys: |
+          ${{ runner.os }}-platformio-
+    - name: Set up Python
+      uses: actions/setup-python@v2
+    - name: Install PlatformIO
+      run: |
+        python -m pip install --upgrade pip
+        pip install --upgrade platformio
+    - name: Build S3 firmware
+      run: pio run -e t-watch2020-v3-s3
