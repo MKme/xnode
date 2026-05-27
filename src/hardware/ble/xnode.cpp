@@ -6,6 +6,7 @@
     #include <Arduino.h>
     #include <ArduinoJson.h>
     #include <errno.h>
+    #include <math.h>
     #include <sys/time.h>
     #include <sys/stat.h>
     #include <mbedtls/base64.h>
@@ -660,6 +661,11 @@
             const double lat = item[ "lat" ].isNull() ? ( item[ "latitude" ] | 999.0 ) : ( item[ "lat" ] | 999.0 );
             const double lon = item[ "lon" ].isNull() ? ( item[ "longitude" ] | 999.0 ) : ( item[ "lon" ] | 999.0 );
             const uint32_t updated_at = item[ "updatedAt" ].isNull() ? ( item[ "packetAt" ] | 0 ) : ( item[ "updatedAt" ] | 0 );
+            const double map_x = item[ "mapX" ].isNull() ? ( item[ "px" ] | 999999.0 ) : ( item[ "mapX" ] | 999999.0 );
+            const double map_y = item[ "mapY" ].isNull() ? ( item[ "py" ] | 999999.0 ) : ( item[ "mapY" ] | 999999.0 );
+            const bool has_pixel = isfinite( map_x ) && isfinite( map_y ) && map_x > -32768.0 && map_x < 32767.0 && map_y > -32768.0 && map_y < 32767.0;
+            const int16_t pixel_x = has_pixel ? (int16_t)lround( map_x ) : 0;
+            const int16_t pixel_y = has_pixel ? (int16_t)lround( map_y ) : 0;
 
             if ( !key[ 0 ] || !kind[ 0 ] ) {
                 return( false );
@@ -668,7 +674,7 @@
                 return( false );
             }
 
-            osmmap_upsert_overlay_item( key, kind, lon, lat, label, updated_at, color );
+            osmmap_upsert_overlay_item( key, kind, lon, lat, label, updated_at, color, has_pixel, pixel_x, pixel_y );
             return( true );
         }
 
@@ -688,11 +694,15 @@
             if ( strcmp( type, "syncState" ) == 0 ) {
                 StaticJsonDocument< 384 > reply;
                 const bool replace = payload[ "replace" ] | false;
+                const bool has_location = payload.containsKey( "location" );
 
-                if ( payload.containsKey( "location" ) ) {
+                if ( has_location ) {
                     JsonObjectConst location = payload[ "location" ].as<JsonObjectConst>();
                     xnode_apply_location_payload( location, false );
                     xnode_apply_time_payload( location );
+                }
+                else if ( replace ) {
+                    osmmap_clear_external_marker();
                 }
                 if ( payload.containsKey( "basemap" ) ) {
                     JsonObjectConst basemap = payload[ "basemap" ].as<JsonObjectConst>();
