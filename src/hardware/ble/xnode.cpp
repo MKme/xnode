@@ -64,6 +64,9 @@
         size_t xnode_file_offset = 0;
         size_t xnode_file_next_status = 0;
         bool xnode_file_active = false;
+        size_t xnode_overlay_sync_expected = 0;
+        size_t xnode_overlay_sync_seen = 0;
+        bool xnode_overlay_sync_replacing = false;
 
         bool xnode_link_ready( void ) {
             return( pXnodeTXCharacteristic && blectl_get_event( BLECTL_CONNECT | BLECTL_AUTHWAIT ) );
@@ -796,6 +799,9 @@
                 StaticJsonDocument< 384 > reply;
                 const bool replace = payload[ "replace" ] | false;
                 const bool has_location = payload.containsKey( "location" );
+                const size_t expected_overlays = payload.containsKey( "overlayCount" )
+                    ? ( payload[ "overlayCount" ] | 0 )
+                    : ( payload[ "packetCount" ] | 0 );
 
                 if ( has_location ) {
                     JsonObjectConst location = payload[ "location" ].as<JsonObjectConst>();
@@ -810,7 +816,22 @@
                     xnode_send_status_event( "profile-staged", basemap[ "name" ] | "", XNODE_OFFLINE_TILE_ROOT );
                 }
                 if ( replace ) {
-                    osmmap_clear_overlay_items();
+                    xnode_overlay_sync_replacing = expected_overlays > 0;
+                    xnode_overlay_sync_expected = expected_overlays;
+                    xnode_overlay_sync_seen = 0;
+                    if ( expected_overlays == 0 ) {
+                        osmmap_clear_overlay_items();
+                        osmmap_clear_persisted_overlay_items();
+                    }
+                    else {
+                        osmmap_begin_overlay_replace();
+                    }
+                }
+                else {
+                    osmmap_cancel_overlay_replace();
+                    xnode_overlay_sync_replacing = false;
+                    xnode_overlay_sync_expected = 0;
+                    xnode_overlay_sync_seen = 0;
                 }
 
                 reply[ "packetCount" ] = payload[ "packetCount" ] | 0;
@@ -825,6 +846,7 @@
                 StaticJsonDocument< 256 > reply;
                 JsonArrayConst items = payload[ "items" ].as<JsonArrayConst>();
                 size_t applied = 0;
+                size_t seen = 0;
 
                 if ( !items.isNull() ) {
                     for ( JsonVariantConst raw_item : items ) {
@@ -833,10 +855,24 @@
                         if ( item.isNull() ) {
                             continue;
                         }
+                        seen++;
                         if ( xnode_apply_overlay_item_payload( item ) ) {
                             applied++;
                         }
                     }
+                }
+                if ( xnode_overlay_sync_replacing ) {
+                    xnode_overlay_sync_seen += seen;
+                    if ( xnode_overlay_sync_seen >= xnode_overlay_sync_expected ) {
+                        osmmap_commit_overlay_replace();
+                        osmmap_save_overlay_items();
+                        xnode_overlay_sync_replacing = false;
+                        xnode_overlay_sync_expected = 0;
+                        xnode_overlay_sync_seen = 0;
+                    }
+                }
+                else {
+                    osmmap_save_overlay_items();
                 }
                 reply[ "count" ] = applied;
                 reply[ "overlayCount" ] = osmmap_overlay_item_count();
@@ -848,10 +884,17 @@
                 StaticJsonDocument< 256 > reply;
                 JsonArrayConst packets = payload[ "packets" ].as<JsonArrayConst>();
                 size_t applied = 0;
+                size_t seen = 0;
 
                 if ( !packets.isNull() ) {
                     for ( JsonVariantConst raw_packet : packets ) {
                         JsonObjectConst packet = raw_packet.as<JsonObjectConst>();
+
+                        if ( packet.isNull() ) {
+                            continue;
+                        }
+                        seen++;
+
                         const char *key = packet[ "key" ] | "";
                         const char *kind = xnode_overlay_kind_for_template( packet[ "templateId" ] | 0 );
                         const char *label = packet[ "summary" ] | ( kind ? kind : "" );
@@ -873,6 +916,19 @@
                     }
                 }
 
+                if ( xnode_overlay_sync_replacing ) {
+                    xnode_overlay_sync_seen += seen;
+                    if ( xnode_overlay_sync_seen >= xnode_overlay_sync_expected ) {
+                        osmmap_commit_overlay_replace();
+                        osmmap_save_overlay_items();
+                        xnode_overlay_sync_replacing = false;
+                        xnode_overlay_sync_expected = 0;
+                        xnode_overlay_sync_seen = 0;
+                    }
+                }
+                else {
+                    osmmap_save_overlay_items();
+                }
                 reply[ "count" ] = applied;
                 reply[ "overlayCount" ] = osmmap_overlay_item_count();
                 xnode_send_event( "packetBatchAck", reply );
@@ -1046,6 +1102,11 @@
                 remove( XNODE_CURRENT_TILE_PATH );
                 remove( XNODE_SEED_TILE_PATH );
                 osmmap_clear_overlay_items();
+                osmmap_clear_persisted_overlay_items();
+                osmmap_cancel_overlay_replace();
+                xnode_overlay_sync_replacing = false;
+                xnode_overlay_sync_expected = 0;
+                xnode_overlay_sync_seen = 0;
                 xnode_send_status_event( "tile-cleared", XNODE_CURRENT_TILE_PATH, XNODE_OFFLINE_TILE_ROOT, 0, 0, XNODE_CURRENT_TILE_PATH );
                 return;
             }

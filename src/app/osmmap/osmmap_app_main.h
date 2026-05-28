@@ -45,6 +45,12 @@
     void osmmap_prepare_watch_basemap_file_replace( const char *path );
     void osmmap_upsert_overlay_item( const char *key, const char *kind, double lon, double lat, const char *label, uint32_t updated_at, const char *color, bool has_pixel = false, int16_t pixel_x = 0, int16_t pixel_y = 0 );
     void osmmap_clear_overlay_items( void );
+    void osmmap_begin_overlay_replace( void );
+    void osmmap_commit_overlay_replace( void );
+    void osmmap_cancel_overlay_replace( void );
+    bool osmmap_save_overlay_items( void );
+    bool osmmap_load_overlay_items( void );
+    void osmmap_clear_persisted_overlay_items( void );
     uint32_t osmmap_overlay_item_count( void );
     bool osmmap_apply_watch_basemap( const char *map_name, double lon, double lat, uint32_t zoom, uint32_t projection_zoom = 0xffffffffUL );
 
