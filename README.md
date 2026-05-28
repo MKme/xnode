@@ -18,20 +18,29 @@ Hardware listing:
 Working now:
 - Builds for `t-watch2020-v3-s3`.
 - Flashes to the LilyGO Watch Gen3 / ESP32-S3 target.
-- Inactivity timeout now returns the T-Watch S3 build to standby instead of leaving it awake indefinitely.
-- T-Watch S3 standby now uses the LilyGo `ext1` touch wake path on `BOARD_TOUCH_INT`.
-- Display timeout settings now use a real `15..300` second range again. `300` is five minutes, not a hidden never-sleep mode.
-- Accepts one installed XNODE basemap tile in watch flash.
-- Shows that installed tile in the map app without switching to stale old tiles.
-- Zoom buttons scale the same installed image instead of loading another map.
-- Markers stay aligned with the map image as zoom changes.
-- Map panning works in watch-flash mode.
-- Map swipe direction is corrected only inside the map view.
+- Exposes the XNODE BLE bridge to XTOC and XCOM with `sync`, `location`, `meshtastic`, `basemap`, `mapOverlay`, `newsNotifications`, and `ble` capabilities.
+- Installs the active XTOC/XCOM tactical map raster as the watch basemap in SPIFFS and selects `offline from watch flash` on the watch.
+- Replaces the active basemap cleanly with `clearBasemap` plus a streamed `mapTile` upload, so stale seed or old tiles do not bleed into the current map.
+- Persists the installed basemap center, zoom, and projection zoom so the same map returns after reboot.
+- Displays local position, shared location, Meshtastic position updates, and XTOC/XCOM overlay markers on the tactical map.
+- Supports watch markers for team members, mesh nodes, SITREPs, CONTACTs, TASKs, CHECKINs, resource requests, assets, zones, missions, events, phase lines, Sentinel, and routes.
+- Uses host-projected `mapX`/`mapY` marker placement when provided, with Web Mercator lon/lat projection as the fallback.
+- Keeps markers aligned while zooming and panning the installed watch-flash basemap.
+- Persists synced overlay markers in `/spiffs/osmmap/overlays.jsonl` and reloads them when the map opens or the watch reboots.
+- Applies replacement overlay syncs transactionally: existing markers stay visible until the expected replacement batch arrives; an intentional zero-count replacement clears the cache.
+- Stores XTOC/XCOM pushed news and alert items in the XNODE alerts app, with the watch-side `show pushed news` toggle.
+- Keeps the launcher functions active for messages, mesh, Tac Map, media player, Alert Summary, and watchface manager.
+- Inactivity timeout returns the T-Watch S3 build to standby instead of leaving it awake indefinitely.
+- T-Watch S3 standby uses the LilyGo `ext1` touch wake path on `BOARD_TOUCH_INT`.
+- Display timeout settings use a real `15..300` second range. `300` is five minutes, not a hidden never-sleep mode.
 
 Known limits:
 - Watch-flash mode is a single installed raster tile, not a multi-tile slippy engine.
 - Zoom is image scaling around the installed tile center.
 - Panning is constrained by the visible image bounds.
+- The watch keeps up to 96 overlay markers; when full, the oldest marker slot is reused.
+- The active watch basemap is one current image, not a stored library of selectable maps.
+- SPIFFS is small, so host-side tooling must keep the installed raster compact.
 
 ## Watch screens
 
@@ -164,21 +173,25 @@ That removes the last build dependency on `C:\GitHub\lilygo`.
 The XNODE watch map path is:
 
 1. XTOC or XCOM fetches one raster tile for a chosen center and zoom.
-2. The host sends the tile over the XNODE bridge as `mapTile`.
-3. The tile is written to:
+2. The host clears the active watch basemap state with `clearBasemap`.
+3. The host streams the new image over the XNODE bridge with `mapTileBegin` / `mapTile`.
+4. The active tile is written to:
 
 ```text
-/spiffs/osmmap/<z>/<x>/<y>.png
+/spiffs/osmmap/current.png
 ```
 
-4. The host sends `installBasemap` with center longitude, latitude, and zoom.
-5. The watch persists that manifest and uses the installed tile in `offline from watch flash`.
+5. The host sends `installBasemap` with center longitude, latitude, zoom, and projection zoom.
+6. The watch persists that manifest and uses the installed tile in `offline from watch flash`.
+7. The watch requests overlay sync for the active basemap, then stores synced overlay markers in `/spiffs/osmmap/overlays.jsonl`.
 
 Behavior on the watch:
 - zoom in/out scales the installed tile
 - directional controls pan around the tile
 - long press recenters to the stored map center
 - markers are projected with Web Mercator math and stay in the right position as zoom changes
+- host-projected marker pixels are used when the host generated the installed map image
+- overlay markers persist across map close/open and watch reboot
 
 ## Controls in watch-flash mode
 
@@ -191,17 +204,20 @@ The minimum zoom is clamped so the tile still fills the display frame. The app s
 ## Files that implement the map fix
 
 - `src/hardware/ble/xnode.cpp`
-  - accepts `mapTile` uploads
-  - creates `/spiffs/osmmap/<z>/<x>` before writing
-  - writes PNG chunks into the final flash tile path
+  - accepts `clearBasemap`, `mapTileBegin`, `mapTile`, `installBasemap`, `syncState`, `overlayBatch`, `packetBatch`, `newsItem`, and location commands
+  - creates the watch basemap directory before writing
+  - streams PNG chunks into `/spiffs/osmmap/current.png`
+  - acknowledges overlay counts back to the host so XTOC/XCOM can verify sync progress
 - `src/app/osmmap/config/osmmap_config.cpp`
 - `src/app/osmmap/config/osmmap_config.h`
-  - persist installed basemap center and zoom
+  - persist installed basemap center, zoom, and projection zoom
 - `src/app/osmmap/osmmap_app_main.cpp`
   - resolves watch-flash mode to the installed tile
   - scales one image across zoom levels
   - applies pan offsets only in map mode
   - keeps swipe inversion local to the map view
+  - stores and restores overlay markers from `/spiffs/osmmap/overlays.jsonl`
+  - handles transactional overlay replacement so partial syncs do not wipe visible markers
 - `src/utils/osm_map/osm_map.cpp`
 - `src/utils/osm_map/osm_map.h`
   - Web Mercator projection helpers for marker placement
@@ -215,6 +231,15 @@ Host-side install support lives in:
 - `C:\GitHub\xcom\xcom\modules\xnode\xnode.js`
 
 These flows now support installing the active raster tile onto the watch using the existing XNODE install path.
+They also sync visible tactical map markers to the watch as overlay batches, including packet/check-in style markers and host-projected marker pixels for the currently installed basemap.
+
+Current host behavior:
+- clear the watch basemap and overlay cache before installing a replacement map
+- stream the active map image to `/spiffs/osmmap/current.png`
+- send the basemap manifest with center and projection metadata
+- push overlay batches after the watch activates the basemap
+- keep overlay markers persistent on the watch until a new complete replacement sync arrives
+- push XTOC/XCOM news and alerts into the XNODE alerts app
 
 ## Build
 
@@ -252,4 +277,6 @@ If the watch does not auto-reset into bootloader mode, put it into boot mode man
    - the same image stays loaded while zoom changes
    - the map still fills the screen at maximum zoom-out
    - markers remain visible and aligned
+   - markers survive closing/reopening the map and rebooting the watch
+   - a new packet/check-in sync updates markers without making existing markers vanish
    - panning moves the viewed area without affecting the rest of the watch UI
