@@ -33,6 +33,15 @@ Known limits:
 - Zoom is image scaling around the installed tile center.
 - Panning is constrained by the visible image bounds.
 
+## Watch screens
+
+These XNODE screens show the LilyGO T-Watch S3 firmware in daily use.
+
+| Launcher | Tactical map | XNODE alerts |
+| --- | --- | --- |
+| <img src="images/xnode/IMG_6597.jpg" alt="XNODE launcher showing messages, mesh, Tac Map, media player, alert summary, and watchface manager apps" width="240"> | <img src="images/xnode/IMG_6590.jpg" alt="XNODE tactical map showing an installed basemap, synced markers, and map controls" width="240"> | <img src="images/xnode/IMG_6592.jpg" alt="XNODE alerts screen showing pushed XTOC news, check-ins, and operator alerts" width="240"> |
+| App launcher for messages, mesh, the tactical map, media controls, alert summary, and watchface management. | Tactical map view with the installed basemap, synced XTOC/XCOM markers, zoom controls, and map menu access. | Alert/news view for XTOC-pushed check-ins, operator alerts, and other watch-visible updates. |
+
 ## Power management audit (2026-04-18)
 
 Scope:
