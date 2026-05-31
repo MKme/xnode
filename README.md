@@ -13,6 +13,15 @@ Workspace paths:
 Hardware listing:
 - [LILYGO T-Watch S3 on Amazon](https://amzn.to/4sHfvgK)
 
+## Companion software
+
+XNODE is built to work with the MKME X software stack. Add the companion software below to turn the watch into part of a larger offline tactical comms, mapping, and intelligence workflow.
+
+- [XTOC - Tactical Operations Center Software Suite](https://store.mkme.org/product/xtoc-tactical-operations-center-software-suite/) - Offline command-center software for SITREPs, TASKs, CHECKIN/LOC, map overlays, zones, SATCOM, ATAK/KML/CoT workflows, and packet-based field coordination. XTOC directly interfaces with XNODE over the BLE bridge to move maps, markers, locations, alerts, and operational data back and forth.
+- [XCOM - Offline Radio Communication Suite](https://store.mkme.org/product/xcom-offline-radio-communication-suite/) - Offline-first radio and mapping toolkit with repeater maps, packet stations, callsign lookup, mesh/Reticulum support, and XTOC data import. XCOM also directly interfaces with XNODE over the BLE bridge so operators can send and receive watch-ready map, alert, location, and packet data.
+- [XCORE - Offline Tactical AI Analyst](https://store.mkme.org/product/xcore/) - Local Windows AI analyst for XTOC/XCOM operational data, including AO summaries, anomaly scans, 24-hour SITREPs, aircraft pattern checks, and structured packet drafting.
+- [XINTEL - Radio Intel Monitor + Transcription](https://store.mkme.org/product/xintel/) - Local radio-intelligence monitor that transcribes legally receivable audio, watches for keyword/rule hits, decodes ViperGram bursts, and pushes structured intel into the XTOC/XCOM workflow.
+
 ## Current status
 
 Working now:
