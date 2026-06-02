@@ -28,6 +28,8 @@ Working now:
 - Builds for `t-watch2020-v3-s3`.
 - Flashes to the LilyGO Watch Gen3 / ESP32-S3 target.
 - Exposes the XNODE BLE bridge to XTOC and XCOM with `sync`, `location`, `meshtastic`, `basemap`, `mapOverlay`, `newsNotifications`, and `ble` capabilities.
+- Adds a Manual SOS launcher tile that sends a clear XTOC `SITREP` packet over the watch's Meshtastic radio, with the roster Unit ID, destination Unit ID, `P1`, `HELP`, current lat/lon, and note `Manual SOS`.
+- Adds a CheckIn launcher tile that sends a clear XTOC `CHECKIN/LOC` packet over the watch's Meshtastic radio, with the roster Unit ID, `OK` status, current lat/lon, and timestamp.
 - Installs the active XTOC/XCOM tactical map raster as the watch basemap in SPIFFS and selects `offline from watch flash` on the watch.
 - Replaces the active basemap cleanly with `clearBasemap` plus a streamed `mapTile` upload, so stale seed or old tiles do not bleed into the current map.
 - Persists the installed basemap center, zoom, and projection zoom so the same map returns after reboot.
@@ -50,6 +52,8 @@ Known limits:
 - The watch keeps up to 96 overlay markers; when full, the oldest marker slot is reused.
 - The active watch basemap is one current image, not a stored library of selectable maps.
 - SPIFFS is small, so host-side tooling must keep the installed raster compact.
+- Manual SOS requires a configured watch Unit ID, a valid watch location, and a ready Meshtastic radio/channel before it can transmit.
+- CheckIn requires the same watch Unit ID, valid watch location, and ready Meshtastic radio/channel.
 
 ## Watch screens
 
@@ -246,9 +250,89 @@ Current host behavior:
 - clear the watch basemap and overlay cache before installing a replacement map
 - stream the active map image to `/spiffs/osmmap/current.png`
 - send the basemap manifest with center and projection metadata
+- send watch SOS configuration, including the roster-backed `Watch Unit ID` and `SOS To` Unit ID
 - push overlay batches after the watch activates the basemap
 - keep overlay markers persistent on the watch until a new complete replacement sync arrives
 - push XTOC/XCOM news and alerts into the XNODE alerts app
+
+## Manual SOS over Meshtastic
+
+Manual SOS is a watch-side emergency shortcut. It does not send the distress packet back to the BLE host. When the operator opens `SOS` on the watch and taps `SEND SOS`, XNODE builds one clear XTOC `SITREP` packet and passes it to the watch Meshtastic service for transmission on the active Meshtastic channel.
+
+Packet contents:
+
+- packet family: `SITREP` v1
+- source: the configured watch `Unit ID`
+- destination: configured `SOS To` Unit ID, or `U0` for broadcast
+- priority: `P1`
+- status: `HELP`
+- location: the watch's currently stored latitude/longitude
+- note: `Manual SOS`
+
+Real-world uses:
+
+- injured, lost, trapped, or separated operator who cannot stop to use a phone or tablet
+- vehicle crew, shelter lead, search team, or marshal who needs a fast distress cue on the same mesh net the TOC is already monitoring
+- bad-weather, low-light, gloved, or high-stress conditions where a two-tap watch flow is more reliable than opening a full field app
+
+Setup for success:
+
+1. In `XTOC Team` or the `XCOM` imported roster, give every watch wearer a stable `Unit ID`.
+2. In `XTOC -> XNODE` or `XCOM -> XNODE`, connect the watch, choose `Watch Unit ID` from the roster, choose `SOS To`, and click `Save`.
+3. Set the watch location from the XNODE page with `Set watch GPS + time`, `Share current GPS once`, or the GPS relay before relying on Manual SOS. Future GPS-equipped watches can provide this directly.
+4. On the watch, open the `mesh` app and confirm the status is `Mesh ready` on the expected Meshtastic channel.
+5. Send a short test mesh message and confirm the TOC mesh station can receive and auto-import XTOC packet text.
+
+Use in the field:
+
+1. Open the watch launcher.
+2. Tap `SOS`.
+3. Tap `SEND SOS`.
+4. Confirm the watch shows `SOS sent over mesh`.
+
+If it fails:
+
+- `Set the watch Unit ID in XTOC/XCOM first.` means the watch has not received a roster Unit ID.
+- `Set the watch location before sending SOS.` means no valid lat/lon has been stored yet.
+- `Meshtastic not ready` means the onboard radio did not initialize or no usable channel is active.
+
+The receiving TOC should leave mesh packet auto-decode enabled so the inbound `SITREP` lands in the normal packet store, timeline, triggers, and map workflows.
+
+## CheckIn over Meshtastic
+
+CheckIn is the routine one-button position report. It also transmits from the watch Meshtastic radio, not back through the BLE host.
+
+Packet contents:
+
+- packet family: `CHECKIN/LOC` v1
+- source: the configured watch `Unit ID`
+- status: `OK`
+- location: the watch's currently stored latitude/longitude
+- timestamp: current watch time, rounded to packet minutes
+
+Real-world uses:
+
+- shift start, staging arrival, checkpoint arrival, shelter arrival, route departure, vehicle stop, or post-task accountability
+- routine "I am here and OK" updates from operators who should not be distracted by a phone screen
+- last-known-position breadcrumbs for TOC staff when a field team only has time for a single button press
+
+Use `CheckIn` for routine accountability. Use `SOS` when the operator needs help, safety response, or urgent TOC attention.
+
+Setup is the same as Manual SOS:
+
+1. Assign the watch wearer a stable roster `Unit ID`.
+2. In `XTOC -> XNODE` or `XCOM -> XNODE`, connect the watch, choose `Watch Unit ID`, and click `Save`.
+3. Set the watch location from the XNODE page or GPS relay before relying on CheckIn.
+4. On the watch, open the `mesh` app and confirm `Mesh ready` on the intended channel.
+
+Use in the field:
+
+1. Open the watch launcher.
+2. Tap `CheckIn`.
+3. Tap `CHECK IN`.
+4. Confirm the watch shows `Check-in sent over mesh`.
+
+The receiving TOC should auto-decode mesh packets so the inbound `CHECKIN/LOC` updates the unit's latest position on the map and in the roster.
 
 ## Build
 

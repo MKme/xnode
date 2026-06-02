@@ -44,6 +44,7 @@
 #include "mainbar/setup_tile/sdcard_settings/sdcard_settings.h"
 #include "mainbar/setup_tile/utilities/utilities.h"
 #include "mainbar/setup_tile/bluetooth_settings/bluetooth_settings.h"
+#include "mainbar/setup_tile/bluetooth_settings/bluetooth_media.h"
 #include "mainbar/setup_tile/wlan_settings/wlan_settings.h"
 #include "mainbar/setup_tile/time_settings/time_settings.h"
 #include "mainbar/setup_tile/touch_settings/touch_settings.h"
@@ -51,6 +52,8 @@
 #include "mainbar/setup_tile/update/update.h"
 #include "mainbar/setup_tile/style_settings/style_settings.h"
 #include "mainbar/app_tile/xnode_notifications/xnode_notifications.h"
+#include "mainbar/app_tile/xnode_sos/xnode_sos.h"
+#include "mainbar/app_tile/xnode_checkin/xnode_checkin.h"
 #include "hardware/powermgm.h"
 #include "hardware/framebuffer.h"
 #include "hardware/display.h"
@@ -185,7 +188,10 @@ void gui_setup( void ) {
     update_tile_setup();
     #ifndef NO_BLUETOOTH
         bluetooth_settings_tile_setup();
+        xnode_checkin_tile_setup();
         xnode_notifications_tile_setup();
+        xnode_sos_tile_setup();
+        bluetooth_media_tile_setup();
     #endif
     watchface_manager_setup();
     #if defined( LILYGO_WATCH_HAS_SDCARD )

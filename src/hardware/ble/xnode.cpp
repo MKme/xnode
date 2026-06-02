@@ -10,6 +10,7 @@
     #include <math.h>
     #include <sys/time.h>
     #include <sys/stat.h>
+    #include <time.h>
     #include <mbedtls/base64.h>
 
     #include "NimBLEDescriptor.h"
@@ -55,6 +56,12 @@
         } xnode_rx_frame_t;
 
         char xnode_last_host_name[ 32 ] = "XTOC";
+        uint16_t xnode_watch_unit_id = 0;
+        uint16_t xnode_sos_to_unit_id = 0;
+        char xnode_watch_unit_label[ 32 ] = "";
+        double xnode_last_lat = 0.0;
+        double xnode_last_lon = 0.0;
+        bool xnode_has_location = false;
         char xnode_rx_id[ 24 ] = "";
         uint16_t xnode_rx_total = 0;
         uint16_t xnode_rx_index = 0;
@@ -96,6 +103,48 @@
             return( bluetooth_message_queue_msg( json ) );
         }
 
+        uint16_t xnode_payload_u16( JsonObjectConst payload, const char *primary_key, const char *fallback_key, uint16_t fallback ) {
+            const char *key = NULL;
+
+            if ( primary_key && payload.containsKey( primary_key ) ) {
+                key = primary_key;
+            }
+            else if ( fallback_key && payload.containsKey( fallback_key ) ) {
+                key = fallback_key;
+            }
+            if ( !key ) {
+                return( fallback );
+            }
+
+            const int32_t value = payload[ key ] | (int32_t)fallback;
+            if ( value < 0 ) {
+                return( 0 );
+            }
+            if ( value > 65535 ) {
+                return( 65535 );
+            }
+            return( (uint16_t)value );
+        }
+
+        bool xnode_apply_sos_config_payload( JsonObjectConst payload ) {
+            bool changed = false;
+
+            if ( payload.containsKey( "watchUnitId" ) || payload.containsKey( "unitId" ) ) {
+                xnode_watch_unit_id = xnode_payload_u16( payload, "watchUnitId", "unitId", xnode_watch_unit_id );
+                changed = true;
+            }
+            if ( payload.containsKey( "sosToUnitId" ) || payload.containsKey( "toUnitId" ) ) {
+                xnode_sos_to_unit_id = xnode_payload_u16( payload, "sosToUnitId", "toUnitId", xnode_sos_to_unit_id );
+                changed = true;
+            }
+            if ( payload[ "watchUnitLabel" ].is<const char *>() ) {
+                strlcpy( xnode_watch_unit_label, payload[ "watchUnitLabel" ], sizeof( xnode_watch_unit_label ) );
+                changed = true;
+            }
+
+            return( changed );
+        }
+
         bool xnode_base64url_encode( const uint8_t *input, size_t input_len, String &output ) {
             const size_t encoded_capacity = ( ( input_len + 2 ) / 3 ) * 4 + 4;
             unsigned char *encoded = (unsigned char *)malloc( encoded_capacity );
@@ -128,6 +177,118 @@
             output = (const char *)encoded;
             free( encoded );
             return( true );
+        }
+
+        void xnode_write_u16_be( uint8_t *out, uint16_t value ) {
+            out[ 0 ] = (uint8_t)( ( value >> 8 ) & 0xff );
+            out[ 1 ] = (uint8_t)( value & 0xff );
+        }
+
+        void xnode_write_u32_be( uint8_t *out, uint32_t value ) {
+            out[ 0 ] = (uint8_t)( ( value >> 24 ) & 0xff );
+            out[ 1 ] = (uint8_t)( ( value >> 16 ) & 0xff );
+            out[ 2 ] = (uint8_t)( ( value >> 8 ) & 0xff );
+            out[ 3 ] = (uint8_t)( value & 0xff );
+        }
+
+        void xnode_write_i32_be( uint8_t *out, int32_t value ) {
+            xnode_write_u32_be( out, (uint32_t)value );
+        }
+
+        uint32_t xnode_unix_minutes( void ) {
+            const time_t now = time( NULL );
+            if ( now <= 0 ) {
+                return( 0 );
+            }
+            return( (uint32_t)( now / 60 ) );
+        }
+
+        void xnode_generate_packet_id( char *out, size_t out_size ) {
+            static const char alphabet[] = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+            const size_t alphabet_len = sizeof( alphabet ) - 1;
+
+            if ( !out || out_size == 0 ) {
+                return;
+            }
+
+            const size_t count = out_size > 9 ? 8 : out_size - 1;
+            for ( size_t i = 0; i < count; i++ ) {
+                out[ i ] = alphabet[ esp_random() % alphabet_len ];
+            }
+            out[ count ] = '\0';
+        }
+
+        bool xnode_make_manual_sos_packet( char *out, size_t out_size ) {
+            static const char note[] = "Manual SOS";
+            uint8_t buf[ 64 ];
+            size_t o = 0;
+            String encoded;
+            char packet_id[ 9 ] = { 0 };
+            const int32_t lat_e5 = (int32_t)lround( xnode_last_lat * 100000.0 );
+            const int32_t lon_e5 = (int32_t)lround( xnode_last_lon * 100000.0 );
+            const size_t note_len = strlen( note );
+
+            if ( !out || out_size == 0 || xnode_watch_unit_id == 0 || !xnode_has_location ) {
+                return( false );
+            }
+
+            buf[ o++ ] = 1; // SITREP v1
+            xnode_write_u16_be( &buf[ o ], xnode_watch_unit_id );
+            o += 2;
+            xnode_write_u16_be( &buf[ o ], xnode_sos_to_unit_id );
+            o += 2;
+            buf[ o++ ] = 0; // P1
+            buf[ o++ ] = 1; // HELP
+            xnode_write_u32_be( &buf[ o ], xnode_unix_minutes() );
+            o += 4;
+            buf[ o++ ] = 0x03; // has location + note
+            xnode_write_i32_be( &buf[ o ], lat_e5 );
+            o += 4;
+            xnode_write_i32_be( &buf[ o ], lon_e5 );
+            o += 4;
+            buf[ o++ ] = (uint8_t)note_len;
+            memcpy( &buf[ o ], note, note_len );
+            o += note_len;
+
+            if ( !xnode_base64url_encode( buf, o, encoded ) ) {
+                return( false );
+            }
+
+            xnode_generate_packet_id( packet_id, sizeof( packet_id ) );
+            const int written = snprintf( out, out_size, "X1.1.C.%s.1/1.%s", packet_id, encoded.c_str() );
+            return( written > 0 && (size_t)written < out_size );
+        }
+
+        bool xnode_make_manual_checkin_packet( char *out, size_t out_size ) {
+            uint8_t buf[ 16 ];
+            size_t o = 0;
+            String encoded;
+            char packet_id[ 9 ] = { 0 };
+            const int32_t lat_e5 = (int32_t)lround( xnode_last_lat * 100000.0 );
+            const int32_t lon_e5 = (int32_t)lround( xnode_last_lon * 100000.0 );
+
+            if ( !out || out_size == 0 || xnode_watch_unit_id == 0 || !xnode_has_location ) {
+                return( false );
+            }
+
+            buf[ o++ ] = 1; // CHECKIN/LOC v1
+            xnode_write_u16_be( &buf[ o ], xnode_watch_unit_id );
+            o += 2;
+            xnode_write_i32_be( &buf[ o ], lat_e5 );
+            o += 4;
+            xnode_write_i32_be( &buf[ o ], lon_e5 );
+            o += 4;
+            xnode_write_u32_be( &buf[ o ], xnode_unix_minutes() );
+            o += 4;
+            buf[ o++ ] = 0; // OK
+
+            if ( !xnode_base64url_encode( buf, o, encoded ) ) {
+                return( false );
+            }
+
+            xnode_generate_packet_id( packet_id, sizeof( packet_id ) );
+            const int written = snprintf( out, out_size, "X1.4.C.%s.1/1.%s", packet_id, encoded.c_str() );
+            return( written > 0 && (size_t)written < out_size );
         }
 
         bool xnode_base64url_decode( const char *input, String &output ) {
@@ -697,7 +858,7 @@
         }
 
         bool xnode_send_hello_ack( void ) {
-            StaticJsonDocument< 512 > payload;
+            StaticJsonDocument< 768 > payload;
             JsonArray capabilities = payload.createNestedArray( "capabilities" );
 
             payload[ "deviceName" ] = device_get_name();
@@ -707,12 +868,20 @@
             payload[ "meshReady" ] = meshtastic_service_is_ready();
             payload[ "meshStatus" ] = meshtastic_service_get_status();
             payload[ "nodeId" ] = meshtastic_service_get_node_id();
+            payload[ "watchUnitId" ] = xnode_watch_unit_id;
+            payload[ "sosToUnitId" ] = xnode_sos_to_unit_id;
+            payload[ "hasLocation" ] = xnode_has_location;
+            if ( xnode_has_location ) {
+                payload[ "lat" ] = xnode_last_lat;
+                payload[ "lon" ] = xnode_last_lon;
+            }
             capabilities.add( "sync" );
             capabilities.add( "location" );
             capabilities.add( "meshtastic" );
             capabilities.add( "basemap" );
             capabilities.add( "mapOverlay" );
             capabilities.add( "newsNotifications" );
+            capabilities.add( "manualSos" );
             capabilities.add( "ble" );
 
             return( xnode_send_event( "helloAck", payload ) );
@@ -728,6 +897,9 @@
             }
 
             osmmap_set_external_marker( lon, lat, label ? label : "XTOC" );
+            xnode_last_lat = lat;
+            xnode_last_lon = lon;
+            xnode_has_location = true;
 
             if ( notify_user ) {
                 char body[ 128 ];
@@ -791,7 +963,18 @@
             }
 
             if ( strcmp( type, "hello" ) == 0 ) {
+                xnode_apply_sos_config_payload( payload );
                 xnode_send_hello_ack();
+                return;
+            }
+
+            if ( strcmp( type, "setSosConfig" ) == 0 ) {
+                StaticJsonDocument< 160 > reply;
+
+                xnode_apply_sos_config_payload( payload );
+                reply[ "watchUnitId" ] = xnode_watch_unit_id;
+                reply[ "sosToUnitId" ] = xnode_sos_to_unit_id;
+                xnode_send_event( "sosConfigAck", reply );
                 return;
             }
 
@@ -803,6 +986,7 @@
                     ? ( payload[ "overlayCount" ] | 0 )
                     : ( payload[ "packetCount" ] | 0 );
 
+                xnode_apply_sos_config_payload( payload );
                 if ( has_location ) {
                     JsonObjectConst location = payload[ "location" ].as<JsonObjectConst>();
                     xnode_apply_location_payload( location, false );
@@ -838,6 +1022,8 @@
                 reply[ "overlayCount" ] = osmmap_overlay_item_count();
                 reply[ "meshCount" ] = payload[ "meshCount" ] | 0;
                 reply[ "replace" ] = replace;
+                reply[ "watchUnitId" ] = xnode_watch_unit_id;
+                reply[ "sosToUnitId" ] = xnode_sos_to_unit_id;
                 xnode_send_event( "syncAck", reply );
                 return;
             }
@@ -1285,11 +1471,80 @@
     bool xnode_send_location_update( double lat, double lon, const char *label ) {
         StaticJsonDocument< 320 > payload;
 
+        if ( lat >= -90.0 && lat <= 90.0 && lon >= -180.0 && lon <= 180.0 ) {
+            xnode_last_lat = lat;
+            xnode_last_lon = lon;
+            xnode_has_location = true;
+        }
         payload[ "lat" ] = lat;
         payload[ "lon" ] = lon;
         payload[ "label" ] = label ? label : "Meshtastic";
         payload[ "ts" ] = (uint32_t)( millis() / 1000 );
         return( xnode_send_event( "location", payload ) );
+    }
+
+    bool xnode_send_manual_sos( void ) {
+        char packet[ 160 ] = { 0 };
+        char body[ 128 ] = { 0 };
+
+        if ( xnode_watch_unit_id == 0 ) {
+            xnode_queue_notification( "Manual SOS", "Set the watch Unit ID in XTOC/XCOM first." );
+            return( false );
+        }
+        if ( !xnode_has_location ) {
+            xnode_queue_notification( "Manual SOS", "Set the watch location before sending SOS." );
+            return( false );
+        }
+        if ( !meshtastic_service_is_ready() ) {
+            snprintf( body, sizeof( body ), "Meshtastic not ready: %s", meshtastic_service_get_status() );
+            xnode_queue_notification( "Manual SOS", body );
+            return( false );
+        }
+        if ( !xnode_make_manual_sos_packet( packet, sizeof( packet ) ) ) {
+            xnode_queue_notification( "Manual SOS", "Could not build SITREP packet." );
+            return( false );
+        }
+        if ( !meshtastic_service_send_text( packet ) ) {
+            snprintf( body, sizeof( body ), "Mesh send failed: %s", meshtastic_service_get_status() );
+            xnode_queue_notification( "Manual SOS", body );
+            return( false );
+        }
+
+        snprintf( body, sizeof( body ), "Sent U%u P1 HELP to U%u.", (unsigned)xnode_watch_unit_id, (unsigned)xnode_sos_to_unit_id );
+        xnode_queue_notification( "Manual SOS", body );
+        return( true );
+    }
+
+    bool xnode_send_manual_checkin( void ) {
+        char packet[ 160 ] = { 0 };
+        char body[ 128 ] = { 0 };
+
+        if ( xnode_watch_unit_id == 0 ) {
+            xnode_queue_notification( "CheckIn", "Set the watch Unit ID in XTOC/XCOM first." );
+            return( false );
+        }
+        if ( !xnode_has_location ) {
+            xnode_queue_notification( "CheckIn", "Set the watch location before checking in." );
+            return( false );
+        }
+        if ( !meshtastic_service_is_ready() ) {
+            snprintf( body, sizeof( body ), "Meshtastic not ready: %s", meshtastic_service_get_status() );
+            xnode_queue_notification( "CheckIn", body );
+            return( false );
+        }
+        if ( !xnode_make_manual_checkin_packet( packet, sizeof( packet ) ) ) {
+            xnode_queue_notification( "CheckIn", "Could not build CHECKIN/LOC packet." );
+            return( false );
+        }
+        if ( !meshtastic_service_send_text( packet ) ) {
+            snprintf( body, sizeof( body ), "Mesh send failed: %s", meshtastic_service_get_status() );
+            xnode_queue_notification( "CheckIn", body );
+            return( false );
+        }
+
+        snprintf( body, sizeof( body ), "Sent U%u OK check-in.", (unsigned)xnode_watch_unit_id );
+        xnode_queue_notification( "CheckIn", body );
+        return( true );
     }
 
 #else
@@ -1302,6 +1557,14 @@
     }
 
     bool xnode_send_location_update( double lat, double lon, const char *label ) {
+        return( false );
+    }
+
+    bool xnode_send_manual_sos( void ) {
+        return( false );
+    }
+
+    bool xnode_send_manual_checkin( void ) {
         return( false );
     }
 

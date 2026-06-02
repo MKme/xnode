@@ -4,5 +4,7 @@
     void xnode_setup( void );
     bool xnode_send_meshtastic_rx( const char *from, const char *text );
     bool xnode_send_location_update( double lat, double lon, const char *label );
+    bool xnode_send_manual_sos( void );
+    bool xnode_send_manual_checkin( void );
 
 #endif // _XNODE_H

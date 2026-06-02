@@ -134,7 +134,6 @@ void bluetooth_settings_tile_setup( void ) {
     bluetooth_message_tile_setup();
     meshtastic_app_setup();
     osmmap_app_setup();
-    bluetooth_media_tile_setup();
 
     blectl_register_cb( BLECTL_ON | BLECTL_OFF, blectl_onoff_event_cb, "bluetooth settings");
 }
