@@ -1,0 +1,224 @@
+<style>
+  .xnode-page{--ink:#102024;--muted:#55686b;--panel:#f5f8f4;--line:#c9d9d4;--dark:#101820;--green:#6fbf73;--blue:#4f8fcf;--amber:#d69a2d;--red:#c94c4c;font-family:Arial,Helvetica,sans-serif;color:var(--ink);line-height:1.48}
+  .xnode-page *{box-sizing:border-box}
+  .xnode-page a{color:#126e73;font-weight:700;text-decoration:none}
+  .xnode-page a:hover{text-decoration:underline}
+  .xnode-wrap{max-width:1180px;margin:0 auto;padding:0 18px}
+  .xnode-hero{position:relative;min-height:640px;overflow:hidden;background:#111;border-radius:18px;margin:0 0 30px}
+  .xnode-hero-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .xnode-hero:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(8,14,16,.92) 0%,rgba(8,14,16,.72) 38%,rgba(8,14,16,.28) 74%,rgba(8,14,16,.15) 100%)}
+  .xnode-hero-content{position:relative;z-index:1;max-width:680px;padding:76px 52px;color:#fff}
+  .xnode-kicker{display:inline-flex;gap:8px;align-items:center;margin:0 0 18px;padding:8px 12px;border:1px solid rgba(255,255,255,.28);border-radius:999px;background:rgba(255,255,255,.08);font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+  .xnode-hero h1{margin:0 0 18px;font-size:56px;line-height:1.02;letter-spacing:0;color:#fff}
+  .xnode-hero p{margin:0 0 24px;font-size:21px;color:#e5f2ef}
+  .xnode-actions{display:flex;flex-wrap:wrap;gap:12px;margin:26px 0 22px}
+  .xnode-button{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:12px 18px;border-radius:8px;border:1px solid #d7e8e2;background:#eaf6ef;color:#102024!important;font-weight:800}
+  .xnode-button.dark{background:#132328;color:#fff!important;border-color:#2e5056}
+  .xnode-button.warn{background:#ffe8bb;border-color:#efc36e}
+  .xnode-proof{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:28px;max-width:620px}
+  .xnode-proof div{padding:12px 14px;border:1px solid rgba(255,255,255,.22);border-radius:8px;background:rgba(0,0,0,.28);color:#eef8f5}
+  .xnode-proof strong{display:block;font-size:22px;color:#fff}
+  .xnode-section{padding:34px 0;border-top:1px solid var(--line)}
+  .xnode-section:first-of-type{border-top:0}
+  .xnode-section h2{margin:0 0 14px;font-size:34px;line-height:1.15;color:#14262a}
+  .xnode-section h3{margin:0 0 9px;font-size:22px;color:#182d31}
+  .xnode-lead{max-width:860px;margin:0 0 18px;font-size:20px;color:#30484c}
+  .xnode-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+  .xnode-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .xnode-card{border:1px solid var(--line);border-radius:8px;background:var(--panel);padding:20px}
+  .xnode-card p{margin:0;color:#41575b}
+  .xnode-card ul{margin:8px 0 0;padding-left:20px;color:#41575b}
+  .xnode-feature{display:flex;gap:12px;align-items:flex-start}
+  .xnode-dot{flex:0 0 16px;width:16px;height:16px;margin-top:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 4px rgba(111,191,115,.18)}
+  .xnode-dot.blue{background:var(--blue);box-shadow:0 0 0 4px rgba(79,143,207,.18)}
+  .xnode-dot.amber{background:var(--amber);box-shadow:0 0 0 4px rgba(214,154,45,.18)}
+  .xnode-dot.red{background:var(--red);box-shadow:0 0 0 4px rgba(201,76,76,.18)}
+  .xnode-image{width:100%;height:auto;border-radius:12px;border:1px solid var(--line);display:block;background:#0f1719}
+  .xnode-split{display:grid;grid-template-columns:1.05fr .95fr;gap:26px;align-items:center}
+  .xnode-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}
+  .xnode-mini{padding:16px;border-left:4px solid #6fbf73;background:#f7faf8;border-radius:6px}
+  .xnode-mini strong{display:block;margin-bottom:4px;color:#14262a}
+  .xnode-callout{padding:20px 22px;border:1px solid #b9d7dc;background:#eef8fa;border-radius:8px}
+  .xnode-faq details{border:1px solid var(--line);border-radius:8px;background:#fff;margin:10px 0;padding:14px 16px}
+  .xnode-faq summary{cursor:pointer;font-weight:800;color:#182d31}
+  .xnode-faq p{margin:10px 0 0;color:#445b5f}
+  .xnode-note{font-size:14px;color:#637579}
+  @media (max-width:900px){.xnode-hero{min-height:auto}.xnode-hero-content{padding:44px 24px}.xnode-hero h1{font-size:38px}.xnode-hero p{font-size:18px}.xnode-proof,.xnode-grid,.xnode-grid.two,.xnode-split,.xnode-strip{grid-template-columns:1fr}}
+</style>
+
+<div class="xnode-page">
+  <section class="xnode-hero">
+    <img class="xnode-hero-img" src="images/xnode-hero.webp" alt="XNODE tactical watch hero visual" width="1600" height="900" />
+    <div class="xnode-hero-content">
+      <div class="xnode-kicker">X Suite wearable field node</div>
+      <h1>XNODE puts the tactical picture on your wrist.</h1>
+      <p>XNODE turns the LilyGO T-Watch S3 into a field-ready companion for XTOC and XCOM: offline watch maps, synced tactical markers, pushed alerts, and one-tap Meshtastic SOS or CheckIn packets.</p>
+      <div class="xnode-actions">
+        <a class="xnode-button dark" href="https://github.com/MKme/xnode" target="_blank" rel="noreferrer">View XNODE on GitHub</a>
+        <a class="xnode-button warn" href="https://amzn.to/4sHfvgK" target="_blank" rel="noreferrer">Buy the T-Watch S3 hardware</a>
+        <a class="xnode-button" href="https://store.mkme.org/product/xtoc-tactical-operations-center-software-suite/" target="_blank" rel="noreferrer">Pair with XTOC</a>
+      </div>
+      <div class="xnode-proof">
+        <div><strong>BLE</strong>XTOC/XCOM bridge</div>
+        <div><strong>LoRa</strong>Meshtastic packets</div>
+        <div><strong>Offline</strong>watch-flash basemap</div>
+      </div>
+    </div>
+  </section>
+
+  <div class="xnode-wrap">
+    <section class="xnode-section">
+      <h2>Why XNODE exists</h2>
+      <p class="xnode-lead">Phones and tablets are powerful, but they are not always the fastest tool in a moving operation. XNODE gives the operator a wearable tactical surface: check the map, see TOC alerts, send a routine position check-in, or trigger a high-priority SOS without digging out another device.</p>
+      <div class="xnode-grid">
+        <div class="xnode-card xnode-feature">
+          <span class="xnode-dot"></span>
+          <div><h3>Watch-ready common operating picture</h3><p>XTOC and XCOM can install the active raster map onto the watch and sync overlay markers for team members, mesh nodes, CHECKINs, SITREPs, CONTACTs, TASKs, assets, routes, zones, and more.</p></div>
+        </div>
+        <div class="xnode-card xnode-feature">
+          <span class="xnode-dot blue"></span>
+          <div><h3>Two-tap field reporting</h3><p>The watch can transmit clear XTOC packet text over its Meshtastic radio for Manual SOS and CheckIn flows, using the configured roster Unit ID and current watch location.</p></div>
+        </div>
+        <div class="xnode-card xnode-feature">
+          <span class="xnode-dot amber"></span>
+          <div><h3>Local-first by design</h3><p>Maps and overlay data live on the device. Synced overlays persist in watch flash and reload when the tactical map opens or the watch reboots.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="xnode-section">
+      <div class="xnode-split">
+        <div>
+          <h2>Real watch screens, not vaporware.</h2>
+          <p class="xnode-lead">The current firmware builds for the T-Watch S3, flashes to the ESP32-S3 target, exposes the XNODE BLE bridge, installs a compact basemap, displays operational overlays, and keeps alerts visible on the watch.</p>
+          <div class="xnode-actions">
+            <a class="xnode-button dark" href="https://github.com/MKme/xnode/blob/main/README.md" target="_blank" rel="noreferrer">Read the project README</a>
+            <a class="xnode-button" href="https://github.com/MKme/xnode/blob/main/platformio.ini" target="_blank" rel="noreferrer">PlatformIO build config</a>
+          </div>
+        </div>
+        <img class="xnode-image" src="images/xnode-watch-screens.webp" alt="Real XNODE watch screens showing launcher, tactical map, and alerts" width="1680" height="980" loading="lazy" decoding="async" />
+      </div>
+    </section>
+
+    <section class="xnode-section">
+      <h2>Built for the X Suite workflow</h2>
+      <p class="xnode-lead">XNODE is not another disconnected gadget. It is the wearable edge of the X Suite: XTOC drives the command picture, XCOM supports field communications, and XNODE carries the essentials on the operator's wrist.</p>
+      <img class="xnode-image" src="images/xnode-system-flow.svg" alt="XNODE operational flow between XTOC, XCOM, the watch, maps, and Meshtastic" width="1600" height="900" loading="lazy" decoding="async" />
+      <div class="xnode-strip">
+        <div class="xnode-mini"><strong>XTOC</strong>Push maps, overlay markers, roster Unit IDs, SOS destination, and operational alerts.</div>
+        <div class="xnode-mini"><strong>XCOM</strong>Use field comms and watch workflows from the same packet ecosystem.</div>
+        <div class="xnode-mini"><strong>XNODE</strong>Carry the tactical map, alerts, and mesh shortcuts on the watch.</div>
+        <div class="xnode-mini"><strong>Meshtastic</strong>Move CHECKIN/LOC and SITREP packet text across the active mesh channel.</div>
+      </div>
+    </section>
+
+    <section class="xnode-section">
+      <h2>What XNODE does in the field</h2>
+      <div class="xnode-grid two">
+        <div class="xnode-card">
+          <h3>Tactical map on watch flash</h3>
+          <ul>
+            <li>Installs the active XTOC/XCOM raster basemap into SPIFFS.</li>
+            <li>Persists center, zoom, and projection metadata.</li>
+            <li>Scales the installed image while keeping markers aligned.</li>
+            <li>Supports panning, zoom controls, and recenter behavior.</li>
+          </ul>
+        </div>
+        <div class="xnode-card">
+          <h3>Overlay sync that survives reboot</h3>
+          <ul>
+            <li>Stores synced markers in <code>/spiffs/osmmap/overlays.jsonl</code>.</li>
+            <li>Reloads overlays when the map opens or the watch restarts.</li>
+            <li>Uses transactional replacement so partial syncs do not wipe the live picture.</li>
+            <li>Keeps up to 96 overlay marker slots on the watch.</li>
+          </ul>
+        </div>
+        <div class="xnode-card">
+          <h3>SOS over mesh</h3>
+          <ul>
+            <li>Creates a clear XTOC <code>SITREP</code> packet.</li>
+            <li>Uses the watch Unit ID, SOS destination, priority <code>P1</code>, status <code>HELP</code>, and current lat/lon.</li>
+            <li>Sends over the watch Meshtastic service on the active channel.</li>
+          </ul>
+        </div>
+        <div class="xnode-card">
+          <h3>Routine CheckIn</h3>
+          <ul>
+            <li>Creates a clear XTOC <code>CHECKIN/LOC</code> packet.</li>
+            <li>Reports Unit ID, <code>OK</code> status, current lat/lon, and timestamp.</li>
+            <li>Gives operators a fast accountability signal without opening a phone or tablet.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="xnode-section">
+      <h2>Source, build, and ecosystem links</h2>
+      <div class="xnode-grid">
+        <div class="xnode-card">
+          <h3>GitHub source</h3>
+          <p><a href="https://github.com/MKme/xnode" target="_blank" rel="noreferrer">github.com/MKme/xnode</a></p>
+          <p class="xnode-note">Firmware source, board config, PlatformIO environment, watch photos, and current implementation notes.</p>
+        </div>
+        <div class="xnode-card">
+          <h3>Key code areas</h3>
+          <p><a href="https://github.com/MKme/xnode/tree/main/src/hardware/ble" target="_blank" rel="noreferrer">BLE bridge</a> | <a href="https://github.com/MKme/xnode/tree/main/src/app/osmmap" target="_blank" rel="noreferrer">watch map app</a> | <a href="https://github.com/MKme/xnode/tree/main/support" target="_blank" rel="noreferrer">support tools</a></p>
+          <p class="xnode-note">Useful for developers who want to audit how maps, overlays, and packet shortcuts are wired.</p>
+        </div>
+        <div class="xnode-card">
+          <h3>Hardware target</h3>
+          <p><a href="https://amzn.to/4sHfvgK" target="_blank" rel="noreferrer">LILYGO T-Watch S3 hardware listing</a></p>
+          <p class="xnode-note">ESP32-S3 watch target with 16 MB flash, PSRAM, touch display, and SX1262 LoRa hardware path.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="xnode-section">
+      <h2>Complete the stack</h2>
+      <div class="xnode-grid">
+        <div class="xnode-card">
+          <h3>XTOC</h3>
+          <p>Command-center software for SITREPs, TASKs, CHECKIN/LOC, map overlays, zones, SATCOM, ATAK/KML/CoT workflows, and packet-based field coordination.</p>
+          <p><a href="https://store.mkme.org/product/xtoc-tactical-operations-center-software-suite/" target="_blank" rel="noreferrer">View XTOC</a></p>
+        </div>
+        <div class="xnode-card">
+          <h3>XCOM</h3>
+          <p>Offline-first radio and mapping toolkit with packet workflows, repeaters, mesh, Reticulum, APRS/D-STAR, field maps, and XNODE watch integration.</p>
+          <p><a href="https://store.mkme.org/product/xcom-offline-radio-communication-suite/" target="_blank" rel="noreferrer">View XCOM</a></p>
+        </div>
+        <div class="xnode-card">
+          <h3>XCORE + XINTEL</h3>
+          <p>Add a local AI analyst and a radio-intel watch layer for teams that need monitoring, summaries, anomaly scans, and operational escalation.</p>
+          <p><a href="https://store.mkme.org/product/xcore/" target="_blank" rel="noreferrer">View XCORE</a> | <a href="https://store.mkme.org/product/xintel/" target="_blank" rel="noreferrer">View XINTEL</a></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="xnode-section">
+      <div class="xnode-callout">
+        <h2>Operational note</h2>
+        <p>XNODE is a firmware project for a specific watch target and a companion workflow for the X Suite. The current watch-flash map mode is intentionally compact: one installed raster basemap with synced overlays, not a full multi-tile slippy map engine. That tradeoff is what makes the watch useful inside tight flash, RAM, battery, and screen constraints.</p>
+      </div>
+    </section>
+
+    <section class="xnode-section xnode-faq">
+      <h2>FAQ</h2>
+      <details open>
+        <summary>Does XNODE replace XTOC or XCOM?</summary>
+        <p>No. XNODE is the wearable edge. XTOC and XCOM remain the larger planning, mapping, packet, and radio workflow tools.</p>
+      </details>
+      <details>
+        <summary>Does XNODE work offline?</summary>
+        <p>The watch can display the installed basemap and persisted overlays from flash. Syncing new maps, markers, unit settings, and pushed alerts happens through the companion XTOC/XCOM bridge.</p>
+      </details>
+      <details>
+        <summary>Does the SOS button send through the phone?</summary>
+        <p>No. Manual SOS builds a clear XTOC SITREP packet and hands it to the watch Meshtastic service for transmission on the active mesh channel.</p>
+      </details>
+      <details>
+        <summary>Is it open source?</summary>
+        <p>The active firmware source is published at <a href="https://github.com/MKme/xnode" target="_blank" rel="noreferrer">github.com/MKme/xnode</a>.</p>
+      </details>
+    </section>
+  </div>
+</div>

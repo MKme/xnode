@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">XNODE operational flow</title>
+  <desc id="desc">XTOC and XCOM push maps, markers, alerts, and unit settings to XNODE over BLE. XNODE displays the tactical picture on the watch and transmits SOS or CheckIn packets over Meshtastic.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#101820"/>
+      <stop offset="0.46" stop-color="#18272a"/>
+      <stop offset="1" stop-color="#243018"/>
+    </linearGradient>
+    <linearGradient id="watch" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#0c1113"/>
+      <stop offset="1" stop-color="#384144"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+    <style>
+      .label{font-family:Arial,Segoe UI,sans-serif;font-weight:700;letter-spacing:.08em;fill:#eaf6f1}
+      .copy{font-family:Arial,Segoe UI,sans-serif;font-size:27px;fill:#cbd9d5}
+      .small{font-family:Arial,Segoe UI,sans-serif;font-size:22px;fill:#d8e8e2}
+      .node{filter:url(#shadow)}
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <g opacity=".18" stroke="#d4f2df" stroke-width="1">
+    <path d="M0 180H1600M0 360H1600M0 540H1600M0 720H1600"/>
+    <path d="M200 0V900M400 0V900M600 0V900M800 0V900M1000 0V900M1200 0V900M1400 0V900"/>
+  </g>
+  <text x="82" y="92" class="label" font-size="42">XNODE FIELD BRIDGE</text>
+  <text x="82" y="136" class="copy">Wearable tactical map, mesh packet shortcut, and alert surface for the X Suite.</text>
+
+  <g class="node">
+    <rect x="90" y="245" width="290" height="170" rx="26" fill="#f4fbf7"/>
+    <text x="130" y="312" font-family="Arial,Segoe UI,sans-serif" font-size="39" font-weight="700" fill="#132125">XTOC</text>
+    <text x="130" y="356" class="small" fill="#274348">TOC map, roster,</text>
+    <text x="130" y="388" class="small" fill="#274348">packets, overlays</text>
+  </g>
+  <g class="node">
+    <rect x="90" y="486" width="290" height="170" rx="26" fill="#eef7ff"/>
+    <text x="130" y="553" font-family="Arial,Segoe UI,sans-serif" font-size="39" font-weight="700" fill="#132125">XCOM</text>
+    <text x="130" y="597" class="small" fill="#274348">field comms,</text>
+    <text x="130" y="629" class="small" fill="#274348">mesh and maps</text>
+  </g>
+
+  <path d="M405 330 C500 330 555 398 650 398" fill="none" stroke="#78d5c1" stroke-width="8" stroke-linecap="round"/>
+  <path d="M405 575 C500 575 555 502 650 502" fill="none" stroke="#86b7ff" stroke-width="8" stroke-linecap="round"/>
+  <polygon points="648,388 680,400 648,412" fill="#78d5c1"/>
+  <polygon points="648,492 680,504 648,516" fill="#86b7ff"/>
+  <text x="455" y="300" class="small">BLE bridge</text>
+  <text x="455" y="620" class="small">map + alerts</text>
+
+  <g class="node">
+    <rect x="682" y="206" width="330" height="488" rx="68" fill="url(#watch)" stroke="#879395" stroke-width="10"/>
+    <rect x="731" y="272" width="232" height="340" rx="26" fill="#071012" stroke="#d8eee8" stroke-width="4"/>
+    <path d="M757 520 C812 452 854 454 933 367" fill="none" stroke="#8fd87d" stroke-width="9" stroke-linecap="round"/>
+    <path d="M756 374 C810 392 860 368 938 418" fill="none" stroke="#5fa4ff" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="842" cy="436" r="22" fill="#f6fbf6" stroke="#5fa4ff" stroke-width="5"/>
+    <circle cx="907" cy="390" r="15" fill="#e84a4a"/>
+    <circle cx="790" cy="512" r="15" fill="#8fd87d"/>
+    <rect x="760" y="302" width="174" height="34" rx="17" fill="#263b40"/>
+    <text x="777" y="326" font-family="Arial,Segoe UI,sans-serif" font-size="19" font-weight="700" fill="#e9f8f3">Tac Map</text>
+    <text x="740" y="654" font-family="Arial,Segoe UI,sans-serif" font-size="35" font-weight="700" fill="#eaf6f1">XNODE WATCH</text>
+  </g>
+
+  <path d="M1035 450 C1132 450 1186 352 1280 352" fill="none" stroke="#ffd166" stroke-width="8" stroke-linecap="round"/>
+  <path d="M1035 492 C1132 492 1186 574 1280 574" fill="none" stroke="#f05d5e" stroke-width="8" stroke-linecap="round"/>
+  <polygon points="1278,340 1310,352 1278,364" fill="#ffd166"/>
+  <polygon points="1278,562 1310,574 1278,586" fill="#f05d5e"/>
+  <text x="1092" y="414" class="small">offline picture</text>
+  <text x="1092" y="548" class="small">SOS / CheckIn</text>
+
+  <g class="node">
+    <rect x="1312" y="252" width="210" height="170" rx="26" fill="#f9f7ed"/>
+    <text x="1348" y="318" font-family="Arial,Segoe UI,sans-serif" font-size="33" font-weight="700" fill="#1a2528">MAP</text>
+    <text x="1348" y="361" class="small" fill="#364548">basemap</text>
+    <text x="1348" y="392" class="small" fill="#364548">markers</text>
+  </g>
+  <g class="node">
+    <rect x="1312" y="494" width="210" height="170" rx="26" fill="#fff0f0"/>
+    <text x="1348" y="560" font-family="Arial,Segoe UI,sans-serif" font-size="33" font-weight="700" fill="#1a2528">MESH</text>
+    <text x="1348" y="603" class="small" fill="#364548">SITREP</text>
+    <text x="1348" y="634" class="small" fill="#364548">CHECKIN</text>
+  </g>
+</svg>
