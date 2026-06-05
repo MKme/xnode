@@ -1,5 +1,6 @@
 #include "config.h"
 #include "xnode.h"
+#include "xnode_config.h"
 
 #ifndef NATIVE_64BIT
 
@@ -42,6 +43,7 @@
         constexpr size_t XNODE_MAX_JSON = 6144;
         constexpr size_t XNODE_QUEUE_DEPTH = 96;
         constexpr size_t XNODE_FRAME_BUFFER = 256;
+        constexpr uint32_t XNODE_LOCATION_SAVE_INTERVAL_MS = 300000;
 
         extern const uint8_t xnode_seed_tile_start[] asm("_binary_src_assets_xnode_seed_tile_10_279_373_png_start");
         extern const uint8_t xnode_seed_tile_end[] asm("_binary_src_assets_xnode_seed_tile_10_279_373_png_end");
@@ -56,12 +58,14 @@
         } xnode_rx_frame_t;
 
         char xnode_last_host_name[ 32 ] = "XTOC";
+        xnode_config_t xnode_config;
         uint16_t xnode_watch_unit_id = 0;
         uint16_t xnode_sos_to_unit_id = 0;
         char xnode_watch_unit_label[ 32 ] = "";
         double xnode_last_lat = 0.0;
         double xnode_last_lon = 0.0;
         bool xnode_has_location = false;
+        uint32_t xnode_last_location_save_ms = 0;
         char xnode_rx_id[ 24 ] = "";
         uint16_t xnode_rx_total = 0;
         uint16_t xnode_rx_index = 0;
@@ -124,6 +128,52 @@
                 return( 65535 );
             }
             return( (uint16_t)value );
+        }
+
+        void xnode_load_persistent_config( void ) {
+            xnode_config.load();
+
+            xnode_watch_unit_id = xnode_config.watch_unit_id;
+            xnode_sos_to_unit_id = xnode_config.sos_to_unit_id;
+            strlcpy( xnode_watch_unit_label, xnode_config.watch_unit_label, sizeof( xnode_watch_unit_label ) );
+            if ( xnode_config.has_location &&
+                 xnode_config.lat >= -90.0 && xnode_config.lat <= 90.0 &&
+                 xnode_config.lon >= -180.0 && xnode_config.lon <= 180.0 ) {
+                xnode_last_lat = xnode_config.lat;
+                xnode_last_lon = xnode_config.lon;
+                xnode_has_location = true;
+            }
+            else {
+                xnode_last_lat = 0.0;
+                xnode_last_lon = 0.0;
+                xnode_has_location = false;
+            }
+        }
+
+        bool xnode_save_persistent_config( void ) {
+            xnode_config.watch_unit_id = xnode_watch_unit_id;
+            xnode_config.sos_to_unit_id = xnode_sos_to_unit_id;
+            strlcpy( xnode_config.watch_unit_label, xnode_watch_unit_label, sizeof( xnode_config.watch_unit_label ) );
+            xnode_config.has_location = xnode_has_location;
+            xnode_config.lat = xnode_has_location ? xnode_last_lat : 0.0;
+            xnode_config.lon = xnode_has_location ? xnode_last_lon : 0.0;
+            return( xnode_config.save() );
+        }
+
+        bool xnode_save_persistent_location_if_due( bool force ) {
+            const uint32_t now = millis();
+
+            if ( !xnode_has_location ) {
+                return( false );
+            }
+            if ( !force &&
+                 xnode_config.has_location &&
+                 now - xnode_last_location_save_ms < XNODE_LOCATION_SAVE_INTERVAL_MS ) {
+                return( true );
+            }
+
+            xnode_last_location_save_ms = now;
+            return( xnode_save_persistent_config() );
         }
 
         bool xnode_apply_sos_config_payload( JsonObjectConst payload ) {
@@ -963,7 +1013,6 @@
             }
 
             if ( strcmp( type, "hello" ) == 0 ) {
-                xnode_apply_sos_config_payload( payload );
                 xnode_send_hello_ack();
                 return;
             }
@@ -972,6 +1021,7 @@
                 StaticJsonDocument< 160 > reply;
 
                 xnode_apply_sos_config_payload( payload );
+                xnode_save_persistent_config();
                 reply[ "watchUnitId" ] = xnode_watch_unit_id;
                 reply[ "sosToUnitId" ] = xnode_sos_to_unit_id;
                 xnode_send_event( "sosConfigAck", reply );
@@ -986,10 +1036,11 @@
                     ? ( payload[ "overlayCount" ] | 0 )
                     : ( payload[ "packetCount" ] | 0 );
 
-                xnode_apply_sos_config_payload( payload );
                 if ( has_location ) {
                     JsonObjectConst location = payload[ "location" ].as<JsonObjectConst>();
-                    xnode_apply_location_payload( location, false );
+                    if ( xnode_apply_location_payload( location, false ) ) {
+                        xnode_save_persistent_location_if_due( false );
+                    }
                     xnode_apply_time_payload( location );
                 }
                 else if ( replace ) {
@@ -1179,6 +1230,7 @@
                 const bool time_updated = xnode_apply_time_payload( payload );
 
                 if ( xnode_apply_location_payload( payload, false ) ) {
+                    xnode_save_persistent_location_if_due( true );
                     reply[ "lat" ] = lat;
                     reply[ "lon" ] = lon;
                     reply[ "label" ] = label;
@@ -1434,6 +1486,7 @@
         NimBLEAdvertising *pAdvertising = blectl_get_ble_advertising();
         NimBLEService *pXnodeService = pServer->createService( NimBLEUUID( XNODE_SERVICE_UUID ) );
 
+        xnode_load_persistent_config();
         xnode_seed_default_basemap_tile();
 
         if ( !xnode_rx_queue ) {

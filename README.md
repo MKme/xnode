@@ -279,9 +279,10 @@ Setup for success:
 
 1. In `XTOC Team` or the `XCOM` imported roster, give every watch wearer a stable `Unit ID`.
 2. In `XTOC -> XNODE` or `XCOM -> XNODE`, connect the watch, choose `Watch Unit ID` from the roster, choose `SOS To`, and click `Save`.
-3. Set the watch location from the XNODE page with `Set watch GPS + time`, `Share current GPS once`, or the GPS relay before relying on Manual SOS. Future GPS-equipped watches can provide this directly.
-4. On the watch, open the `mesh` app and confirm the status is `Mesh ready` on the expected Meshtastic channel.
-5. Send a short test mesh message and confirm the TOC mesh station can receive and auto-import XTOC packet text.
+3. The watch stores this assignment in `/xnode.json` and reloads it after reboot. To clear it, reconnect from `XTOC`/`XCOM`, choose `Unassigned / clear saved watch ID`, and click `Save`.
+4. Set the watch location from the XNODE page with `Set watch GPS + time`, `Share current GPS once`, or the GPS relay before relying on Manual SOS. Future GPS-equipped watches can provide this directly. Host-set location is also stored so the last known lat/lon survives reboot.
+5. On the watch, open the `mesh` app and confirm the status is `Mesh ready` on the expected Meshtastic channel.
+6. Send a short test mesh message and confirm the TOC mesh station can receive and auto-import XTOC packet text.
 
 Use in the field:
 
@@ -322,8 +323,9 @@ Setup is the same as Manual SOS:
 
 1. Assign the watch wearer a stable roster `Unit ID`.
 2. In `XTOC -> XNODE` or `XCOM -> XNODE`, connect the watch, choose `Watch Unit ID`, and click `Save`.
-3. Set the watch location from the XNODE page or GPS relay before relying on CheckIn.
-4. On the watch, open the `mesh` app and confirm `Mesh ready` on the intended channel.
+3. The watch keeps the saved Unit ID across reboot until `XTOC`/`XCOM` explicitly saves `Unassigned / clear saved watch ID`.
+4. Set the watch location from the XNODE page or GPS relay before relying on CheckIn.
+5. On the watch, open the `mesh` app and confirm `Mesh ready` on the intended channel.
 
 Use in the field:
 
