@@ -45,65 +45,127 @@
         AsyncWebHandler mHandler_SPIFFSEditor;
         SPIFFSEditor * mSPIFFSEditor = nullptr;
 
-    static const char* serverIndex =
-        "<!DOCTYPE html>\n <html><head>\n <script src='https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js'></script>"
-        "\n <script src='/jquery.min.js'></script>"
+    static const char* serverIndex = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>XNODE Firmware Update</title>
+<style>
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:#101820;color:#edf4f7}
+main{max-width:720px;margin:0 auto;padding:32px 20px}
+h1{font-size:28px;margin:0 0 8px}
+p{color:#a9bac3}
+form{margin-top:24px;padding:20px;border:1px solid #2f4652;background:#15242c}
+input,button{font:inherit}
+button{margin-top:16px;border:0;background:#2fc27d;color:#07130d;padding:10px 16px;font-weight:700;cursor:pointer}
+#progressbarfull{background:#22323a;width:100%;height:18px;margin-top:18px}
+#progressbar{background:#2fc27d;width:0;height:18px}
+#prg{margin-top:14px;color:#cfe3ea}
+a{color:#7fc7ff}
+</style>
+</head>
+<body>
+<main>
+<h1>XNODE Firmware Update</h1>
+<p>Upload a firmware binary. The watch will reboot after a successful update.</p>
+<form method="POST" action="/update" enctype="multipart/form-data" id="upload_form">
+<input type="file" name="update" required>
+<br><button type="submit">Update Firmware</button>
+<div id="prg">Progress: 0%</div>
+<div id="progressbarfull"><div id="progressbar"></div></div>
+</form>
+<p><a href="/">Return to console</a></p>
+</main>
+<script>
+document.getElementById('upload_form').addEventListener('submit',function(e){
+  e.preventDefault();
+  var request=new XMLHttpRequest();
+  request.open('POST','/update');
+  request.upload.addEventListener('progress',function(evt){
+    if(evt.lengthComputable){
+      var pct=Math.round((evt.loaded/evt.total)*100);
+      document.getElementById('prg').textContent='Progress: '+pct+'%';
+      document.getElementById('progressbar').style.width=pct+'%';
+    }
+  });
+  request.onload=function(){document.getElementById('prg').textContent=request.status<400?'Progress: success':'Progress: error';};
+  request.onerror=function(){document.getElementById('prg').textContent='Progress: error';};
+  request.send(new FormData(e.target));
+});
+</script>
+</body>
+</html>
+)rawliteral";
 
-        "\n <style>"
-        "\n #progressbarfull {"
-        "\n background-color: #20201F;"
-        "\n border-radius: 20px;"
-        "\n width: 320px;"
-        "\n padding: 4px;"
-        "\n}"
-        "\n #progressbar {"
-        "\n background-color: #20CC00;"
-        "\n width: 3%;"
-        "\n height: 16px;"
-        "\n border-radius: 10px;"
-        "\n}"
-        "\n</style>"
-        "\n </head><body>"
-        "<h2>Update by Browser</h2>"
-        "\n <form method='POST' action='#' enctype='multipart/form-data' id='upload_form'>"
-        "\n <input type='file' name='update'>"
-        "\n <br><br><input type='submit' value='Update'>"
-        "\n </form>"
-        "\n <div id='prg'>Progress: 0%</div>"
-        "\n <div id=\"progressbarfull\"><div id=\"progressbar\"></div></div>"
-        "\n <script>"
-        "\n $('form').submit(function(e){"
-        "\n e.preventDefault();"
-        "\n var form = $('#upload_form')[0];"
-        "\n var data = new FormData(form);"
-        "\n $.ajax({"
-        "\n url: '/update',"
-        "\n type: 'POST',"
-        "\n data: data,"
-        "\n contentType: false,"
-        "\n processData:false,"
-        "\n xhr: function() {"
-        "\n var xhr = new window.XMLHttpRequest();"
-        "\n xhr.upload.addEventListener('progress', function(evt) {"
-        "\n if (evt.lengthComputable) {"
-        "\n var per = evt.loaded / evt.total;"
-        "\n document.getElementById(\"prg\").innerHTML = 'Progress: ' + Math.round(per*100) + '%';"
-        "\n document.getElementById(\"progressbar\").style.width=Math.round(per*100)+ '%';"
-        "}"
-        "}, false);"
-        "return xhr;"
-        "},"
-        "\n success:function(d, s) {"
-        "\n document.getElementById(\"prg\").innerHTML = 'Progress: success';"
-        "\n console.log('success!')"
-        "},"
-        "\n error: function (a, b, c) {"
-        "\n document.getElementById(\"prg\").innerHTML = 'Progress: error';"
-        "}"
-        "});"
-        "});"
-        "\n </script>"
-        "\n </body></html>";
+    static const char* meshtasticIndex = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Meshtastic XNODE</title>
+<style>
+:root{color-scheme:dark;--bg:#0f171b;--panel:#162229;--line:#2a3d47;--text:#eef6f8;--muted:#9cb0ba;--accent:#35c486;--warn:#ffcc66}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,Segoe UI,sans-serif;background:var(--bg);color:var(--text)}
+header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;border-bottom:1px solid var(--line);background:#111c22}
+h1{margin:0;font-size:24px;letter-spacing:0}
+.sub{color:var(--muted);font-size:13px}
+nav{display:flex;flex-wrap:wrap;gap:8px;padding:14px 22px;border-bottom:1px solid var(--line)}
+button,a.action{border:1px solid var(--line);background:var(--panel);color:var(--text);padding:10px 13px;text-decoration:none;cursor:pointer;font:inherit}
+button:hover,a.action:hover{border-color:var(--accent)}
+main{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px;padding:18px 22px}
+section{border:1px solid var(--line);background:var(--panel);min-height:240px}
+#panel{padding:16px;overflow:auto}
+aside{display:grid;gap:18px;align-content:start}
+.metric{padding:16px;border:1px solid var(--line);background:#101b21}
+.metric h2{margin:0 0 10px;font-size:15px;color:#d8e7ec}
+.metric div{color:var(--muted);font-size:14px;line-height:1.6}
+.danger{color:var(--warn)}
+@media(max-width:820px){main{grid-template-columns:1fr}header{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Meshtastic XNODE</h1>
+    <div class="sub">T-Watch Ultra firmware console</div>
+  </div>
+  <div class="sub" id="clock"></div>
+</header>
+<nav>
+  <button data-load="/info">Device</button>
+  <button data-load="/memory">Memory</button>
+  <button data-load="/network">Network</button>
+  <a class="action" href="/edit" target="_blank">Files</a>
+  <a class="action" href="/update">Firmware</a>
+  <a class="action danger" href="/reset">Reboot</a>
+</nav>
+<main>
+  <section id="panel">Loading device status...</section>
+  <aside>
+    <div class="metric"><h2>Endpoints</h2><div>/info<br>/memory<br>/network<br>/edit<br>/update</div></div>
+    <div class="metric"><h2>Storage</h2><div>Ultra basemaps use /sd/osmmap when an SD card is mounted.</div></div>
+    <div class="metric"><h2>Mesh</h2><div>Meshtastic BLE and XNODE services advertise over the watch BLE stack.</div></div>
+  </aside>
+</main>
+<script>
+function now(){document.getElementById('clock').textContent=new Date().toLocaleString();}
+function extract(html){var doc=new DOMParser().parseFromString(html,'text/html');return doc.body?doc.body.innerHTML:html;}
+async function load(path){
+  var panel=document.getElementById('panel');
+  panel.textContent='Loading '+path+'...';
+  try{var res=await fetch(path,{cache:'no-store'});panel.innerHTML=extract(await res.text());}
+  catch(e){panel.textContent='Unable to load '+path;}
+}
+document.querySelectorAll('[data-load]').forEach(function(btn){btn.addEventListener('click',function(){load(btn.dataset.load);});});
+now();setInterval(now,1000);load('/info');
+</script>
+</body>
+</html>
+)rawliteral";
 
     void handleUpdate( AsyncWebServerRequest *request, const String& filename, size_t index, uint8_t *data, size_t len, bool final) {
     if (!index){
@@ -146,40 +208,17 @@
     */
     void asyncwebserver_start(void){
     asyncserver.on("/index.htm", HTTP_GET, [](AsyncWebServerRequest *request) {
-        String html = (String) "<!DOCTYPE html>"
-        "<html>"
-        "<frameset cols=\"300, *\">"
-        "<frame src=\"/nav.htm\" name=\"nav\">"
-        "<frame name=\"cont\">"
-        "</frameset>"
-        "</html>";
-        request->send(200, "text/html", html);
+        request->send(200, "text/html", meshtasticIndex);
     });
 
     asyncserver.on("/nav.htm", HTTP_GET, [](AsyncWebServerRequest *request) {
-        String html = (String) "<!DOCTYPE html>"
-        "<html><head>"
-        "<meta http-equiv='Content-type' content='text/html; charset=utf-8'>"
-        "<title>Web Interface</title>"
-        "</head><body>"
-        "<h1>TTGo Watch Web Server</h1>"
-        "<p>This is your device, program it as you see fit."
-        "<p>Here are some URLs the device already supports, which you might find helpful:"
-        "<ul>"
-        "<li><a target=\"cont\" href=\"/info\">/info</a> - Display information about the device"
-        "<li><a target=\"cont\" href=\"/memory\">/memory</a> - Display memory information"
-        "<li><a target=\"cont\" href=\"/battery\">/battery</a> - Display battery charging information"
-        "<li><a target=\"cont\" href=\"/touch\">/touch</a> - Display touch screen information"
-        "<li><a target=\"cont\" href=\"/network\">/network</a> - Display network information"
-        "<li><a target=\"cont\" href=\"/shot\">/shot</a> - Capture a screen shot"
-        "<li><a target=\"cont\" href=\"/screen.png\">/screen.png</a> - Retrieve the image in png format, open it with gimp"
-        "<li><a target=\"_blank\" href=\"/edit\">/edit</a> - View, edit, upload, and delete files"
-        "</ul>"
-        "<p><div style=\"color:red;\">Caution:</div> Use these with care:"
-        "<ul><li><a target=\"cont\"  href=\"/reset\">/reset</a> Reboot the device"
-        "<li><a target=\"_top\" href=\"/update\">/update</a> Transmit a firmware update through POST request"
-        "</body></html>";
-        request->send(200, "text/html", html);
+        AsyncWebServerResponse *response = request->beginResponse(302, "text/plain", "Moved");
+        response->addHeader("Location", "/index.htm");
+        request->send(response);
+    });
+
+    asyncserver.on("/meshtastic", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(200, "text/html", meshtasticIndex);
     });
 
     asyncserver.on("/info", HTTP_GET, [](AsyncWebServerRequest *request) {

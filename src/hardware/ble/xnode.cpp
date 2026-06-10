@@ -23,6 +23,7 @@
     #include "gui/mainbar/setup_tile/bluetooth_settings/bluetooth_message.h"
     #include "hardware/blectl.h"
     #include "hardware/device.h"
+    #include "hardware/gpsctl.h"
     #include "hardware/sdcard.h"
     #include "hardware/timesync.h"
 
@@ -30,11 +31,19 @@
         constexpr const char *XNODE_SERVICE_UUID = "7f35b8a0-8d1c-4f8b-b8d5-1f1f0c0d0001";
         constexpr const char *XNODE_CHARACTERISTIC_UUID_RX = "7f35b8a0-8d1c-4f8b-b8d5-1f1f0c0d0002";
         constexpr const char *XNODE_CHARACTERISTIC_UUID_TX = "7f35b8a0-8d1c-4f8b-b8d5-1f1f0c0d0003";
-        constexpr const char *XNODE_OFFLINE_TILE_ROOT = "/spiffs/osmmap";
-        constexpr const char *XNODE_OFFLINE_TILE_PREFIX = "/spiffs/osmmap/";
-        constexpr const char *XNODE_OFFLINE_MAP_NAME = "offline from watch flash";
-        constexpr const char *XNODE_CURRENT_TILE_PATH = "/spiffs/osmmap/current.png";
-        constexpr const char *XNODE_SEED_TILE_PATH = "/spiffs/osmmap/10/279/373.png";
+        #if defined( LILYGO_WATCH_ULTRA )
+            constexpr const char *XNODE_OFFLINE_TILE_ROOT = "/sd/osmmap";
+            constexpr const char *XNODE_OFFLINE_TILE_PREFIX = "/sd/osmmap/";
+            constexpr const char *XNODE_OFFLINE_MAP_NAME = "offline from watch sd";
+            constexpr const char *XNODE_CURRENT_TILE_PATH = "/sd/osmmap/current.png";
+            constexpr const char *XNODE_SEED_TILE_PATH = "/sd/osmmap/10/279/373.png";
+        #else
+            constexpr const char *XNODE_OFFLINE_TILE_ROOT = "/spiffs/osmmap";
+            constexpr const char *XNODE_OFFLINE_TILE_PREFIX = "/spiffs/osmmap/";
+            constexpr const char *XNODE_OFFLINE_MAP_NAME = "offline from watch flash";
+            constexpr const char *XNODE_CURRENT_TILE_PATH = "/spiffs/osmmap/current.png";
+            constexpr const char *XNODE_SEED_TILE_PATH = "/spiffs/osmmap/10/279/373.png";
+        #endif
         constexpr double XNODE_SEED_TILE_LAT = 43.74623;
         constexpr double XNODE_SEED_TILE_LON = -81.70749;
         constexpr uint32_t XNODE_SEED_TILE_ZOOM = 10;
@@ -550,12 +559,43 @@
             if ( detail && detail_size ) {
                 detail[ 0 ] = '\0';
             }
+#if defined( LILYGO_WATCH_ULTRA )
+            char path[ sizeof( xnode_file_path ) ] = { 0 };
+            char *cursor = NULL;
+
+            strlcpy( path, filepath, sizeof( path ) );
+            cursor = strrchr( path, '/' );
+            if ( !cursor ) {
+                return( true );
+            }
+            *cursor = '\0';
+            for ( cursor = path + 1; *cursor; cursor++ ) {
+                if ( *cursor == '/' ) {
+                    *cursor = '\0';
+                    if ( !xnode_create_dir_if_missing( path ) ) {
+                        if ( detail && detail_size ) {
+                            snprintf( detail, detail_size, "mkdir-failed %s errno=%d", path, errno );
+                        }
+                        return( false );
+                    }
+                    *cursor = '/';
+                }
+            }
+            if ( !xnode_create_dir_if_missing( path ) ) {
+                if ( detail && detail_size ) {
+                    snprintf( detail, detail_size, "mkdir-failed %s errno=%d", path, errno );
+                }
+                return( false );
+            }
+            return( true );
+#else
             /*
              * ESP32 SPIFFS has no real directory tree. Paths with slashes are valid
              * filenames in the mounted namespace, but mkdir("/spiffs/osmmap") fails
              * on device and blocks map install before the first write.
              */
             return( true );
+#endif
         }
 
         bool xnode_file_hash32( const char *filepath, uint32_t *hash, size_t *bytes ) {
@@ -1479,6 +1519,25 @@
         };
 
         XnodeCallbacks xnode_callbacks;
+
+        bool xnode_gpsctl_event_cb( EventBits_t event, void *arg ) {
+            gps_data_t *gps_data = (gps_data_t *)arg;
+
+            if ( !gps_data || !gps_data->valid_location ) {
+                return( true );
+            }
+            switch ( event ) {
+                case GPSCTL_SET_APP_LOCATION:
+                case GPSCTL_UPDATE_LOCATION:
+                    ::xnode_send_location_update(
+                        gps_data->lat,
+                        gps_data->lon,
+                        gps_data->gps_source == GPS_SOURCE_GPS ? "GPS" : gpsctl_get_source_str( gps_data->gps_source )
+                    );
+                    break;
+            }
+            return( true );
+        }
     }
 
     void xnode_setup( void ) {
@@ -1488,6 +1547,7 @@
 
         xnode_load_persistent_config();
         xnode_seed_default_basemap_tile();
+        gpsctl_register_cb( GPSCTL_SET_APP_LOCATION | GPSCTL_UPDATE_LOCATION, xnode_gpsctl_event_cb, "xnode gps" );
 
         if ( !xnode_rx_queue ) {
             xnode_rx_queue = xQueueCreate( XNODE_QUEUE_DEPTH, sizeof( xnode_rx_frame_t ) );
@@ -1528,6 +1588,7 @@
             xnode_last_lat = lat;
             xnode_last_lon = lon;
             xnode_has_location = true;
+            xnode_save_persistent_location_if_due( false );
         }
         payload[ "lat" ] = lat;
         payload[ "lon" ] = lon;

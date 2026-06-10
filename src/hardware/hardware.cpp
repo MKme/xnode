@@ -61,6 +61,8 @@
         #include <M5EPD.h>
     #elif defined( M5CORE2 )
         #include <M5Core2.h>
+    #elif defined( LILYGO_WATCH_ULTRA )
+        #include "hardware/twatch_ultra_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -156,6 +158,11 @@ void hardware_setup( void ) {
              * init M5Core2 hardware
              */
             M5.begin();
+        #elif defined( LILYGO_WATCH_ULTRA )
+            Serial.begin(115200);
+            delay(100);
+            watch.begin(&Serial);
+            lv_init();
         #elif defined( LILYGO_WATCH_S3 )
             Serial.begin(115200);
             delay(100);

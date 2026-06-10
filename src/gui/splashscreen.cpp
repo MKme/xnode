@@ -34,6 +34,8 @@
 #else
     #if defined( M5PAPER )
     #elif defined( M5CORE2 )
+    #elif defined( LILYGO_WATCH_ULTRA )
+        #include "hardware/twatch_ultra_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -92,7 +94,7 @@ void splash_screen_stage_one( void ) {
     #else
         #ifdef M5PAPER
             framebuffer_refresh();
-        #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_WATCH_S3 )
             for( int bl = 0 ; bl < display_get_brightness() ; bl++ ) {
                 watch.setBrightness( bl );
                 delay(5);
@@ -128,7 +130,7 @@ void splash_screen_stage_finish( void ) {
     #ifdef NATIVE_64BIT
     #else
         #ifdef M5PAPER
-        #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_WATCH_S3 )
             watch.setBrightness( display_get_brightness() );
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();

@@ -34,6 +34,8 @@
         #include <M5EPD.h>
     #elif defined( M5CORE2 )
         #include <M5Core2.h>
+    #elif defined( LILYGO_WATCH_ULTRA )
+        #include "hardware/twatch_ultra_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -85,6 +87,9 @@ void display_setup( void ) {
 
         #elif defined( M5CORE2 )
             M5.Axp.SetLcdVoltage( 2532 + display_get_brightness() );
+        #elif defined( LILYGO_WATCH_ULTRA )
+            watch.setRotation( display_config.rotation / 90 );
+            watch.setBrightness( 0 );
         #elif defined( LILYGO_WATCH_S3 )
             watch.setRotation( display_config.rotation / 90 );
             watch.setBrightness( 0 );
@@ -151,6 +156,19 @@ static bool display_powermgm_loop_cb( EventBits_t event, void *arg ) {
                     brightness--;
                     M5.Axp.SetLcdVoltage( 2532 + brightness );
                 }
+            }
+            display_update_timeout_dimmer();
+
+            retval = true;
+        #elif defined( LILYGO_WATCH_ULTRA )
+            if ( dest_brightness != brightness ) {
+                if ( brightness < dest_brightness ) {
+                    brightness++;
+                }
+                else {
+                    brightness--;
+                }
+                watch.setBrightness( brightness );
             }
             display_update_timeout_dimmer();
 
@@ -288,6 +306,10 @@ static void display_standby( void ) {
 
         #elif defined( M5CORE2 )
             M5.Lcd.sleep();
+        #elif defined( LILYGO_WATCH_ULTRA )
+            watch.setBrightness( 0 );
+            brightness = 0;
+            dest_brightness = 0;
         #elif defined( LILYGO_WATCH_S3 )
             watch.setBrightness( 0 );
             brightness = 0;
@@ -331,6 +353,10 @@ static void display_wakeup( bool silence ) {
                 M5.Axp.SetLcdVoltage( 2532 + display_get_brightness() );
                 brightness = 0;
                 dest_brightness = 0;
+            #elif defined( LILYGO_WATCH_ULTRA )
+                watch.setBrightness( 0 );
+                brightness = 0;
+                dest_brightness = 0;
             #elif defined( LILYGO_WATCH_S3 )
                 watch.setBrightness( 0 );
                 brightness = 0;
@@ -372,6 +398,9 @@ static void display_wakeup( bool silence ) {
                 M5.Lcd.begin();
                 M5.Lcd.wakeup();
                 M5.Axp.SetLcdVoltage( 2532 + display_get_brightness() );
+            #elif defined( LILYGO_WATCH_ULTRA )
+                brightness = 0;
+                dest_brightness = display_get_brightness();
             #elif defined( LILYGO_WATCH_S3 )
                 brightness = 0;
                 dest_brightness = display_get_brightness();
@@ -452,6 +481,9 @@ void display_set_brightness( uint32_t brightness_level ) {
     #else
         #if defined ( M5CORE2 )
         M5.Axp.SetLcdVoltage( 2532 + display_get_brightness() );
+        #elif defined( LILYGO_WATCH_ULTRA )
+        brightness = brightness_level;
+        watch.setBrightness( brightness_level );
         #elif defined( LILYGO_WATCH_S3 )
         brightness = brightness_level;
         watch.setBrightness( brightness_level );
@@ -493,6 +525,9 @@ void display_set_rotation( uint32_t rotation ) {
     #else
         #if defined( M5PAPER )
         #elif defined( M5CORE2 )
+        #elif defined( LILYGO_WATCH_ULTRA )
+            display_config.rotation = rotation;
+            watch.setRotation( rotation / 90 );
         #elif defined( LILYGO_WATCH_S3 )
             display_config.rotation = rotation;
             watch.setRotation( rotation / 90 );

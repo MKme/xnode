@@ -136,8 +136,19 @@ static int32_t osmmap_watch_flash_pan_y = 0;
 static double osmmap_watch_flash_center_lon = 0.0;
 static double osmmap_watch_flash_center_lat = 0.0;
 static char osmmap_watch_flash_uri[ 160 ] = { 0 };
+#if defined( LILYGO_WATCH_ULTRA )
+static constexpr const char *OSMMAP_WATCH_MAP_NAME = "offline from watch sd";
+static constexpr const char *OSMMAP_WATCH_TILE_ROOT = "/sd/osmmap";
+static constexpr const char *OSMMAP_WATCH_CURRENT_TILE_PATH = "/sd/osmmap/current.png";
+static constexpr const char *OSMMAP_WATCH_SEED_TILE_PATH = "/sd/osmmap/10/279/373.png";
+static constexpr const char *OSMMAP_OVERLAY_CACHE_PATH = "/sd/osmmap/overlays.jsonl";
+#else
+static constexpr const char *OSMMAP_WATCH_MAP_NAME = "offline from watch flash";
+static constexpr const char *OSMMAP_WATCH_TILE_ROOT = "/spiffs/osmmap";
 static constexpr const char *OSMMAP_WATCH_CURRENT_TILE_PATH = "/spiffs/osmmap/current.png";
+static constexpr const char *OSMMAP_WATCH_SEED_TILE_PATH = "/spiffs/osmmap/10/279/373.png";
 static constexpr const char *OSMMAP_OVERLAY_CACHE_PATH = "/spiffs/osmmap/overlays.jsonl";
+#endif
 static uri_load_dsc_t *osmmap_watch_flash_image_load_dsc = NULL;
 static lv_img_dsc_t osmmap_watch_flash_image_dsc = { 0 };
 static bool osmmap_watch_flash_image_ready = false;
@@ -551,7 +562,9 @@ static void osmmap_reset_overlay_item( osmmap_overlay_item_t *item ) {
 }
 
 static bool osmmap_is_watch_flash_source_name( const char *name ) {
-    return( name && !strcmp( name, "offline from watch flash" ) );
+    return( name && ( !strcmp( name, OSMMAP_WATCH_MAP_NAME ) ||
+                      !strcmp( name, "offline from watch flash" ) ||
+                      !strcmp( name, "offline from watch sd" ) ) );
 }
 
 static uint32_t osmmap_long2tilex( double lon, uint32_t z ) {
@@ -584,8 +597,8 @@ static bool osmmap_configure_watch_flash_source( double lon, double lat, uint32_
     const char *tile_path = NULL;
 
     strlcpy( tile_path_current, OSMMAP_WATCH_CURRENT_TILE_PATH, sizeof( tile_path_current ) );
-    snprintf( tile_path_jpg, sizeof( tile_path_jpg ), "/spiffs/osmmap/%u/%u/%u.jpg", clamped_zoom, tilex, tiley );
-    snprintf( tile_path_png, sizeof( tile_path_png ), "/spiffs/osmmap/%u/%u/%u.png", clamped_zoom, tilex, tiley );
+    snprintf( tile_path_jpg, sizeof( tile_path_jpg ), "%s/%u/%u/%u.jpg", OSMMAP_WATCH_TILE_ROOT, clamped_zoom, tilex, tiley );
+    snprintf( tile_path_png, sizeof( tile_path_png ), "%s/%u/%u/%u.png", OSMMAP_WATCH_TILE_ROOT, clamped_zoom, tilex, tiley );
 #ifndef NATIVE_64BIT
     struct stat st;
 
@@ -1023,7 +1036,7 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
         else {
             struct stat seed_tile_stat;
 
-            if ( stat( "/spiffs/osmmap/10/279/373.png", &seed_tile_stat ) == 0 ) {
+            if ( stat( OSMMAP_WATCH_SEED_TILE_PATH, &seed_tile_stat ) == 0 ) {
                 osmmap_configure_watch_flash_source( -81.70749, 43.74623, 10, true );
             }
         }
@@ -2202,7 +2215,7 @@ void osmmap_clear_persisted_overlay_items( void ) {
 }
 
 bool osmmap_apply_watch_basemap( const char *map_name, double lon, double lat, uint32_t zoom, uint32_t projection_zoom ) {
-    const char *selected_name = ( map_name && map_name[ 0 ] ) ? map_name : "offline from watch flash";
+    const char *selected_name = ( map_name && map_name[ 0 ] ) ? map_name : OSMMAP_WATCH_MAP_NAME;
     bool found = false;
 
     SpiRamJsonDocument doc( strlen( (const char*)osm_server_json_start ) * 2 );

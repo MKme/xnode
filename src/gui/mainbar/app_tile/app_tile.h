@@ -57,6 +57,14 @@
         #define APP_ICON_X_OFFSET       0
         #define APP_ICON_Y_OFFSET       0
         #define MAX_APPS_TILES          3
+    #elif defined( LILYGO_WATCH_ULTRA )
+        #define MAX_APPS_ICON_HORZ      4
+        #define MAX_APPS_ICON_VERT      3
+        #define APP_ICON_X_CLEARENCE    24
+        #define APP_ICON_Y_CLEARENCE    54
+        #define APP_ICON_X_OFFSET       0
+        #define APP_ICON_Y_OFFSET       0
+        #define MAX_APPS_TILES          3
     #else
         #define MAX_APPS_ICON_HORZ      3
         #define MAX_APPS_ICON_VERT      2

@@ -43,6 +43,8 @@
         #include <M5EPD.h>
     #elif defined( M5CORE2 )
         #include <M5Core2.h>
+    #elif defined( LILYGO_WATCH_ULTRA )
+        #include "hardware/twatch_ultra_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -107,6 +109,9 @@ void gpsctl_setup( void ) {
             #elif defined( M5CORE2 )
                 gpsctl_config.RXPin = GPIO_NUM_33;
                 gpsctl_config.TXPin = GPIO_NUM_32;
+            #elif defined( LILYGO_WATCH_ULTRA )
+                gpsctl_config.RXPin = SHIELD_GPS_RX;
+                gpsctl_config.TXPin = SHIELD_GPS_TX;
             #elif defined( LILYGO_WATCH_S3 )
                 gpsctl_config.RXPin = SHIELD_GPS_RX;
                 gpsctl_config.TXPin = SHIELD_GPS_TX;
@@ -130,7 +135,7 @@ void gpsctl_setup( void ) {
                 gps_serial->begin( GPSBaud );
             #else
                 gps_serial = &Serial2;
-#if defined( LILYGO_WATCH_S3 )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_WATCH_S3 )
                 gps_serial->begin( 38400, SERIAL_8N1, gpsctl_config.RXPin, gpsctl_config.TXPin );
 #else
                 gps_serial->begin( GPSBaud, SERIAL_8N1, gpsctl_config.RXPin, gpsctl_config.TXPin );
@@ -375,6 +380,8 @@ void gpsctl_on( void ) {
 
             #elif defined( M5CORE2 )
 
+            #elif defined( LILYGO_WATCH_ULTRA )
+                watch.powerIoctl( WATCH_POWER_GPS, true );
             #elif defined( LILYGO_WATCH_S3 )
                 watch.powerIoctl( WATCH_POWER_GPS, true );
                 watch.powerIoctl( WATCH_POWER_GPS_DC_CHANNEL, true );
@@ -417,6 +424,8 @@ void gpsctl_off( void ) {
 
             #elif defined( M5CORE2 )
 
+            #elif defined( LILYGO_WATCH_ULTRA )
+                watch.powerIoctl( WATCH_POWER_GPS, false );
             #elif defined( LILYGO_WATCH_S3 )
                 watch.powerIoctl( WATCH_POWER_GPS, false );
                 watch.powerIoctl( WATCH_POWER_GPS_DC_CHANNEL, false );
@@ -465,6 +474,8 @@ void gpsctl_autoon_on( void ) {
 
                 #elif defined( M5CORE2 )
 
+                #elif defined( LILYGO_WATCH_ULTRA )
+                    watch.powerIoctl( WATCH_POWER_GPS, true );
                 #elif defined( LILYGO_WATCH_S3 )
                     watch.powerIoctl( WATCH_POWER_GPS, true );
                     watch.powerIoctl( WATCH_POWER_GPS_DC_CHANNEL, true );
@@ -496,6 +507,8 @@ void gpsctl_autoon_off( void ) {
 
         #elif defined( M5CORE2 )
 
+        #elif defined( LILYGO_WATCH_ULTRA )
+            watch.powerIoctl( WATCH_POWER_GPS, false );
         #elif defined( LILYGO_WATCH_S3 )
             watch.powerIoctl( WATCH_POWER_GPS, false );
             watch.powerIoctl( WATCH_POWER_GPS_DC_CHANNEL, false );

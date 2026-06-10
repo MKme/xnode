@@ -44,7 +44,7 @@ bool button_send_cb( EventBits_t event, void *arg );
         HotZone left_btn( 0, 240, 106, 300 );
         HotZone power_btn( 106, 240, 212, 300 );
         HotZone right_btn( 213, 240, 319, 300 );
-    #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
+    #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #include "pmu.h"
         /**
          * special case: on ttgo watch 2020 the button is connected 
@@ -99,9 +99,9 @@ void button_setup( void ) {
              */
             attachInterrupt( M5EPD_KEY_PUSH_PIN, button_irq, FALLING );
         #elif defined( M5CORE2 )
-        #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
+        #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             /**
-             * special case: on ttgo watch 2020 the button is connected 
+             * special case: on ttgo watch 2020 and T-Watch Ultra the button is connected
              * to the pmu
              */
             pmu_register_cb( PMUCTL_SHORT_PRESS | PMUCTL_LONG_PRESS, button_pmu_event_cb, "button pmu event" );

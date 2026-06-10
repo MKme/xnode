@@ -6,5 +6,6 @@
 	"Stamen Toner":"http://a.tile.stamen.com/toner/$z/$x/$y.png",
 	"thunderforest":"http://tile.thunderforest.com/transport/$z/$x/$y.png",
     "memomaps":"http://tile.memomaps.de/tilegen/$z/$x/$y.png",
-    "offline from watch flash":"file:///spiffs/osmmap/$z/$x/$y.png"
+    "offline from watch flash":"file:///spiffs/osmmap/$z/$x/$y.png",
+    "offline from watch sd":"file:///sd/osmmap/$z/$x/$y.png"
 }

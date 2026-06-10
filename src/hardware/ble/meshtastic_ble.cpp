@@ -1,7 +1,7 @@
 #include "config.h"
 #include "meshtastic_ble.h"
 
-#if !defined( NATIVE_64BIT ) && defined( USING_TWATCH_S3 )
+#if !defined( NATIVE_64BIT ) && ( defined( USING_TWATCH_S3 ) || defined( USING_TWATCH_ULTRA ) )
 
     #include <Arduino.h>
     #include <ESP.h>
