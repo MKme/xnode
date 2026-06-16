@@ -530,6 +530,13 @@ bool touch_getXY( int16_t &x, int16_t &y ) {
                     y = TFT_HEIGHT - raw_y;
                     break;
             }
+            if ( x < T_WATCH_ULTRA_SAFE_LEFT || x >= ( TFT_WIDTH - T_WATCH_ULTRA_SAFE_RIGHT ) ||
+                 y < T_WATCH_ULTRA_SAFE_TOP || y >= ( TFT_HEIGHT - T_WATCH_ULTRA_SAFE_BOTTOM ) ) {
+                touched = false;
+                return( false );
+            }
+            x -= T_WATCH_ULTRA_SAFE_LEFT;
+            y -= T_WATCH_ULTRA_SAFE_TOP;
             touched = true;
         #elif defined( LILYGO_WATCH_S3 )
             int16_t raw_x = 0;

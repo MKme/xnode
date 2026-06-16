@@ -21,11 +21,29 @@ namespace {
 SPIClass radioBus = SPIClass(HSPI);
 TWatchUltraHal watch;
 
+const uint8_t *TWatchUltraPanel::getInitCommands(uint8_t listno) const {
+    static constexpr uint8_t list0[] = {
+        0xFE, 1, 0x00,
+        0xC4, 1, 0x80,
+        0x3A, 1, 0x55,
+        0x35, 1, 0x00,
+        0x53, 1, 0x20,
+        0x63, 1, 0xFF,
+        0x2A, 4, 0x00, 0x16, 0x01, 0xAF,
+        0x2B, 4, 0x00, 0x00, 0x01, 0xF5,
+        0x11, 0x80, 120,
+        0x29, 0x80, 120,
+        0x51, 1, 0x00,
+        0xff, 0xff
+    };
+    return listno == 0 ? list0 : nullptr;
+}
+
 TWatchUltraDisplay::TWatchUltraDisplay() {
     auto bus_cfg = bus.config();
-    bus_cfg.spi_host = SPI2_HOST;
+    bus_cfg.spi_host = SPI3_HOST;
     bus_cfg.spi_mode = SPI_MODE0;
-    bus_cfg.freq_write = 75000000;
+    bus_cfg.freq_write = 45000000;
     bus_cfg.freq_read = 16000000;
     bus_cfg.spi_3wire = false;
     bus_cfg.use_lock = true;
@@ -46,7 +64,7 @@ TWatchUltraDisplay::TWatchUltraDisplay() {
     panel_cfg.offset_rotation = 0;
     panel_cfg.offset_x = 22;
     panel_cfg.offset_y = 0;
-    panel_cfg.dummy_read_pixel = 8;
+    panel_cfg.dummy_read_pixel = 1;
     panel_cfg.dummy_read_bits = 1;
     panel_cfg.readable = true;
     panel_cfg.invert = false;
@@ -78,7 +96,15 @@ bool TWatchUltraHal::begin(Stream *stream) {
 
     beginRadioBus();
 
-    display.init();
+    pinMode(DISP_RESET, OUTPUT);
+    digitalWrite(DISP_RESET, HIGH);
+    delay(200);
+    digitalWrite(DISP_RESET, LOW);
+    delay(300);
+    digitalWrite(DISP_RESET, HIGH);
+    delay(200);
+
+    display.init_without_reset(false);
     display.setRotation(rotation);
     display.setBrightness(0);
     display.fillScreen(TFT_BLACK);

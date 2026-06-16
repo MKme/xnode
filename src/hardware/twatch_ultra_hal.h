@@ -17,6 +17,13 @@
 #define TFT_BLACK                   0x0000
 #endif
 
+#define T_WATCH_ULTRA_SAFE_LEFT     (24)
+#define T_WATCH_ULTRA_SAFE_TOP      (36)
+#define T_WATCH_ULTRA_SAFE_RIGHT    (24)
+#define T_WATCH_ULTRA_SAFE_BOTTOM   (26)
+#define T_WATCH_ULTRA_SAFE_WIDTH    (TFT_WIDTH - T_WATCH_ULTRA_SAFE_LEFT - T_WATCH_ULTRA_SAFE_RIGHT)
+#define T_WATCH_ULTRA_SAFE_HEIGHT   (TFT_HEIGHT - T_WATCH_ULTRA_SAFE_TOP - T_WATCH_ULTRA_SAFE_BOTTOM)
+
 #define BOARD_I2C_SDA               (3)
 #define BOARD_I2C_SCL               (2)
 #define BOARD_PMU_INT               (7)
@@ -70,12 +77,17 @@ enum PowerCtrlChannel {
     WATCH_POWER_GPS_DC_CHANNEL
 };
 
+class TWatchUltraPanel : public lgfx::Panel_CO5300 {
+public:
+    const uint8_t *getInitCommands(uint8_t listno) const override;
+};
+
 class TWatchUltraDisplay : public lgfx::LGFX_Device {
 public:
     TWatchUltraDisplay();
 
 private:
-    lgfx::Panel_CO5300 panel;
+    TWatchUltraPanel panel;
     lgfx::Bus_SPI bus;
 };
 

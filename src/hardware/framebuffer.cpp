@@ -78,6 +78,7 @@ uint32_t framebuffer_size = FRAMEBUFFER_BUFFER_SIZE;                /** @brief f
 bool framebuffer_powermgm_event_cb( EventBits_t event, void *arg );
 bool framebuffer_powermgm_loop_cb( EventBits_t event, void *arg );
 static void framebuffer_flush_cb( lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p );
+static void framebuffer_rounder_cb( lv_disp_drv_t *disp_drv, lv_area_t *area );
 
 void framebuffer_setup( void ) {
     static lv_disp_buf_t disp_buf;
@@ -195,6 +196,9 @@ void framebuffer_setup( void ) {
     lv_disp_buf_init( &disp_buf, framebuffer_1, framebuffer_2, FRAMEBUFFER_BUFFER_W * FRAMEBUFFER_BUFFER_H );
     lv_disp_drv_init( &disp_drv );
     disp_drv.flush_cb = framebuffer_flush_cb;
+    #if defined( LILYGO_WATCH_ULTRA )
+        disp_drv.rounder_cb = framebuffer_rounder_cb;
+    #endif
     disp_drv.buffer = &disp_buf;
     disp_drv.hor_res = RES_X_MAX;
     disp_drv.ver_res = RES_Y_MAX;
@@ -378,7 +382,7 @@ static void framebuffer_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area,
         #elif defined( LILYGO_WATCH_ULTRA )
             uint32_t size = (area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1);
             watch.startWrite();
-            watch.setAddrWindow(area->x1, area->y1, (area->x2 - area->x1 + 1), (area->y2 - area->y1 + 1));
+            watch.setAddrWindow(area->x1 + T_WATCH_ULTRA_SAFE_LEFT, area->y1 + T_WATCH_ULTRA_SAFE_TOP, (area->x2 - area->x1 + 1), (area->y2 - area->y1 + 1));
             watch.pushColors((uint16_t *)color_p, size, true);
             watch.endWrite();
         #elif defined( LILYGO_WATCH_S3 )
@@ -455,4 +459,25 @@ static void framebuffer_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area,
         #endif
     #endif
     lv_disp_flush_ready( disp_drv );
+}
+
+static void framebuffer_rounder_cb( lv_disp_drv_t *disp_drv, lv_area_t *area ) {
+    (void)disp_drv;
+
+    #if defined( LILYGO_WATCH_ULTRA )
+        if ( area->x1 & 1 ) {
+            area->x1--;
+        }
+        if ( !( area->x2 & 1 ) ) {
+            area->x2++;
+        }
+        if ( area->x1 < 0 ) {
+            area->x1 = 0;
+        }
+        if ( area->x2 >= RES_X_MAX ) {
+            area->x2 = RES_X_MAX - 1;
+        }
+    #else
+        (void)area;
+    #endif
 }
