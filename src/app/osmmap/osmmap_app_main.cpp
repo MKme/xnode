@@ -261,12 +261,16 @@ static bool osmmap_configure_watch_flash_source( double lon, double lat, uint32_
 static void osmmap_reset_active_tile_image( void );
 static void osmmap_release_watch_flash_image( bool clear_active_src );
 static bool osmmap_load_watch_flash_image( bool force_reload );
+static uint16_t osmmap_get_viewport_width( void );
+static uint16_t osmmap_get_viewport_height( void );
 static uint32_t osmmap_get_watch_flash_min_render_zoom( void );
 static void osmmap_update_watch_flash_status_label( void );
 static void osmmap_clamp_watch_flash_pan( void );
 static uint16_t osmmap_get_watch_flash_lvgl_zoom( void );
+static uint16_t osmmap_get_display_lvgl_zoom( void );
 static void osmmap_apply_image_zoom( void );
 static bool osmmap_watch_flash_uses_current_tile( void );
+static bool osmmap_marker_uses_image_transform( void );
 static bool osmmap_watch_flash_pixel_to_view( double pixel_x, double pixel_y, uint16_t *x, uint16_t *y );
 static bool osmmap_project_watch_flash_current_lon_lat( double lon, double lat, uint16_t *x, uint16_t *y );
 static bool osmmap_project_marker_lon_lat( double lon, double lat, uint16_t *x, uint16_t *y );
@@ -750,6 +754,44 @@ static uint32_t osmmap_get_watch_flash_min_render_zoom( void ) {
     return( osmmap_watch_flash_base_zoom );
 }
 
+static uint16_t osmmap_get_viewport_width( void ) {
+    const lv_coord_t width = lv_disp_get_hor_res( NULL );
+
+#if defined( LILYGO_WATCH_ULTRA )
+    return( width > 0 ? (uint16_t)width : 240 );
+#else
+    return( (uint16_t)( width > 512 ? width : 240 ) );
+#endif
+}
+
+static uint16_t osmmap_get_viewport_height( void ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    const lv_coord_t height = lv_disp_get_ver_res( NULL );
+
+    return( height > 0 ? (uint16_t)height : 240 );
+#else
+    const lv_coord_t width = lv_disp_get_hor_res( NULL );
+
+    return( (uint16_t)( width > 512 ? width : 240 ) );
+#endif
+}
+
+static double osmmap_get_view_cover_lvgl_zoom( void ) {
+    double view_w = (double)osmmap_get_viewport_width();
+    double view_h = (double)osmmap_get_viewport_height();
+
+    if ( osmmap_app_tile_img ) {
+        lv_obj_t *parent = lv_obj_get_parent( osmmap_app_tile_img );
+
+        if ( parent && lv_obj_get_width( parent ) > 0 && lv_obj_get_height( parent ) > 0 ) {
+            view_w = (double)lv_obj_get_width( parent );
+            view_h = (double)lv_obj_get_height( parent );
+        }
+    }
+
+    return( fmax( 256.0, fmax( view_w, view_h ) ) );
+}
+
 static void osmmap_update_watch_flash_status_label( void ) {
     if ( !osmmap_lonlat_label || !osmmap_watch_flash_mode ) {
         return;
@@ -775,8 +817,8 @@ static void osmmap_clamp_watch_flash_pan( void ) {
     const double zoom_factor = (double)osmmap_get_watch_flash_lvgl_zoom() / 256.0;
     const int32_t view_w = lv_obj_get_width( parent );
     const int32_t view_h = lv_obj_get_height( parent );
-    const int32_t image_w = lv_obj_get_width( osmmap_app_tile_img );
-    const int32_t image_h = lv_obj_get_height( osmmap_app_tile_img );
+    const int32_t image_w = 256;
+    const int32_t image_h = 256;
     const int32_t scaled_w = (int32_t)lround( (double)image_w * zoom_factor );
     const int32_t scaled_h = (int32_t)lround( (double)image_h * zoom_factor );
     const int32_t max_pan_x = scaled_w > view_w ? ( scaled_w - view_w ) / 2 : 0;
@@ -791,9 +833,27 @@ static void osmmap_clamp_watch_flash_pan( void ) {
 static uint16_t osmmap_get_watch_flash_lvgl_zoom( void ) {
     const double zoom_factor = pow( 2.0, (double)osmmap_watch_flash_render_zoom - (double)osmmap_watch_flash_base_zoom );
     const double lvgl_zoom = 256.0 * zoom_factor;
-    const double min_lvgl_zoom = 256.0;
+    const double min_lvgl_zoom =
+#if defined( LILYGO_WATCH_ULTRA )
+        osmmap_get_view_cover_lvgl_zoom();
+#else
+        256.0;
+#endif
     const double clamped_zoom = fmax( min_lvgl_zoom, fmin( 2048.0, lvgl_zoom ) );
     return( (uint16_t)lround( clamped_zoom ) );
+}
+
+static uint16_t osmmap_get_display_lvgl_zoom( void ) {
+    if ( osmmap_watch_flash_mode ) {
+        return( osmmap_get_watch_flash_lvgl_zoom() );
+    }
+#if defined( M5PAPER )
+    return( 540 );
+#elif defined( LILYGO_WATCH_ULTRA )
+    return( (uint16_t)lround( fmin( 2048.0, osmmap_get_view_cover_lvgl_zoom() ) ) );
+#else
+    return( 256 );
+#endif
 }
 
 static void osmmap_apply_image_zoom( void ) {
@@ -809,7 +869,7 @@ static void osmmap_apply_image_zoom( void ) {
         return;
     }
 #endif
-    lv_img_set_zoom( osmmap_app_tile_img, osmmap_watch_flash_mode ? osmmap_get_watch_flash_lvgl_zoom() : 256 );
+    lv_img_set_zoom( osmmap_app_tile_img, osmmap_get_display_lvgl_zoom() );
     if ( osmmap_watch_flash_mode ) {
         osmmap_clamp_watch_flash_pan();
         lv_obj_align( osmmap_app_tile_img, lv_obj_get_parent( osmmap_app_tile_img ), LV_ALIGN_CENTER, osmmap_watch_flash_pan_x, osmmap_watch_flash_pan_y );
@@ -823,6 +883,14 @@ static void osmmap_apply_image_zoom( void ) {
 
 static bool osmmap_watch_flash_uses_current_tile( void ) {
     return( osmmap_watch_flash_mode && strstr( osmmap_watch_flash_uri, OSMMAP_WATCH_CURRENT_TILE_PATH ) != NULL );
+}
+
+static bool osmmap_marker_uses_image_transform( void ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    return( true );
+#else
+    return( osmmap_watch_flash_mode );
+#endif
 }
 
 static bool osmmap_watch_flash_pixel_to_view( double pixel_x, double pixel_y, uint16_t *x, uint16_t *y ) {
@@ -841,8 +909,18 @@ static bool osmmap_watch_flash_pixel_to_view( double pixel_x, double pixel_y, ui
         return( false );
     }
 
-    const double scaled_x = pixel_x * ( dest_w / 256.0 );
-    const double scaled_y = pixel_y * ( dest_h / 256.0 );
+    const double scaled_x =
+#if defined( LILYGO_WATCH_ULTRA )
+        ( dest_w * 0.5 ) + ( pixel_x - 128.0 );
+#else
+        pixel_x * ( dest_w / 256.0 );
+#endif
+    const double scaled_y =
+#if defined( LILYGO_WATCH_ULTRA )
+        ( dest_h * 0.5 ) + ( pixel_y - 128.0 );
+#else
+        pixel_y * ( dest_h / 256.0 );
+#endif
 
     *x = (uint16_t)lround( fmax( 0.0, fmin( dest_w - 1.0, scaled_x ) ) );
     *y = (uint16_t)lround( fmax( 0.0, fmin( dest_h - 1.0, scaled_y ) ) );
@@ -873,7 +951,17 @@ static bool osmmap_project_marker_lon_lat( double lon, double lat, uint16_t *x, 
     if ( osmmap_watch_flash_uses_current_tile() ) {
         return( osmmap_project_watch_flash_current_lon_lat( lon, lat, x, y ) );
     }
+#if defined( LILYGO_WATCH_ULTRA )
+    uint16_t tile_x = 0;
+    uint16_t tile_y = 0;
+
+    if ( !osm_map_project_lon_lat( osmmap_location, lon, lat, &tile_x, &tile_y ) ) {
+        return( false );
+    }
+    return( osmmap_watch_flash_pixel_to_view( (double)tile_x, (double)tile_y, x, y ) );
+#else
     return( osm_map_project_lon_lat( osmmap_location, lon, lat, x, y ) );
+#endif
 }
 
 static void osmmap_place_marker( lv_obj_t *marker_obj, uint16_t marker_x, uint16_t marker_y ) {
@@ -885,13 +973,15 @@ static void osmmap_place_marker( lv_obj_t *marker_obj, uint16_t marker_x, uint16
         return;
     }
 
-    if ( osmmap_watch_flash_mode && osmmap_app_tile_img ) {
+    if ( osmmap_marker_uses_image_transform() && osmmap_app_tile_img ) {
         const int32_t center_x = lv_obj_get_width( parent ) / 2;
         const int32_t center_y = lv_obj_get_height( parent ) / 2;
-        const double zoom_factor = (double)osmmap_get_watch_flash_lvgl_zoom() / 256.0;
+        const int32_t pan_x = osmmap_watch_flash_mode ? osmmap_watch_flash_pan_x : 0;
+        const int32_t pan_y = osmmap_watch_flash_mode ? osmmap_watch_flash_pan_y : 0;
+        const double zoom_factor = (double)osmmap_get_display_lvgl_zoom() / 256.0;
 
-        final_x = center_x + osmmap_watch_flash_pan_x + (int32_t)lround( ( (double)marker_x - center_x ) * zoom_factor );
-        final_y = center_y + osmmap_watch_flash_pan_y + (int32_t)lround( ( (double)marker_y - center_y ) * zoom_factor );
+        final_x = center_x + pan_x + (int32_t)lround( ( (double)marker_x - center_x ) * zoom_factor );
+        final_y = center_y + pan_y + (int32_t)lround( ( (double)marker_y - center_y ) * zoom_factor );
     }
 
     const int32_t marker_width = lv_obj_get_width( marker_obj );
@@ -1044,7 +1134,12 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
 #if defined( M5PAPER )
     osmmap_location->tilex_dest_px_res = 540;
     osmmap_location->tiley_dest_px_res = 540;
+#elif defined( LILYGO_WATCH_ULTRA )
+    osmmap_location->tilex_dest_px_res = 256;
+    osmmap_location->tiley_dest_px_res = 256;
 #endif
+    const uint16_t osmmap_view_w = osmmap_get_viewport_width();
+    const uint16_t osmmap_view_h = osmmap_get_viewport_height();
     /**
      * geht app tile
      */
@@ -1066,13 +1161,13 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
     lv_style_set_text_color(&osmmap_app_label_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
 
     lv_obj_t *osmmap_cont = lv_obj_create( osmmap_app_main_tile, NULL );
-    lv_obj_set_size(osmmap_cont, lv_disp_get_hor_res( NULL )>512?lv_disp_get_hor_res( NULL ):240, lv_disp_get_hor_res( NULL )>512?lv_disp_get_hor_res( NULL ):240 );
+    lv_obj_set_size( osmmap_cont, osmmap_view_w, osmmap_view_h );
     lv_obj_add_style( osmmap_cont, LV_OBJ_PART_MAIN, &osmmap_app_main_style );
     lv_obj_align( osmmap_cont, osmmap_app_main_tile, LV_ALIGN_IN_TOP_MID, 0, 0 );
 
     osmmap_app_tile_img = lv_img_create( osmmap_cont, NULL );
-    lv_obj_set_width( osmmap_app_tile_img, lv_disp_get_hor_res( NULL )>512?lv_disp_get_hor_res( NULL ):240 );
-    lv_obj_set_height( osmmap_app_tile_img, lv_disp_get_hor_res( NULL )>512?lv_disp_get_hor_res( NULL ):240 );
+    lv_obj_set_width( osmmap_app_tile_img, osmmap_view_w );
+    lv_obj_set_height( osmmap_app_tile_img, osmmap_view_h );
     lv_img_set_src( osmmap_app_tile_img, osm_map_get_no_data_image() );
     lv_img_set_pivot( osmmap_app_tile_img, 128, 128 );
 #ifdef M5PAPER
@@ -1082,7 +1177,7 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
     osmmap_apply_image_zoom();
 
     osmmap_overlay_layer = lv_obj_create( osmmap_cont, NULL );
-    lv_obj_set_size( osmmap_overlay_layer, lv_disp_get_hor_res( NULL )>512?lv_disp_get_hor_res( NULL ):240, lv_disp_get_hor_res( NULL )>512?lv_disp_get_hor_res( NULL ):240 );
+    lv_obj_set_size( osmmap_overlay_layer, osmmap_view_w, osmmap_view_h );
     lv_obj_set_click( osmmap_overlay_layer, false );
     lv_obj_set_style_local_bg_opa( osmmap_overlay_layer, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, LV_OPA_TRANSP );
     lv_obj_set_style_local_border_width( osmmap_overlay_layer, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, 0 );
