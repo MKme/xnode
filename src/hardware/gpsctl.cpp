@@ -21,12 +21,14 @@
  */
 #include "config.h"
 #include "gpsctl.h"
+#include "timesync.h"
 #include "powermgm.h"
 #include "callback.h"
 #include <math.h>
 #include <string.h>
 #include <ctype.h>
 #include <stdlib.h>
+#include <time.h>
 
 #ifdef NATIVE_64BIT
     #include "utils/logging.h"
@@ -81,6 +83,11 @@ bool gpsctl_send_cb( EventBits_t event, void *arg );
 void gpsctl_autoon_on( void );
 void gpsctl_autoon_off( void );
 
+#ifndef NATIVE_64BIT
+static time_t gpsctl_get_gps_epoch_utc( void );
+static void gpsctl_sync_time_from_gps( void );
+#endif
+
 void gpsctl_setup( void ) {
     /*
      * check if gpsctl already init
@@ -92,6 +99,12 @@ void gpsctl_setup( void ) {
      * load config from json
      */
     gpsctl_config.load();
+    #if defined( LILYGO_WATCH_ULTRA )
+        if ( !gpsctl_config.autoon ) {
+            gpsctl_config.autoon = true;
+            gpsctl_config.save();
+        }
+    #endif
 
     #ifdef NATIVE_64BIT
 
@@ -172,6 +185,84 @@ bool gpsctl_get_available( void ) {
     #endif
 }
 
+#ifndef NATIVE_64BIT
+static int64_t gpsctl_days_from_civil( int year, unsigned month, unsigned day ) {
+    year -= month <= 2;
+    const int era = ( year >= 0 ? year : year - 399 ) / 400;
+    const unsigned year_of_era = static_cast<unsigned>( year - era * 400 );
+    const unsigned day_of_year = ( 153 * ( month + ( month > 2 ? -3 : 9 ) ) + 2 ) / 5 + day - 1;
+    const unsigned day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    return era * 146097LL + static_cast<int>( day_of_era ) - 719468LL;
+}
+
+static time_t gpsctl_get_gps_epoch_utc( void ) {
+    if ( !gps.date.isValid() || !gps.time.isValid() ) {
+        return( 0 );
+    }
+
+    const uint16_t year = gps.date.year();
+    const uint8_t month = gps.date.month();
+    const uint8_t day = gps.date.day();
+    const uint8_t hour = gps.time.hour();
+    const uint8_t minute = gps.time.minute();
+    const uint8_t second = gps.time.second();
+
+    if ( year < 2024 || year > 2099 ||
+         month < 1 || month > 12 ||
+         day < 1 || day > 31 ||
+         hour > 23 || minute > 59 || second > 59 ) {
+        return( 0 );
+    }
+
+    const int64_t days = gpsctl_days_from_civil( year, month, day );
+    if ( days < 0 ) {
+        return( 0 );
+    }
+
+    return( static_cast<time_t>( ( days * 86400LL ) + ( hour * 3600 ) + ( minute * 60 ) + second ) );
+}
+
+static void gpsctl_sync_time_from_gps( void ) {
+    static uint32_t last_sync_millis = 0;
+    static time_t last_sync_epoch = 0;
+    const uint32_t sync_interval = 15UL * 60UL * 1000UL;
+
+    const time_t gps_epoch = gpsctl_get_gps_epoch_utc();
+    if ( gps_epoch <= 0 ) {
+        return;
+    }
+
+    const uint32_t now_millis = millis();
+    time_t current_epoch = 0;
+    time( &current_epoch );
+
+    const bool current_time_is_bad = current_epoch < 1704067200;
+    if ( !current_time_is_bad && last_sync_millis != 0 && (uint32_t)( now_millis - last_sync_millis ) < sync_interval ) {
+        return;
+    }
+
+    if ( !current_time_is_bad && llabs( static_cast<long long>( current_epoch - gps_epoch ) ) <= 2 ) {
+        last_sync_millis = now_millis;
+        last_sync_epoch = gps_epoch;
+        return;
+    }
+
+    if ( last_sync_epoch != 0 && llabs( static_cast<long long>( last_sync_epoch - gps_epoch ) ) <= 2 &&
+         (uint32_t)( now_millis - last_sync_millis ) < sync_interval ) {
+        return;
+    }
+
+    if ( timesync_apply_external_time( gps_epoch ) ) {
+        last_sync_millis = now_millis;
+        last_sync_epoch = gps_epoch;
+        timesyncToRTC();
+        gpsctl_send_cb( GPSCTL_UPDATE_DATE, (void*)&gps_data );
+        gpsctl_send_cb( GPSCTL_UPDATE_TIME, (void*)&gps_data );
+        GPSCTL_INFO_LOG( "synced system time from GPS UTC epoch %ld", static_cast<long>( gps_epoch ) );
+    }
+}
+#endif
+
 bool gpsctl_powermgm_loop_cb( EventBits_t event, void *arg ) {
     static uint64_t nextmillis = millis();
     /*
@@ -247,6 +338,15 @@ bool gpsctl_powermgm_loop_cb( EventBits_t event, void *arg ) {
                 gpsctl_send_cb( GPSCTL_UPDATE_LOCATION, (void*)&gps_data );
                 GPSCTL_DEBUG_LOG("new lat/lon: %f/%f", gps_data.lat, gps_data.lon );
             }
+            if ( gps.date.isUpdated() ) {
+                gps_data.gps_source = GPS_SOURCE_GPS;
+                gpsctl_send_cb( GPSCTL_UPDATE_DATE, (void*)&gps_data );
+            }
+            if ( gps.time.isUpdated() ) {
+                gps_data.gps_source = GPS_SOURCE_GPS;
+                gpsctl_send_cb( GPSCTL_UPDATE_TIME, (void*)&gps_data );
+            }
+            gpsctl_sync_time_from_gps();
             if ( gps.speed.isUpdated() ) {
                 gps_data.gps_source = GPS_SOURCE_GPS;
                 gps_data.speed_mph = gps.speed.mph();

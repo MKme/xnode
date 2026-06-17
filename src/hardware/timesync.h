@@ -22,6 +22,7 @@
 #ifndef _TIME_SYNC_H
     #define _TIME_SYNC_H
 
+    #include <time.h>
     #include "callback.h"
     #include "hardware/config/timesyncconfig.h"
 
@@ -128,6 +129,12 @@
      * @return true if the system clock was updated
      */
     bool timesync_apply_external_time( time_t epoch_seconds );
+    /**
+     * @brief get the firmware build timestamp as a UTC unix timestamp
+     *
+     * @return unix timestamp in seconds, or 0 if the build timestamp is invalid
+     */
+    time_t timesync_get_build_epoch_utc( void );
     /**
      * @brief registers a callback function which is called on a corresponding event
      * 

@@ -20,6 +20,7 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 #include "config.h"
@@ -73,6 +74,11 @@ static lv_style_t infostyle;
 static lv_style_t tempstyle;
 static lv_style_t iconstyle;
 
+#if defined( LILYGO_WATCH_ULTRA )
+static lv_obj_t *main_tile_ultra_top_bar = NULL;
+static lv_style_t main_tile_ultra_top_bar_style;
+#endif
+
 icon_t widget_entry[ MAX_WIDGET_NUM ];
 
 LV_FONT_DECLARE(Ubuntu_144px);
@@ -106,6 +112,11 @@ static bool main_tile_time_update_ebent_cb( EventBits_t event, void *arg );
 static bool main_tile_style_event_cb( EventBits_t event, void *arg );
 static bool main_tile_button_event_cb( EventBits_t event, void *arg );
 static bool main_tile_sensor_event_cb( EventBits_t event, void *arg );
+#if defined( LILYGO_WATCH_ULTRA )
+static bool main_tile_ultra_time_is_valid( const tm &info );
+static void main_tile_ultra_get_display_time( tm *info, time_t *epoch );
+static void main_tile_ultra_align_clock( void );
+#endif
 
 void main_tile_setup( void ) {
     /*
@@ -135,28 +146,81 @@ void main_tile_setup( void ) {
     lv_style_copy( &iconstyle, style);
     lv_style_set_text_font( &iconstyle, LV_STATE_DEFAULT, icon_font );
 
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_style_set_text_color( &timestyle, LV_STATE_DEFAULT, LV_COLOR_WHITE );
+        lv_style_set_text_color( &datestyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 220, 226, 235 ) );
+        lv_style_set_text_color( &infostyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 150, 166, 184 ) );
+
+        lv_style_copy( &main_tile_ultra_top_bar_style, style );
+        lv_style_set_radius( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, 5 );
+        lv_style_set_bg_color( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, LV_COLOR_MAKE( 210, 220, 232 ) );
+        lv_style_set_bg_opa( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, LV_OPA_80 );
+        lv_style_set_border_width( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, 0 );
+    #endif
+
     clock_cont = mainbar_obj_create( main_cont );
-    lv_obj_set_size( clock_cont, lv_disp_get_hor_res( NULL ) , lv_disp_get_ver_res( NULL ) / 2 );
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_obj_set_size( clock_cont, lv_disp_get_hor_res( NULL ), lv_disp_get_ver_res( NULL ) );
+    #else
+        lv_obj_set_size( clock_cont, lv_disp_get_hor_res( NULL ) , lv_disp_get_ver_res( NULL ) / 2 );
+    #endif
     lv_obj_add_style( clock_cont, LV_OBJ_PART_MAIN, style );
     lv_obj_align( clock_cont, main_cont, LV_ALIGN_CENTER, 0, 0 );
+
+    #if defined( LILYGO_WATCH_ULTRA )
+        main_tile_ultra_top_bar = lv_obj_create( clock_cont, NULL );
+        lv_obj_set_size( main_tile_ultra_top_bar, 170, 9 );
+        lv_obj_add_style( main_tile_ultra_top_bar, LV_OBJ_PART_MAIN, &main_tile_ultra_top_bar_style );
+        lv_obj_align( main_tile_ultra_top_bar, clock_cont, LV_ALIGN_IN_TOP_MID, 0, 12 );
+    #endif
     
     timelabel = lv_label_create( clock_cont , NULL);
-    lv_label_set_text(timelabel, "00:00");
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_label_set_text(timelabel, "00:00");
+    #else
+        lv_label_set_text(timelabel, "00:00");
+    #endif
     lv_obj_reset_style_list( timelabel, LV_OBJ_PART_MAIN );
     lv_obj_add_style( timelabel, LV_OBJ_PART_MAIN, &timestyle );
-    lv_obj_align(timelabel, NULL, LV_ALIGN_CENTER, 0, 0);
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, -34 );
+    #else
+        lv_obj_align(timelabel, NULL, LV_ALIGN_CENTER, 0, 0);
+    #endif
 
     datelabel = lv_label_create( clock_cont , NULL);
-    lv_label_set_text(datelabel, "1.Jan 1970");
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_label_set_text(datelabel, "");
+        lv_label_set_long_mode( datelabel, LV_LABEL_LONG_CROP );
+        lv_obj_set_width( datelabel, lv_disp_get_hor_res( NULL ) - 24 );
+        lv_label_set_align( datelabel, LV_LABEL_ALIGN_CENTER );
+    #else
+        lv_label_set_text(datelabel, "1.Jan 1970");
+    #endif
     lv_obj_reset_style_list( datelabel, LV_OBJ_PART_MAIN );
     lv_obj_add_style( datelabel, LV_OBJ_PART_MAIN, &datestyle );
-    lv_obj_align( datelabel, clock_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_obj_align( datelabel, timelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 4 );
+    #else
+        lv_obj_align( datelabel, clock_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
+    #endif
 
     infolabel = lv_label_create( clock_cont , NULL);
-    lv_label_set_text(infolabel, "battery: n/a");
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_label_set_text(infolabel, "BAT --%");
+        lv_label_set_long_mode( infolabel, LV_LABEL_LONG_CROP );
+        lv_obj_set_width( infolabel, lv_disp_get_hor_res( NULL ) - 24 );
+        lv_label_set_align( infolabel, LV_LABEL_ALIGN_CENTER );
+    #else
+        lv_label_set_text(infolabel, "battery: n/a");
+    #endif
     lv_obj_reset_style_list( infolabel, LV_OBJ_PART_MAIN );
     lv_obj_add_style( infolabel, LV_OBJ_PART_MAIN, &infostyle );
-    lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_TOP_MID, 0, 0 );
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 18 );
+    #else
+        lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_TOP_MID, 0, 0 );
+    #endif
 
     templabel = lv_label_create( clock_cont , NULL);
     lv_label_set_text(templabel, "temp/humidity: n/a");
@@ -244,7 +308,7 @@ void main_tile_setup( void ) {
     #ifndef ROUND_DISPLAY
         lv_obj_set_hidden( info_cont, true );
     #endif
-    #ifndef M5PAPER
+    #if !defined( M5PAPER ) && !defined( LILYGO_WATCH_ULTRA )
         lv_obj_set_hidden( infolabel, true );
     #endif
 
@@ -339,6 +403,45 @@ static bool mainbar_wifictl_event_cb( EventBits_t event, void *arg ) {
     return( true );    
 }
 
+#if defined( LILYGO_WATCH_ULTRA )
+static bool main_tile_ultra_time_is_valid( const tm &info ) {
+    return( info.tm_year + 1900 >= 2024 );
+}
+
+static void main_tile_ultra_get_display_time( tm *info, time_t *epoch ) {
+    time( epoch );
+    localtime_r( epoch, info );
+    if ( main_tile_ultra_time_is_valid( *info ) ) {
+        return;
+    }
+
+    *epoch = timesync_get_build_epoch_utc();
+    if ( *epoch > 0 ) {
+        localtime_r( epoch, info );
+        return;
+    }
+
+    memset( info, 0, sizeof( tm ) );
+    info->tm_year = 124;
+    info->tm_mon = 0;
+    info->tm_mday = 1;
+    *epoch = mktime( info );
+}
+
+static void main_tile_ultra_align_clock( void ) {
+    if ( clock_cont == NULL || timelabel == NULL || datelabel == NULL || infolabel == NULL ) {
+        return;
+    }
+
+    if ( main_tile_ultra_top_bar != NULL ) {
+        lv_obj_align( main_tile_ultra_top_bar, clock_cont, LV_ALIGN_IN_TOP_MID, 0, 12 );
+    }
+    lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, -34 );
+    lv_obj_align( datelabel, timelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 4 );
+    lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 18 );
+}
+#endif
+
 static bool main_tile_style_event_cb( EventBits_t event, void *arg ){
     switch( event ) {
         case STYLE_CHANGE:     style = ws_get_mainbar_style();
@@ -357,6 +460,20 @@ static bool main_tile_style_event_cb( EventBits_t event, void *arg ){
 
                                 lv_style_copy( &iconstyle, style);
                                 lv_style_set_text_font( &iconstyle, LV_STATE_DEFAULT, icon_font );
+                                #if defined( LILYGO_WATCH_ULTRA )
+                                    lv_style_set_text_color( &timestyle, LV_STATE_DEFAULT, LV_COLOR_WHITE );
+                                    lv_style_set_text_color( &datestyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 220, 226, 235 ) );
+                                    lv_style_set_text_color( &infostyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 150, 166, 184 ) );
+                                    lv_style_copy( &main_tile_ultra_top_bar_style, style );
+                                    lv_style_set_radius( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, 5 );
+                                    lv_style_set_bg_color( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, LV_COLOR_MAKE( 210, 220, 232 ) );
+                                    lv_style_set_bg_opa( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, LV_OPA_80 );
+                                    lv_style_set_border_width( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, 0 );
+                                    if ( main_tile_ultra_top_bar != NULL ) {
+                                        lv_obj_add_style( main_tile_ultra_top_bar, LV_OBJ_PART_MAIN, &main_tile_ultra_top_bar_style );
+                                    }
+                                    main_tile_ultra_align_clock();
+                                #endif
                                 break;
     }
     return( true );
@@ -483,17 +600,28 @@ void main_tile_align_widgets( void ) {
     lv_obj_align( wifiicon, batteryicon, LV_ALIGN_OUT_LEFT_MID, -THEME_PADDING, 0 );
     lv_obj_align( bluetoothicon, wifiicon, LV_ALIGN_OUT_LEFT_MID, -THEME_PADDING, 0 );
     lv_obj_align( batterylabel, batteryicon, LV_ALIGN_OUT_RIGHT_MID, THEME_PADDING, 0 );
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_obj_align( clock_cont, main_cont, LV_ALIGN_CENTER, 0, 0 );
+        main_tile_ultra_align_clock();
+    #endif
     /**
      * if we habe zero active widget, realign with no widgets
      */
     if ( active_widgets == 0 ) {
         lv_obj_align( clock_cont, main_cont, LV_ALIGN_CENTER, 0, 0 );
+        #if defined( LILYGO_WATCH_ULTRA )
+            main_tile_ultra_align_clock();
+        #endif
         return;
     };
     /**
      * set clock container to the top
      */
-    lv_obj_align( clock_cont, main_cont, LV_ALIGN_IN_TOP_MID, 0, 0 );
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_obj_align( clock_cont, main_cont, LV_ALIGN_CENTER, 0, 0 );
+    #else
+        lv_obj_align( clock_cont, main_cont, LV_ALIGN_IN_TOP_MID, 0, 0 );
+    #endif
     /**
      * align the widgets
      */
@@ -536,8 +664,12 @@ void main_tile_update_time( bool force ) {
     /*
      * copy current time into now and convert it local time info
      */
-    time( &now );
-    localtime_r( &now, &info );
+    #if defined( LILYGO_WATCH_ULTRA )
+        main_tile_ultra_get_display_time( &info, &now );
+    #else
+        time( &now );
+        localtime_r( &now, &info );
+    #endif
     /*
      * convert last time_t into tm from
      * last check if last equal zero (first run condition)
@@ -545,30 +677,63 @@ void main_tile_update_time( bool force ) {
     if ( last != 0 ) {
         localtime_r( &last, &last_info );
     }
+
     /*
      * Time:
      * only update while time changes or force is set
      * Display has a minute resolution
      */
     if ( last == 0 || info.tm_min != last_info.tm_min || info.tm_hour != last_info.tm_hour || force ) {
-        timesync_get_current_timestring( time_str, sizeof(time_str) );
+        #if defined( LILYGO_WATCH_ULTRA )
+            if ( timesync_get_24hr() ) {
+                snprintf( time_str, sizeof( time_str ), "%02d:%02d", info.tm_hour, info.tm_min );
+            }
+            else {
+                int hour = info.tm_hour;
+                if ( hour == 0 ) {
+                    hour = 12;
+                }
+                else if ( hour > 12 ) {
+                    hour -= 12;
+                }
+                snprintf( time_str, sizeof( time_str ), "%d:%02d", hour, info.tm_min );
+            }
+        #else
+            timesync_get_current_timestring( time_str, sizeof(time_str) );
+        #endif
         log_d("renew time: %s", time_str );
         lv_label_set_text( timelabel, time_str );
-        lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, 0 );
+        #if defined( LILYGO_WATCH_ULTRA )
+            main_tile_ultra_align_clock();
+        #else
+            lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, 0 );
+        #endif
         /*
          * Date:
          * only update while date changes
          */
-        if ( last == 0 || info.tm_yday != last_info.tm_yday ) {
+        if ( last == 0 || info.tm_yday != last_info.tm_yday || force ) {
             strftime( time_str, sizeof(time_str), "%a %d.%b %Y", &info );
             log_d("renew date: %s", time_str );
             lv_label_set_text( datelabel, time_str );
-            lv_obj_align( datelabel, clock_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
+            #if defined( LILYGO_WATCH_ULTRA )
+                main_tile_ultra_align_clock();
+            #else
+                lv_obj_align( datelabel, clock_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
+            #endif
         }
 
-        snprintf( info_str, sizeof( info_str ),"battery: %d%%", pmu_get_battery_percent() );
+        #if defined( LILYGO_WATCH_ULTRA )
+            snprintf( info_str, sizeof( info_str ), "BAT %d%%", pmu_get_battery_percent() );
+        #else
+            snprintf( info_str, sizeof( info_str ),"battery: %d%%", pmu_get_battery_percent() );
+        #endif
         lv_label_set_text( infolabel, info_str );
-        lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_TOP_MID, 0, 0 );
+        #if defined( LILYGO_WATCH_ULTRA )
+            main_tile_ultra_align_clock();
+        #else
+            lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_TOP_MID, 0, 0 );
+        #endif
         /*
          * Save for next loop
          */
