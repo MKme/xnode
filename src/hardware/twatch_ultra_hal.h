@@ -150,8 +150,7 @@ private:
 };
 
 extern TWatchUltraHal watch;
-extern SPIClass radioBus;
 
-#define newModule() new Module(BOARD_RADIO_SS, BOARD_RADIO_DI01, BOARD_RADIO_RST, BOARD_RADIO_BUSY, radioBus)
+#define newModule() new Module(BOARD_RADIO_SS, BOARD_RADIO_DI01, BOARD_RADIO_RST, BOARD_RADIO_BUSY)
 
 #endif

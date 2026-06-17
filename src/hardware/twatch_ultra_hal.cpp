@@ -18,7 +18,6 @@ namespace {
     }
 }
 
-SPIClass radioBus = SPIClass(HSPI);
 TWatchUltraHal watch;
 
 const uint8_t *TWatchUltraPanel::getInitCommands(uint8_t listno) const {
@@ -240,7 +239,7 @@ bool TWatchUltraHal::expanderDigitalWrite(uint8_t pin, bool high) {
 }
 
 void TWatchUltraHal::beginRadioBus() {
-    radioBus.begin(BOARD_RADIO_SCK, BOARD_RADIO_MISO, BOARD_RADIO_MOSI);
+    SPI.begin(BOARD_RADIO_SCK, BOARD_RADIO_MISO, BOARD_RADIO_MOSI);
 }
 
 void TWatchUltraHal::setSwapBytes(bool swap) {

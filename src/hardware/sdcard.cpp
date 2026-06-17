@@ -41,7 +41,7 @@
     #elif defined( LILYGO_WATCH_ULTRA )
         #include "hardware/twatch_ultra_hal.h"
 
-        SPIClass *sdhander = &radioBus;
+        SPIClass *sdhander = &SPI;
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #include <TTGO.h>
         
@@ -108,7 +108,7 @@ void sdcard_setup( void ) {
     #elif defined( LILYGO_WATCH_ULTRA )
         #if defined( LILYGO_WATCH_HAS_SDCARD )
             if ( !sdhander ) {
-                sdhander = &radioBus;
+                sdhander = &SPI;
             }
             heap_caps_malloc_extmem_enable( 1 );
             if ( !SD.begin( SD_CS, *sdhander, 4000000, "/sd" ) ) {
