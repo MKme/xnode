@@ -14,6 +14,7 @@
 
     #include "app/meshtastic/meshtastic_service.h"
     #include "hardware/blectl.h"
+    #include "hardware/ble/xnode.h"
     #include "hardware/device.h"
     #include "meshtastic/admin.pb.h"
     #include "meshtastic/channel.pb.h"
@@ -1256,7 +1257,8 @@
         }
 
         advertising->reset();
-        advertising->addServiceUUID( MESHTASTIC_BLE_SERVICE_UUID );
+        advertising->removeServices();
+        advertising->addServiceUUID( NimBLEUUID( xnode_get_service_uuid() ) );
         advertising->addServiceUUID( NimBLEUUID( MESHTASTIC_BATTERY_SERVICE_UUID ) );
         return( advertising->start( 0 ) );
     }

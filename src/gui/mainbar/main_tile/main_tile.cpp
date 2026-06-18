@@ -74,11 +74,6 @@ static lv_style_t infostyle;
 static lv_style_t tempstyle;
 static lv_style_t iconstyle;
 
-#if defined( LILYGO_WATCH_ULTRA )
-static lv_obj_t *main_tile_ultra_top_bar = NULL;
-static lv_style_t main_tile_ultra_top_bar_style;
-#endif
-
 icon_t widget_entry[ MAX_WIDGET_NUM ];
 
 LV_FONT_DECLARE(Ubuntu_144px);
@@ -150,12 +145,6 @@ void main_tile_setup( void ) {
         lv_style_set_text_color( &timestyle, LV_STATE_DEFAULT, LV_COLOR_WHITE );
         lv_style_set_text_color( &datestyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 220, 226, 235 ) );
         lv_style_set_text_color( &infostyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 150, 166, 184 ) );
-
-        lv_style_copy( &main_tile_ultra_top_bar_style, style );
-        lv_style_set_radius( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, 5 );
-        lv_style_set_bg_color( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, LV_COLOR_MAKE( 210, 220, 232 ) );
-        lv_style_set_bg_opa( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, LV_OPA_80 );
-        lv_style_set_border_width( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, 0 );
     #endif
 
     clock_cont = mainbar_obj_create( main_cont );
@@ -167,13 +156,6 @@ void main_tile_setup( void ) {
     lv_obj_add_style( clock_cont, LV_OBJ_PART_MAIN, style );
     lv_obj_align( clock_cont, main_cont, LV_ALIGN_CENTER, 0, 0 );
 
-    #if defined( LILYGO_WATCH_ULTRA )
-        main_tile_ultra_top_bar = lv_obj_create( clock_cont, NULL );
-        lv_obj_set_size( main_tile_ultra_top_bar, 170, 9 );
-        lv_obj_add_style( main_tile_ultra_top_bar, LV_OBJ_PART_MAIN, &main_tile_ultra_top_bar_style );
-        lv_obj_align( main_tile_ultra_top_bar, clock_cont, LV_ALIGN_IN_TOP_MID, 0, 12 );
-    #endif
-    
     timelabel = lv_label_create( clock_cont , NULL);
     #if defined( LILYGO_WATCH_ULTRA )
         lv_label_set_text(timelabel, "00:00");
@@ -433,9 +415,6 @@ static void main_tile_ultra_align_clock( void ) {
         return;
     }
 
-    if ( main_tile_ultra_top_bar != NULL ) {
-        lv_obj_align( main_tile_ultra_top_bar, clock_cont, LV_ALIGN_IN_TOP_MID, 0, 12 );
-    }
     lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, -34 );
     lv_obj_align( datelabel, timelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 4 );
     lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 18 );
@@ -464,14 +443,6 @@ static bool main_tile_style_event_cb( EventBits_t event, void *arg ){
                                     lv_style_set_text_color( &timestyle, LV_STATE_DEFAULT, LV_COLOR_WHITE );
                                     lv_style_set_text_color( &datestyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 220, 226, 235 ) );
                                     lv_style_set_text_color( &infostyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 150, 166, 184 ) );
-                                    lv_style_copy( &main_tile_ultra_top_bar_style, style );
-                                    lv_style_set_radius( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, 5 );
-                                    lv_style_set_bg_color( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, LV_COLOR_MAKE( 210, 220, 232 ) );
-                                    lv_style_set_bg_opa( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, LV_OPA_80 );
-                                    lv_style_set_border_width( &main_tile_ultra_top_bar_style, LV_STATE_DEFAULT, 0 );
-                                    if ( main_tile_ultra_top_bar != NULL ) {
-                                        lv_obj_add_style( main_tile_ultra_top_bar, LV_OBJ_PART_MAIN, &main_tile_ultra_top_bar_style );
-                                    }
                                     main_tile_ultra_align_clock();
                                 #endif
                                 break;

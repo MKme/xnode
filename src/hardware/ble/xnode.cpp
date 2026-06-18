@@ -1647,6 +1647,10 @@
         pAdvertising->addServiceUUID( pXnodeService->getUUID() );
     }
 
+    const char *xnode_get_service_uuid( void ) {
+        return( XNODE_SERVICE_UUID );
+    }
+
     bool xnode_send_meshtastic_rx( const char *from, const char *text ) {
         StaticJsonDocument< 384 > payload;
 
@@ -1739,6 +1743,10 @@
 #else
 
     void xnode_setup( void ) {
+    }
+
+    const char *xnode_get_service_uuid( void ) {
+        return( "" );
     }
 
     bool xnode_send_meshtastic_rx( const char *from, const char *text ) {

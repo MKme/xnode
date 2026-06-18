@@ -346,12 +346,25 @@ bool touch_powermgm_event_cb( EventBits_t event, void *arg ) {
         #elif defined( LILYGO_WATCH_ULTRA )
             switch( event ) {
                 case POWERMGM_STANDBY:          log_d("go standby");
+                                                if ( touch_lock_take() ) {
+                                                    watch.interruptTrigger();
+                                                    touch_lock_give();
+                                                }
+                                                portENTER_CRITICAL(&Touch_IRQ_Mux);
+                                                touch_irq_flag = false;
+                                                portEXIT_CRITICAL(&Touch_IRQ_Mux);
                                                 gpio_wakeup_enable( (gpio_num_t)BOARD_TOUCH_INT, GPIO_INTR_LOW_LEVEL );
                                                 esp_sleep_enable_gpio_wakeup ();
                                                 retval = true;
                                                 break;
                 case POWERMGM_WAKEUP:           log_d("go wakeup");
-                                                watch.interruptTrigger();
+                                                if ( touch_lock_take() ) {
+                                                    watch.interruptTrigger();
+                                                    touch_lock_give();
+                                                }
+                                                portENTER_CRITICAL(&Touch_IRQ_Mux);
+                                                touch_irq_flag = false;
+                                                portEXIT_CRITICAL(&Touch_IRQ_Mux);
                                                 retval = true;
                                                 break;
                 case POWERMGM_SILENCE_WAKEUP:   log_d("go silence wakeup");
@@ -499,10 +512,6 @@ bool touch_getXY( int16_t &x, int16_t &y ) {
             int16_t raw_x = 0;
             int16_t raw_y = 0;
             bool getTouchResult = false;
-            if ( !watch.getTouched() ) {
-                touched = false;
-                return( false );
-            }
             if ( touch_lock_take() ) {
                 getTouchResult = watch.getPoint( &raw_x, &raw_y ) > 0;
                 touch_lock_give();

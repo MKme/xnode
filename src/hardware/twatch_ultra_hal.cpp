@@ -280,7 +280,7 @@ void TWatchUltraHal::setBrightness(uint8_t level) {
 }
 
 bool TWatchUltraHal::getTouched() {
-    return touch_ready;
+    return touch_ready && digitalRead(BOARD_TOUCH_INT) == LOW;
 }
 
 uint8_t TWatchUltraHal::getPoint(int16_t *x, int16_t *y) {
@@ -331,6 +331,13 @@ uint8_t TWatchUltraHal::getPoint(int16_t *x, int16_t *y) {
 }
 
 void TWatchUltraHal::interruptTrigger() {
+    if (!touch_ready || digitalRead(BOARD_TOUCH_INT) != LOW) {
+        return;
+    }
+
+    int16_t x = 0;
+    int16_t y = 0;
+    getPoint(&x, &y);
 }
 
 void TWatchUltraHal::setMonitorTime(uint8_t time) {

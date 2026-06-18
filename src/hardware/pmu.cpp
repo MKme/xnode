@@ -638,7 +638,17 @@ void pmu_standby( void ) {
             esp_sleep_enable_timer_wakeup( pmu_config.silence_wakeup_interval * 60 * 1000000 );
             log_d("enable wakeup timer (%d sec)", pmu_config.silence_wakeup_interval * 60 );
         }
-    #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
+    #elif defined( LILYGO_WATCH_ULTRA )
+        if ( pmu_get_silence_wakeup() ) {
+            esp_sleep_enable_timer_wakeup( pmu_config.silence_wakeup_interval * 60 * 1000000ULL );
+        }
+        watch.clearPMU();
+        portENTER_CRITICAL(&PMU_IRQ_Mux);
+        pmu_irq_flag = false;
+        portEXIT_CRITICAL(&PMU_IRQ_Mux);
+        gpio_wakeup_enable( (gpio_num_t)BOARD_PMU_INT, GPIO_INTR_LOW_LEVEL );
+        esp_sleep_enable_gpio_wakeup ();
+    #elif defined( LILYGO_WATCH_S3 )
         if ( pmu_get_silence_wakeup() ) {
             esp_sleep_enable_timer_wakeup( pmu_config.silence_wakeup_interval * 60 * 1000000ULL );
         }
