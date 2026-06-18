@@ -49,6 +49,8 @@
         #include <utility/In_eSPI.h>
 
         TFT_eSPI tft = TFT_eSPI();
+    #elif defined( LILYGO_WATCH_ULTRA )
+        #include "hardware/twatch_ultra_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -76,6 +78,7 @@ uint32_t framebuffer_size = FRAMEBUFFER_BUFFER_SIZE;                /** @brief f
 bool framebuffer_powermgm_event_cb( EventBits_t event, void *arg );
 bool framebuffer_powermgm_loop_cb( EventBits_t event, void *arg );
 static void framebuffer_flush_cb( lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p );
+static void framebuffer_rounder_cb( lv_disp_drv_t *disp_drv, lv_area_t *area );
 
 void framebuffer_setup( void ) {
     static lv_disp_buf_t disp_buf;
@@ -105,6 +108,10 @@ void framebuffer_setup( void ) {
             tft.setRotation(1);
             tft.setTextSize(1);
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        #elif defined( LILYGO_WATCH_ULTRA )
+            framebuffer_use_dma = false;
+            watch.setSwapBytes( true );
+            watch.fillScreen( TFT_BLACK );
         #elif defined( LILYGO_WATCH_S3 )
             framebuffer_use_dma = false;
             watch.setSwapBytes( true );
@@ -189,6 +196,9 @@ void framebuffer_setup( void ) {
     lv_disp_buf_init( &disp_buf, framebuffer_1, framebuffer_2, FRAMEBUFFER_BUFFER_W * FRAMEBUFFER_BUFFER_H );
     lv_disp_drv_init( &disp_drv );
     disp_drv.flush_cb = framebuffer_flush_cb;
+    #if defined( LILYGO_WATCH_ULTRA )
+        disp_drv.rounder_cb = framebuffer_rounder_cb;
+    #endif
     disp_drv.buffer = &disp_buf;
     disp_drv.hor_res = RES_X_MAX;
     disp_drv.ver_res = RES_Y_MAX;
@@ -252,6 +262,7 @@ bool framebuffer_powermgm_loop_cb( EventBits_t event, void *arg ) {
                 }
             }
         #elif defined( M5CORE2 )
+        #elif defined( LILYGO_WATCH_ULTRA )
         #elif defined( LILYGO_WATCH_S3 )
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #elif defined( LILYGO_WATCH_2021 )
@@ -279,6 +290,7 @@ void framebuffer_refresh( void ) {
             min_y = FRAMEBUFFER_BUFFER_H;
             max_y = 0;
         #elif defined( M5CORE2 )
+        #elif defined( LILYGO_WATCH_ULTRA )
         #elif defined( LILYGO_WATCH_S3 )
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #elif defined( LILYGO_WATCH_2021 )
@@ -367,6 +379,12 @@ static void framebuffer_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area,
             tft.setAddrWindow(area->x1, area->y1, (area->x2 - area->x1 + 1), (area->y2 - area->y1 + 1)); /* set the working window */
             tft.pushColors( ( uint16_t *)color_p, size );
             tft.endWrite();
+        #elif defined( LILYGO_WATCH_ULTRA )
+            uint32_t size = (area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1);
+            watch.startWrite();
+            watch.setAddrWindow(area->x1 + T_WATCH_ULTRA_SAFE_LEFT, area->y1 + T_WATCH_ULTRA_SAFE_TOP, (area->x2 - area->x1 + 1), (area->y2 - area->y1 + 1));
+            watch.pushColors((uint16_t *)color_p, size, true);
+            watch.endWrite();
         #elif defined( LILYGO_WATCH_S3 )
             uint32_t size = (area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1);
             watch.startWrite();
@@ -441,4 +459,25 @@ static void framebuffer_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area,
         #endif
     #endif
     lv_disp_flush_ready( disp_drv );
+}
+
+static void framebuffer_rounder_cb( lv_disp_drv_t *disp_drv, lv_area_t *area ) {
+    (void)disp_drv;
+
+    #if defined( LILYGO_WATCH_ULTRA )
+        if ( area->x1 & 1 ) {
+            area->x1--;
+        }
+        if ( !( area->x2 & 1 ) ) {
+            area->x2++;
+        }
+        if ( area->x1 < 0 ) {
+            area->x1 = 0;
+        }
+        if ( area->x2 >= RES_X_MAX ) {
+            area->x2 = RES_X_MAX - 1;
+        }
+    #else
+        (void)area;
+    #endif
 }

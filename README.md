@@ -1,6 +1,6 @@
 # XNODE
 
-Git-tracked home for the active LilyGO Watch Gen3 / T-Watch S3 XNODE firmware.
+Git-tracked home for the active LilyGO Watch Gen3 / T-Watch S3 and T-Watch Ultra XNODE firmware.
 
 Workspace paths:
 - Active project: `C:\GitHub\XNODE`
@@ -25,8 +25,9 @@ XNODE is built to work with the MKME X software stack. Add the companion softwar
 ## Current status
 
 Working now:
-- Builds for `t-watch2020-v3-s3`.
+- Builds for `t-watch2020-v3-s3` and `t-watch-ultra`.
 - Flashes to the LilyGO Watch Gen3 / ESP32-S3 target.
+- Flashes to the LilyGO T-Watch Ultra / ESP32-S3 target.
 - Exposes the XNODE BLE bridge to XTOC and XCOM with `sync`, `location`, `meshtastic`, `basemap`, `mapOverlay`, `newsNotifications`, and `ble` capabilities.
 - Adds a Manual SOS launcher tile that sends a clear XTOC `SITREP` packet over the watch's Meshtastic radio, with the roster Unit ID, destination Unit ID, `P1`, `HELP`, current lat/lon, and note `Manual SOS`.
 - Adds a CheckIn launcher tile that sends a clear XTOC `CHECKIN/LOC` packet over the watch's Meshtastic radio, with the roster Unit ID, `OK` status, current lat/lon, and timestamp.
@@ -43,6 +44,10 @@ Working now:
 - Keeps the launcher functions active for messages, mesh, Tac Map, media player, Alert Summary, and watchface manager.
 - Inactivity timeout returns the T-Watch S3 build to standby instead of leaving it awake indefinitely.
 - T-Watch S3 standby uses the LilyGo `ext1` touch wake path on `BOARD_TOUCH_INT`.
+- T-Watch Ultra has a repo-local HAL for display, touch, PMU, GPS, SD, radio bus, and safe-area rendering.
+- T-Watch Ultra step count uses the QMI8658 pedometer instead of uninitialized retained data.
+- T-Watch Ultra sleep no longer immediately wakes from a stale touch-ready state, and touch / PMU wake remain armed for light sleep.
+- T-Watch Ultra no longer renders the extra horizontal bar over the top menu area on the watch face.
 - Display timeout settings use a real `15..300` second range. `300` is five minutes, not a hidden never-sleep mode.
 
 Known limits:
@@ -54,6 +59,7 @@ Known limits:
 - SPIFFS is small, so host-side tooling must keep the installed raster compact.
 - Manual SOS requires a configured watch Unit ID, a valid watch location, and a ready Meshtastic radio/channel before it can transmit.
 - CheckIn requires the same watch Unit ID, valid watch location, and ready Meshtastic radio/channel.
+- T-Watch Ultra currently depends on the vendored `support/twatch-s3-libdeps/LovyanGFX` copy. Do not replace it with a machine-local absolute path.
 
 ## Watch screens
 
@@ -160,6 +166,54 @@ Follow-up risk still open:
 - Those paths do not currently show a matching release call in the same flow, so light sleep can remain disabled until reboot after those operations.
 - That does not explain the idle timeout bug on a clean boot, but it is another battery-life issue worth fixing next.
 
+## T-Watch Ultra integration audit (2026-06-18)
+
+Scope:
+- Board/environment: `t-watch-ultra`
+- Merge target branch in this repo: `main`
+- Goal: keep the S3 target working while adding the Ultra target, with `pio run` building both watch firmwares.
+
+Ultra support added:
+- Added `boards/twatch_ultra.json`.
+- Added `src/hardware/twatch_ultra_hal.cpp` and `src/hardware/twatch_ultra_hal.h` for the Ultra display, safe-area geometry, AXP2101 PMU, CST9217 touch, I/O expander, radio bus, and board pin map.
+- Added the `t-watch-ultra` PlatformIO environment.
+- Vendored LovyanGFX under `support/twatch-s3-libdeps/LovyanGFX` so the Ultra build no longer depends on `C:\GitHub\lilygo`.
+- Trimmed unused optional LovyanGFX CJK font data from the vendored copy and excluded those files in `library.json`; the Ultra HAL does not use them.
+- Kept the S3 environment on the existing `lib/twatchs3_core` and `support/twatch-s3-libdeps` path.
+
+Ultra fixes applied:
+- Removed the Ultra watch-face horizontal top bar that could occlude the main menu/status area.
+- Fixed the long garbage number in the top-left status area by wiring Ultra step count to the QMI8658 pedometer and avoiding uninitialized retained step data.
+- Added QMI8658 pedometer setup, polling, reset, wake, and daily reset handling.
+- Fixed Ultra `getTouched()` so it reflects the touch interrupt pin instead of returning true whenever touch init succeeded.
+- Cleared stale touch and PMU IRQ flags before standby and kept GPIO light-sleep wake enabled for both touch and PMU paths.
+- Preserved normal touch polling while awake so UI interaction still works after the false-wake fix.
+
+Build verification:
+- Confirm with:
+
+```powershell
+pio run
+```
+
+This builds both default watch environments:
+- `t-watch2020-v3-s3`
+- `t-watch-ultra`
+
+Flash verification:
+- Flash one connected watch at a time with the matching environment and explicit port:
+
+```powershell
+pio run -e t-watch2020-v3-s3 -t upload --upload-port COM8
+pio run -e t-watch-ultra -t upload --upload-port COM11
+```
+
+Use the current ports from:
+
+```powershell
+Get-CimInstance Win32_SerialPort | Select-Object DeviceID, Description, PNPDeviceID
+```
+
 ## Repo layout
 
 The active firmware now lives here in git:
@@ -179,7 +233,7 @@ That archive is for reference and rollback only. New work should happen in `C:\G
 The repo also vendors the required T-Watch S3 support libraries under:
 - `support/twatch-s3-libdeps`
 
-That removes the last build dependency on `C:\GitHub\lilygo`.
+That folder now includes the shared S3/Ultra support dependencies, including `LovyanGFX` for the Ultra display path. That removes the build dependency on `C:\GitHub\lilygo`.
 
 ## Map install flow
 
@@ -341,7 +395,16 @@ The receiving TOC should auto-decode mesh packets so the inbound `CHECKIN/LOC` u
 From `C:\GitHub\XNODE`:
 
 ```powershell
+pio run
+```
+
+`pio run` builds both default watch environments: `t-watch2020-v3-s3` and `t-watch-ultra`.
+
+To build only one target:
+
+```powershell
 pio run -e t-watch2020-v3-s3
+pio run -e t-watch-ultra
 ```
 
 ## Flash
@@ -356,9 +419,10 @@ Then flash:
 
 ```powershell
 pio run -e t-watch2020-v3-s3 -t upload --upload-port COM8
+pio run -e t-watch-ultra -t upload --upload-port COM11
 ```
 
-Last confirmed watch upload in this workspace used `COM8`.
+Last confirmed S3 upload in this workspace used `COM8`. Last confirmed Ultra upload used `COM11`, which reset into the bootloader on `COM10`.
 
 If the watch does not auto-reset into bootloader mode, put it into boot mode manually and rerun the upload command on the current port.
 

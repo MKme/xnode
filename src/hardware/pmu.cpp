@@ -44,6 +44,8 @@
     #elif defined( M5CORE2 )
         #include <M5Core2.h>
         static uint64_t next_wakeup = 0;
+    #elif defined( LILYGO_WATCH_ULTRA )
+        #include "hardware/twatch_ultra_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -100,7 +102,7 @@ void pmu_setup( void ) {
         M5.Axp.SetCHGCurrent( true );
         M5.Axp.EnableCoulombcounter();
         M5.Axp.SetAdcState( true );
-    #elif defined( LILYGO_WATCH_S3 )
+    #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
         pinMode( BOARD_PMU_INT, INPUT_PULLUP );
         attachInterrupt( BOARD_PMU_INT, &pmu_irq, FALLING );
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -229,7 +231,7 @@ bool pmu_powermgm_event_cb( EventBits_t event, void *arg ) {
                                                 detachInterrupt( AXP202_INT );
                                                 retval = true;
                                                 break;
-            #elif defined( LILYGO_WATCH_S3 )
+            #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
                 case POWERMGM_ENABLE_INTERRUPTS:
                                                 attachInterrupt( BOARD_PMU_INT, &pmu_irq, FALLING );
                                                 retval = true;
@@ -312,7 +314,7 @@ void pmu_loop( void ) {
         if ( temp_pmu_irq_flag ) {
             log_e("hello Mc Fly, witch AXP irq on M5Core2?");
         }
-    #elif defined( LILYGO_WATCH_S3 )
+    #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
         static bool plug = watch.isVbusIn();
         static bool charging = watch.isCharging();
         static bool battery = watch.isBatteryConnect();
@@ -597,7 +599,7 @@ void pmu_shutdown( void ) {
         M5.disableMainPower();
     #elif defined( M5CORE2 )
         M5.shutdown();
-    #elif defined( LILYGO_WATCH_S3 )
+    #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
         watch.shutdown();
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         TTGOClass *ttgo = TTGOClass::getWatch();
@@ -636,6 +638,16 @@ void pmu_standby( void ) {
             esp_sleep_enable_timer_wakeup( pmu_config.silence_wakeup_interval * 60 * 1000000 );
             log_d("enable wakeup timer (%d sec)", pmu_config.silence_wakeup_interval * 60 );
         }
+    #elif defined( LILYGO_WATCH_ULTRA )
+        if ( pmu_get_silence_wakeup() ) {
+            esp_sleep_enable_timer_wakeup( pmu_config.silence_wakeup_interval * 60 * 1000000ULL );
+        }
+        watch.clearPMU();
+        portENTER_CRITICAL(&PMU_IRQ_Mux);
+        pmu_irq_flag = false;
+        portEXIT_CRITICAL(&PMU_IRQ_Mux);
+        gpio_wakeup_enable( (gpio_num_t)BOARD_PMU_INT, GPIO_INTR_LOW_LEVEL );
+        esp_sleep_enable_gpio_wakeup ();
     #elif defined( LILYGO_WATCH_S3 )
         if ( pmu_get_silence_wakeup() ) {
             esp_sleep_enable_timer_wakeup( pmu_config.silence_wakeup_interval * 60 * 1000000ULL );
@@ -713,7 +725,7 @@ void pmu_wakeup( void ) {
         }
     #elif defined( M5CORE2 )
         M5.Axp.RestoreFromLightSleep();
-    #elif defined( LILYGO_WATCH_S3 )
+    #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
         watch.clearPMU();
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         TTGOClass *ttgo = TTGOClass::getWatch();
@@ -788,7 +800,7 @@ void pmu_set_high_charging_target_voltage( bool value ) {
 
     #elif defined( M5CORE2 )
 
-    #elif defined( LILYGO_WATCH_S3 )
+    #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
         pmu_config.high_charging_target_voltage = value;
         if ( pmu_config.high_charging_target_voltage ) {
             watch.setChargeTargetVoltage( XPOWERS_AXP2101_CHG_VOL_4V35 );
@@ -850,7 +862,7 @@ void pmu_set_safe_voltage_for_update( void ) {
         #if defined( M5PAPER )
 
         #elif defined( M5CORE2 )
-        #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
             watch.setDC3Voltage( NORMALVOLTAGE + 100 );
             log_d("set %dmV voltage", NORMALVOLTAGE );
         
@@ -886,7 +898,7 @@ int32_t pmu_get_battery_percent( void ) {
                 if( tmp_percent )
                     percent = tmp_percent;
             }
-        #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
             percent = watch.getBatteryPercent();
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
@@ -964,7 +976,7 @@ float pmu_get_battery_voltage( void ) {
             voltage = M5.getBatteryVoltage();
         #elif defined( M5CORE2 )
             voltage = M5.Axp.GetBatVoltage() * 1000.0;
-        #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
             voltage = watch.getBattVoltage();
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
@@ -1087,7 +1099,7 @@ float pmu_get_battery_charge_current( void ) {
         #if defined( M5PAPER )
         #elif defined( M5CORE2 )
             current = M5.Axp.GetBatChargeCurrent();
-        #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
             current = 0.0f;
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
@@ -1111,7 +1123,7 @@ float pmu_get_battery_discharge_current( void ) {
             current = M5.Axp.GetBatCurrent();
             if( current < 0.0f )
                 current = current * -1.0f;
-        #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
             current = 0.0f;
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
@@ -1136,7 +1148,7 @@ float pmu_get_vbus_voltage( void ) {
             while( voltage == 0.0 ) {
                 voltage = M5.Axp.GetVBusVoltage() * 1000.0;
             }
-        #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
             voltage = watch.getVbusVoltage();
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
@@ -1159,7 +1171,7 @@ float pmu_get_coulumb_data( void ) {
         #if defined( M5PAPER )
         #elif defined( M5CORE2 )
             coulumb_data = M5.Axp.GetCoulombData();
-        #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
             coulumb_data = 0.0f;
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
@@ -1181,7 +1193,7 @@ bool pmu_is_charging( void ) {
         #if defined( M5PAPER )
         #elif defined( M5CORE2 )
             charging = M5.Axp.isCharging();
-        #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
             charging = watch.isCharging();
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
@@ -1205,7 +1217,7 @@ bool pmu_is_vbus_plug( void ) {
         #if defined( M5PAPER )
         #elif defined( M5CORE2 )
             plug = M5.Axp.isACIN();
-        #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
             plug = watch.isVbusIn();
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();

@@ -57,6 +57,14 @@
         #define SETUP_ICON_X_OFFSET         0
         #define SETUP_ICON_Y_OFFSET         0
         #define MAX_SETUP_TILES             2
+    #elif defined( LILYGO_WATCH_ULTRA )
+        #define MAX_SETUP_ICON_HORZ         4
+        #define MAX_SETUP_ICON_VERT         3
+        #define SETUP_ICON_X_CLEARENCE      28
+        #define SETUP_ICON_Y_CLEARENCE      60
+        #define SETUP_ICON_X_OFFSET         0
+        #define SETUP_ICON_Y_OFFSET         0
+        #define MAX_SETUP_TILES             3
     #else
         #define MAX_SETUP_ICON_HORZ         3
         #define MAX_SETUP_ICON_VERT         2

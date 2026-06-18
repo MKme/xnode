@@ -2,12 +2,16 @@
 #include "meshtastic_service.h"
 #include "meshtastic_channels_config.h"
 
-#if defined( USING_TWATCH_S3 )
+#if defined( USING_TWATCH_S3 ) || defined( USING_TWATCH_ULTRA )
 
     #include <Arduino.h>
     #include <ArduinoJson.h>
     #include <ESP.h>
-    #include <LilyGoLib.h>
+    #if defined( USING_TWATCH_ULTRA )
+        #include "hardware/twatch_ultra_hal.h"
+    #else
+        #include <LilyGoLib.h>
+    #endif
     #include <RadioLib.h>
     #include <inttypes.h>
     #include <mbedtls/aes.h>
@@ -38,7 +42,11 @@
         constexpr uint8_t MESHTASTIC_CR = 5;
         constexpr uint16_t MESHTASTIC_PREAMBLE = 16;
         constexpr int8_t MESHTASTIC_TX_POWER = 22;
-        constexpr float MESHTASTIC_TCXO_VOLTAGE = 3.0f;
+        #if defined( USING_TWATCH_ULTRA )
+            constexpr float MESHTASTIC_TCXO_VOLTAGE = 1.8f;
+        #else
+            constexpr float MESHTASTIC_TCXO_VOLTAGE = 3.0f;
+        #endif
         constexpr const char *MESHTASTIC_DEFAULT_PRIMARY_CHANNEL = "LongFast";
         constexpr const char *MESHTASTIC_DEFAULT_PRIMARY_PSK = "AQ==";
         constexpr uint8_t MESHTASTIC_PRIMARY_CHANNEL_SLOT = 0;

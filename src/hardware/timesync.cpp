@@ -21,6 +21,9 @@
  */
 #include "config.h"
 #include <sys/time.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <string.h>
 #include "timesync.h"
 #include "powermgm.h"
 #include "callback.h"
@@ -46,6 +49,9 @@ bool timesync_powermgm_event_cb( EventBits_t event, void *arg );
 bool timesync_wifictl_event_cb( EventBits_t event, void *arg );
 bool timesync_blectl_event_cb( EventBits_t event, void *arg );
 bool timesync_send_event_cb( EventBits_t event, void *arg );
+#if defined( LILYGO_WATCH_ULTRA )
+static bool timesync_apply_build_time_if_needed( void );
+#endif
 
 void timesync_setup( void ) {
     /*
@@ -68,6 +74,9 @@ void timesync_setup( void ) {
      * sync time from rtc to system
      */
     timesyncToSystem();
+    #if defined( LILYGO_WATCH_ULTRA )
+        timesync_apply_build_time_if_needed();
+    #endif
 }
 
 bool timesync_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id ) {
@@ -93,6 +102,78 @@ bool timesync_send_event_cb( EventBits_t event, void *arg ) {
      */
     return( callback_send( timesync_callback, event, (void*)NULL ) );
 }
+
+static int64_t timesync_days_from_civil( int year, unsigned month, unsigned day ) {
+    year -= month <= 2;
+    const int era = ( year >= 0 ? year : year - 399 ) / 400;
+    const unsigned year_of_era = static_cast<unsigned>( year - era * 400 );
+    const unsigned day_of_year = ( 153 * ( month + ( month > 2 ? -3 : 9 ) ) + 2 ) / 5 + day - 1;
+    const unsigned day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    return( static_cast<int64_t>( era ) * 146097LL + static_cast<int64_t>( day_of_era ) - 719468LL );
+}
+
+time_t timesync_get_build_epoch_utc( void ) {
+    static const char *months[] = {
+        "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+        "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    };
+    char month_name[ 4 ] = "";
+    int day = 0;
+    int year = 0;
+    int hour = 0;
+    int minute = 0;
+    int second = 0;
+    int month = -1;
+
+    if ( sscanf( __DATE__, "%3s %d %d", month_name, &day, &year ) != 3 ||
+         sscanf( __TIME__, "%d:%d:%d", &hour, &minute, &second ) != 3 ) {
+        return( 0 );
+    }
+
+    for ( int i = 0 ; i < 12 ; i++ ) {
+        if ( strncmp( month_name, months[ i ], 3 ) == 0 ) {
+            month = i;
+            break;
+        }
+    }
+
+    if ( month < 0 || year < 2024 || day < 1 || day > 31 ||
+         hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59 ) {
+        return( 0 );
+    }
+
+    const int64_t days = timesync_days_from_civil( year, static_cast<unsigned>( month + 1 ), static_cast<unsigned>( day ) );
+    const int64_t epoch_seconds = days * 86400LL + hour * 3600LL + minute * 60LL + second;
+
+    if ( epoch_seconds <= 0 ) {
+        return( 0 );
+    }
+
+    return( static_cast<time_t>( epoch_seconds ) );
+}
+
+#if defined( LILYGO_WATCH_ULTRA )
+static bool timesync_apply_build_time_if_needed( void ) {
+    time_t now;
+    struct tm current_info;
+    time( &now );
+    localtime_r( &now, &current_info );
+    if ( current_info.tm_year + 1900 >= 2024 ) {
+        return( false );
+    }
+
+    struct timeval build_now;
+
+    build_now.tv_sec = timesync_get_build_epoch_utc();
+    build_now.tv_usec = 0;
+    if ( build_now.tv_sec <= 0 || settimeofday( &build_now, NULL ) != 0 ) {
+        return( false );
+    }
+
+    log_i( "applied Ultra build-time UTC clock fallback: %s %s", __DATE__, __TIME__ );
+    return( true );
+}
+#endif
 
 bool timesync_powermgm_event_cb( EventBits_t event, void *arg ) {
     switch( event ) {

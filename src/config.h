@@ -29,7 +29,15 @@
             #define RES_Y_MAX       LV_VER_RES_MAX
             #define HARDWARE_NAME   "NATIVE 64BIT APP"
     #else
-        #if defined( LILYGO_WATCH_S3 )
+        #if defined( LILYGO_WATCH_ULTRA )
+            #undef LILYGO_WATCH_LVGL
+            #define HARDWARE_NAME   "T-WatchUltra"
+            #define RES_X_MAX       362
+            #define RES_Y_MAX       440
+            #define USE_PSRAM_ALLOC_LVGL
+            #define ENABLE_WEBSERVER
+            #define ENABLE_FTPSERVER
+        #elif defined( LILYGO_WATCH_S3 )
             #undef LILYGO_WATCH_LVGL
             #define HARDWARE_NAME   "T-WatchS3"
             #define RES_X_MAX       240

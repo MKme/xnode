@@ -36,6 +36,9 @@
         #elif defined( M5CORE2 )
             #define FRAMEBUFFER_BUFFER_W        RES_X_MAX
             #define FRAMEBUFFER_BUFFER_H        10
+        #elif defined( LILYGO_WATCH_ULTRA )
+            #define FRAMEBUFFER_BUFFER_W        RES_X_MAX
+            #define FRAMEBUFFER_BUFFER_H        20
         #elif defined( LILYGO_WATCH_S3 )
             #define FRAMEBUFFER_BUFFER_W        RES_X_MAX
             #define FRAMEBUFFER_BUFFER_H        20

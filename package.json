@@ -4,6 +4,9 @@
   "private": true,
   "scripts": {
     "test": "python support/check_watch_overlay_persistence.py",
-    "build": "npm test && pio run -e t-watch2020-v3-s3"
+    "build": "npm test && pio run",
+    "build:watches": "pio run -e t-watch2020-v3-s3 -e t-watch-ultra",
+    "upload:s3": "pio run -e t-watch2020-v3-s3 -t upload",
+    "upload:ultra": "pio run -e t-watch-ultra -t upload"
   }
 }
