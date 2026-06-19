@@ -359,7 +359,18 @@ void TWatchUltraHal::powerIoctl(PowerCtrlChannel ch, bool enable) {
             enable ? power.enableBLDO2() : power.disableBLDO2();
             break;
         case WATCH_POWER_GPS:
-            enable ? power.enableBLDO1() : power.disableBLDO1();
+            if ( enable ) {
+                power.enableBLDO1();
+                Serial1.begin(BOARD_GPS_BAUDRATE, SERIAL_8N1, SHIELD_GPS_RX, SHIELD_GPS_TX);
+                pinMode(BOARD_GPS_1PPS, INPUT);
+            }
+            else {
+                Serial1.end();
+                power.disableBLDO1();
+                pinMode(SHIELD_GPS_RX, INPUT);
+                pinMode(SHIELD_GPS_TX, INPUT);
+                pinMode(BOARD_GPS_1PPS, INPUT);
+            }
             break;
         case WATCH_POWER_GPS_DC_CHANNEL:
         default:

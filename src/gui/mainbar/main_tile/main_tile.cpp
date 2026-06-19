@@ -61,6 +61,10 @@ static lv_obj_t *batteryicon = NULL;
 static lv_obj_t *wifiicon = NULL;
 static lv_obj_t *bluetoothicon = NULL;
 static lv_obj_t *timelabel = NULL;
+#if defined( LILYGO_WATCH_ULTRA )
+static lv_obj_t *timecanvas = NULL;
+static uint8_t *timecanvas_buf = NULL;
+#endif
 static lv_obj_t *infolabel = NULL;
 static lv_obj_t *templabel = NULL;
 static lv_obj_t *datelabel = NULL;
@@ -108,8 +112,15 @@ static bool main_tile_style_event_cb( EventBits_t event, void *arg );
 static bool main_tile_button_event_cb( EventBits_t event, void *arg );
 static bool main_tile_sensor_event_cb( EventBits_t event, void *arg );
 #if defined( LILYGO_WATCH_ULTRA )
+static const lv_coord_t MAIN_TILE_ULTRA_TIME_CANVAS_W = 240;
+static const lv_coord_t MAIN_TILE_ULTRA_TIME_CANVAS_H = 88;
+static const uint16_t MAIN_TILE_ULTRA_TIME_ZOOM = 333;
+
 static bool main_tile_ultra_time_is_valid( const tm &info );
 static void main_tile_ultra_get_display_time( tm *info, time_t *epoch );
+static lv_obj_t *main_tile_ultra_time_obj( void );
+static void main_tile_ultra_create_time_canvas( void );
+static void main_tile_ultra_set_time_text( const char *time_text );
 static void main_tile_ultra_align_clock( void );
 #endif
 
@@ -156,17 +167,14 @@ void main_tile_setup( void ) {
     lv_obj_add_style( clock_cont, LV_OBJ_PART_MAIN, style );
     lv_obj_align( clock_cont, main_cont, LV_ALIGN_CENTER, 0, 0 );
 
-    timelabel = lv_label_create( clock_cont , NULL);
     #if defined( LILYGO_WATCH_ULTRA )
-        lv_label_set_text(timelabel, "00:00");
+        main_tile_ultra_create_time_canvas();
+        main_tile_ultra_set_time_text( "00:00" );
     #else
+        timelabel = lv_label_create( clock_cont , NULL);
         lv_label_set_text(timelabel, "00:00");
-    #endif
-    lv_obj_reset_style_list( timelabel, LV_OBJ_PART_MAIN );
-    lv_obj_add_style( timelabel, LV_OBJ_PART_MAIN, &timestyle );
-    #if defined( LILYGO_WATCH_ULTRA )
-        lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, -34 );
-    #else
+        lv_obj_reset_style_list( timelabel, LV_OBJ_PART_MAIN );
+        lv_obj_add_style( timelabel, LV_OBJ_PART_MAIN, &timestyle );
         lv_obj_align(timelabel, NULL, LV_ALIGN_CENTER, 0, 0);
     #endif
 
@@ -182,7 +190,7 @@ void main_tile_setup( void ) {
     lv_obj_reset_style_list( datelabel, LV_OBJ_PART_MAIN );
     lv_obj_add_style( datelabel, LV_OBJ_PART_MAIN, &datestyle );
     #if defined( LILYGO_WATCH_ULTRA )
-        lv_obj_align( datelabel, timelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 4 );
+        lv_obj_align( datelabel, main_tile_ultra_time_obj(), LV_ALIGN_OUT_BOTTOM_MID, 0, 18 );
     #else
         lv_obj_align( datelabel, clock_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
     #endif
@@ -212,6 +220,10 @@ void main_tile_setup( void ) {
     
     if ( !sensor_get_available() )
         lv_obj_set_hidden( templabel, true );
+
+    #if defined( LILYGO_WATCH_ULTRA )
+        main_tile_ultra_align_clock();
+    #endif
 
     main_tile_update_time( true );
 
@@ -410,13 +422,53 @@ static void main_tile_ultra_get_display_time( tm *info, time_t *epoch ) {
     *epoch = mktime( info );
 }
 
-static void main_tile_ultra_align_clock( void ) {
-    if ( clock_cont == NULL || timelabel == NULL || datelabel == NULL || infolabel == NULL ) {
+static lv_obj_t *main_tile_ultra_time_obj( void ) {
+    return timecanvas != NULL ? timecanvas : timelabel;
+}
+
+static void main_tile_ultra_create_time_canvas( void ) {
+    if ( timecanvas != NULL ) {
         return;
     }
 
-    lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, -34 );
-    lv_obj_align( datelabel, timelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 4 );
+    const size_t canvas_size = LV_CANVAS_BUF_SIZE_TRUE_COLOR_ALPHA( MAIN_TILE_ULTRA_TIME_CANVAS_W, MAIN_TILE_ULTRA_TIME_CANVAS_H );
+    timecanvas_buf = (uint8_t *)CALLOC( 1, canvas_size );
+    ASSERT( timecanvas_buf, "main tile Ultra time canvas malloc failed" );
+
+    timecanvas = lv_canvas_create( clock_cont, NULL );
+    lv_canvas_set_buffer( timecanvas, timecanvas_buf, MAIN_TILE_ULTRA_TIME_CANVAS_W, MAIN_TILE_ULTRA_TIME_CANVAS_H, LV_IMG_CF_TRUE_COLOR_ALPHA );
+    lv_img_set_zoom( timecanvas, MAIN_TILE_ULTRA_TIME_ZOOM );
+    lv_img_set_antialias( timecanvas, true );
+}
+
+static void main_tile_ultra_set_time_text( const char *time_text ) {
+    if ( timecanvas == NULL || time_text == NULL ) {
+        return;
+    }
+
+    lv_draw_label_dsc_t label_dsc;
+    lv_draw_label_dsc_init( &label_dsc );
+    label_dsc.color = LV_COLOR_WHITE;
+    label_dsc.font = time_font;
+
+    lv_canvas_fill_bg( timecanvas, LV_COLOR_BLACK, LV_OPA_TRANSP );
+    lv_canvas_draw_text( timecanvas,
+                         0,
+                         0,
+                         MAIN_TILE_ULTRA_TIME_CANVAS_W,
+                         &label_dsc,
+                         time_text,
+                         LV_LABEL_ALIGN_CENTER );
+}
+
+static void main_tile_ultra_align_clock( void ) {
+    lv_obj_t *time_obj = main_tile_ultra_time_obj();
+    if ( clock_cont == NULL || time_obj == NULL || datelabel == NULL || infolabel == NULL ) {
+        return;
+    }
+
+    lv_obj_align( time_obj, clock_cont, LV_ALIGN_CENTER, 0, -52 );
+    lv_obj_align( datelabel, time_obj, LV_ALIGN_OUT_BOTTOM_MID, 0, 18 );
     lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 18 );
 }
 #endif
@@ -673,10 +725,11 @@ void main_tile_update_time( bool force ) {
             timesync_get_current_timestring( time_str, sizeof(time_str) );
         #endif
         log_d("renew time: %s", time_str );
-        lv_label_set_text( timelabel, time_str );
         #if defined( LILYGO_WATCH_ULTRA )
+            main_tile_ultra_set_time_text( time_str );
             main_tile_ultra_align_clock();
         #else
+            lv_label_set_text( timelabel, time_str );
             lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, 0 );
         #endif
         /*
