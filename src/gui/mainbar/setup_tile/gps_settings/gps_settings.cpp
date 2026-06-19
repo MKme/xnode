@@ -30,6 +30,11 @@
 #include "gui/widget_styles.h"
 
 #include "hardware/gpsctl.h"
+#if defined( LILYGO_WATCH_ULTRA )
+    #include "hardware/twatch_ultra_hal.h"
+#endif
+
+#include <stdint.h>
 
 lv_obj_t *gps_settings_tile = NULL;
 uint32_t gps_tile_num;
@@ -39,7 +44,10 @@ lv_obj_t *enable_on_standby_onoff = NULL;
 lv_obj_t *app_use_gps_onoff = NULL;
 lv_obj_t *fakegps_onoff = NULL;
 lv_obj_t *gps_latlon_label = NULL;
+lv_obj_t *gps_debug_label = NULL;
+lv_obj_t *gps_debug_rows[6] = { NULL, NULL, NULL, NULL, NULL, NULL };
 lv_obj_t *gps_port_list = NULL;
+lv_task_t *gps_debug_task = NULL;
 
 LV_IMG_DECLARE(gps_64px);
 
@@ -50,6 +58,8 @@ static void enable_on_standby_onoff_event_handler( lv_obj_t * obj, lv_event_t ev
 static void app_use_gps_onoff_event_handler( lv_obj_t * obj, lv_event_t event);
 static void fakegps_onoff_event_handler( lv_obj_t * obj, lv_event_t event);
 static void gps_port_list_event_handler( lv_obj_t *obj, lv_event_t event );
+static void gps_settings_debug_task_cb( lv_task_t *task );
+static void gps_settings_update_debug_label( void );
 bool gps_settings_config_update_cb( EventBits_t event, void *arg );
 bool gps_settings_latlon_update_cb( EventBits_t event, void *arg );
 
@@ -88,16 +98,41 @@ void gps_settings_tile_setup( void ) {
     lv_obj_t *fakegps_cont = wf_add_labeled_switch( gps_settings_tile, "fake gps via ip", &fakegps_onoff, gpsctl_get_gps_over_ip(), fakegps_onoff_event_handler, SETUP_STYLE );
     lv_obj_align( fakegps_cont, app_use_gps_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, THEME_PADDING );
 
-    lv_obj_t *gps_port_cont = wf_add_labeled_list( gps_settings_tile, "gps port (need reboot)", &gps_port_list, "PORT.A\nPORT.B\nPORT.C\nNONE", gps_port_list_event_handler, SETUP_STYLE );
+    lv_obj_t *gps_port_cont = wf_add_labeled_list(
+        gps_settings_tile,
+        "gps port (need reboot)",
+        &gps_port_list,
+#if defined( LILYGO_WATCH_ULTRA )
+        "ULTRA RX44/TX43",
+#else
+        "PORT.A\nPORT.B\nPORT.C\nNONE",
+#endif
+        gps_port_list_event_handler,
+        SETUP_STYLE
+    );
     lv_obj_align( gps_port_cont, fakegps_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, THEME_PADDING );
 
-    gps_latlon_label = lv_label_create( gps_settings_tile, NULL);
-    lv_obj_add_style( gps_latlon_label, LV_OBJ_PART_MAIN, ws_get_mainbar_style()  );
-    lv_label_set_text( gps_latlon_label, "fix: - lat: - lon: -");
-    lv_obj_align( gps_latlon_label, gps_settings_tile, LV_ALIGN_IN_BOTTOM_MID, 0, -5 );
+    for ( uint8_t i = 0; i < 6; i++ ) {
+        gps_debug_rows[i] = lv_label_create( gps_settings_tile, NULL );
+        lv_obj_add_style( gps_debug_rows[i], LV_OBJ_PART_MAIN, SETUP_STYLE );
+        lv_obj_set_width( gps_debug_rows[i], lv_disp_get_hor_res( NULL ) - 40 );
+        lv_label_set_long_mode( gps_debug_rows[i], LV_LABEL_LONG_CROP );
+        lv_label_set_align( gps_debug_rows[i], LV_LABEL_ALIGN_LEFT );
+        lv_label_set_text( gps_debug_rows[i], "" );
+        if ( i == 0 ) {
+            lv_obj_align( gps_debug_rows[i], gps_port_cont, LV_ALIGN_OUT_BOTTOM_LEFT, 20, THEME_PADDING );
+        }
+        else {
+            lv_obj_align( gps_debug_rows[i], gps_debug_rows[i - 1], LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2 );
+        }
+    }
+    gps_latlon_label = gps_debug_rows[0];
+    gps_debug_label = gps_debug_rows[1];
 
-    gpsctl_register_cb( GPSCTL_FIX | GPSCTL_NOFIX | GPSCTL_UPDATE_LOCATION, gps_settings_latlon_update_cb, "gps settings" );
+    gpsctl_register_cb( GPSCTL_ENABLE | GPSCTL_DISABLE | GPSCTL_FIX | GPSCTL_NOFIX | GPSCTL_UPDATE_LOCATION | GPSCTL_UPDATE_SATELLITE | GPSCTL_UPDATE_SATELLITE_TYPE | GPSCTL_UPDATE_SOURCE, gps_settings_latlon_update_cb, "gps settings" );
     gpsctl_register_cb( GPSCTL_UPDATE_CONFIG, gps_settings_config_update_cb, "gps settings" );
+    gps_debug_task = lv_task_create( gps_settings_debug_task_cb, 1000, LV_TASK_PRIO_LOW, NULL );
+    gps_settings_update_debug_label();
 
     #if defined( M5PAPER )
         lv_obj_set_hidden( gps_port_cont, false );
@@ -127,7 +162,9 @@ bool gps_settings_config_update_cb( EventBits_t event, void *arg ) {
             else
                 lv_switch_off( fakegps_onoff, LV_ANIM_OFF );
 
-            #if defined( M5PAPER )
+            #if defined( LILYGO_WATCH_ULTRA )
+                lv_dropdown_set_selected( gps_port_list, 0 );
+            #elif defined( M5PAPER )
                 int8_t rx,tx;
                 gpsctl_get_gps_rx_tx_pin( &rx, &tx );
                 switch( rx ) {
@@ -143,6 +180,7 @@ bool gps_settings_config_update_cb( EventBits_t event, void *arg ) {
 
             break;
     }
+    gps_settings_update_debug_label();
     return( true );
 }
 
@@ -168,9 +206,99 @@ bool gps_settings_latlon_update_cb( EventBits_t event, void *arg ) {
     }
     snprintf( msg, sizeof( msg ), "%s @ lat: %.3f lon: %.3f", gpsfix?"fix":"nofix", lat, lon );
     lv_label_set_text( gps_latlon_label, msg );
-    lv_obj_align( gps_latlon_label, gps_settings_tile, LV_ALIGN_IN_BOTTOM_MID, 0, -5 );
+    gps_settings_update_debug_label();
 
     return( true );
+}
+
+static void gps_settings_format_age( uint32_t age_ms, char *buf, size_t len ) {
+    if ( !buf || len == 0 ) {
+        return;
+    }
+
+    if ( age_ms == UINT32_MAX ) {
+        snprintf( buf, len, "never" );
+    }
+    else if ( age_ms < 1000 ) {
+        snprintf( buf, len, "%lums", (unsigned long)age_ms );
+    }
+    else {
+        snprintf( buf, len, "%lus", (unsigned long)( age_ms / 1000 ) );
+    }
+}
+
+static void gps_settings_update_debug_label( void ) {
+    if ( !gps_debug_rows[0] ) {
+        return;
+    }
+
+    gpsctl_debug_t debug;
+    char rx_age[ 12 ] = "";
+    char sentence_age[ 12 ] = "";
+
+    gpsctl_get_debug( &debug );
+    gps_settings_format_age( debug.last_rx_age_ms, rx_age, sizeof( rx_age ) );
+    gps_settings_format_age( debug.last_sentence_age_ms, sentence_age, sizeof( sentence_age ) );
+
+    const char *probe = debug.probe_done ? ( debug.probe_ok ? "ok" : "fail" ) : "wait";
+    uint32_t active_baud = debug.active_baud ? debug.active_baud : debug.baud;
+    const char *last_sentence = debug.last_sentence[0] ? debug.last_sentence : "none";
+
+    lv_label_set_text_fmt(
+        gps_debug_rows[0],
+        "Pos:%s Lat:%.5f Lon:%.5f",
+        debug.valid_location ? "yes" : "no",
+        debug.lat,
+        debug.lon
+    );
+    lv_label_set_text_fmt(
+        gps_debug_rows[1],
+        "Power:%s UART:%s Probe:%s %s",
+        debug.enabled ? "on" : "off",
+        debug.serial_available ? "ok" : "none",
+        probe,
+        debug.probe_model
+    );
+    lv_label_set_text_fmt(
+        gps_debug_rows[2],
+#if defined( LILYGO_WATCH_ULTRA )
+        "Serial1 RX%ld TX%ld @%lu",
+#else
+        "Port RX%ld TX%ld @%lu",
+#endif
+        (long)debug.rx_pin,
+        (long)debug.tx_pin,
+        (unsigned long)active_baud
+    );
+    lv_label_set_text_fmt(
+        gps_debug_rows[3],
+        "Raw:%lu Last:%s Chars:%lu",
+        (unsigned long)debug.rx_bytes,
+        rx_age,
+        (unsigned long)debug.chars_processed
+    );
+    lv_label_set_text_fmt(
+        gps_debug_rows[4],
+        "NMEA ok/bad:%lu/%lu Sentence:%s",
+        (unsigned long)debug.passed_checksum,
+        (unsigned long)debug.failed_checksum,
+        last_sentence
+    );
+    lv_label_set_text_fmt(
+        gps_debug_rows[5],
+        "Fix:%s Sats:%lu View:%lu/%lu/%lu Age:%s",
+        debug.sentences_with_fix > 0 ? "seen" : "no",
+        (unsigned long)debug.satellites,
+        (unsigned long)debug.gps_satellites,
+        (unsigned long)debug.glonass_satellites,
+        (unsigned long)debug.baidou_satellites,
+        sentence_age
+    );
+}
+
+static void gps_settings_debug_task_cb( lv_task_t *task ) {
+    (void)task;
+    gps_settings_update_debug_label();
 }
 
 static void enter_gps_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
@@ -191,6 +319,10 @@ static void gps_port_list_event_handler( lv_obj_t *obj, lv_event_t event ) {
     switch( event ) {
         case( LV_EVENT_VALUE_CHANGED ):
             uint16_t port = lv_dropdown_get_selected( obj );
+#if defined( LILYGO_WATCH_ULTRA )
+            (void)port;
+            gpsctl_set_gps_rx_tx_pin( SHIELD_GPS_RX, SHIELD_GPS_TX );
+#else
             switch( port ) {
                 case 0:     gpsctl_set_gps_rx_tx_pin( 32, 25 );
                             break;
@@ -201,13 +333,23 @@ static void gps_port_list_event_handler( lv_obj_t *obj, lv_event_t event ) {
                 default:    gpsctl_set_gps_rx_tx_pin( -1, -1 );
                             break;
             }
+#endif
+            gps_settings_update_debug_label();
             break;
     }    
 }
 
 static void autoon_onoff_event_handler(lv_obj_t * obj, lv_event_t event) {
     switch( event ) {
-        case( LV_EVENT_VALUE_CHANGED):  gpsctl_set_autoon( lv_switch_get_state( obj ) );
+        case( LV_EVENT_VALUE_CHANGED):
+            if ( lv_switch_get_state( obj ) ) {
+                gpsctl_on();
+            }
+            else {
+                gpsctl_off();
+            }
+            gps_settings_update_debug_label();
+            break;
     }
 }
 

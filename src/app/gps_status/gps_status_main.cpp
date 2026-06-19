@@ -60,7 +60,13 @@ lv_obj_t *pos_longlat_value = NULL;
 lv_obj_t *altitude_value = NULL;
 lv_obj_t *speed_value = NULL;
 lv_obj_t *source_value = NULL;
+lv_obj_t *gps_status_debug_label = NULL;
+lv_obj_t *gps_status_debug_rows[5] = { NULL, NULL, NULL, NULL, NULL };
+lv_task_t *gps_status_debug_task = NULL;
 static bool gps_status_block_return_maintile = false;
+static bool gps_status_prev_autoon = false;
+static bool gps_status_prev_enable_on_standby = false;
+static bool gps_status_forced_gps = false;
 /*
  * images
  */
@@ -70,6 +76,10 @@ LV_FONT_DECLARE(Ubuntu_16px);
 
 bool style_change_event_cb( EventBits_t event, void *arg );
 bool gpsctl_gps_status_event_cb( EventBits_t event, void *arg );
+void gps_status_debug_task_cb(lv_task_t *task);
+static void gps_status_config_value_label( lv_obj_t *label );
+static void gps_status_format_age( uint32_t age_ms, char *buf, size_t len );
+static void gps_status_update_debug_label( void );
 void gps_status_task(lv_task_t *task);
 void gps_status_hibernate_cb(void);
 void gps_status_activate_cb(void);
@@ -108,7 +118,7 @@ void gps_status_main_setup(uint32_t tile_num) {
     lv_obj_align(satfix_cont, gps_status_main_tile, LV_ALIGN_IN_TOP_MID, 0, STATUSBAR_HEIGHT );
     lv_obj_t *satfix_label = lv_label_create(satfix_cont, NULL);
     lv_obj_add_style(satfix_label, LV_OBJ_PART_MAIN, &gps_status_value_style);
-    lv_label_set_text(satfix_label, "SatFix");
+    lv_label_set_text(satfix_label, "Fix");
     lv_obj_align(satfix_label, satfix_cont, LV_ALIGN_IN_LEFT_MID, 5, 0);
     satfix_value_on = lv_led_create(satfix_cont, NULL);
     lv_obj_add_style(satfix_value_on, LV_LED_PART_MAIN, &style_led_green);
@@ -131,10 +141,11 @@ void gps_status_main_setup(uint32_t tile_num) {
     lv_obj_align(num_satellites_cont, satfix_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
     lv_obj_t *num_satellites_label = lv_label_create(num_satellites_cont, NULL);
     lv_obj_add_style(num_satellites_label, LV_OBJ_PART_MAIN, &gps_status_value_style);
-    lv_label_set_text(num_satellites_label, "Num satellites");
+    lv_label_set_text(num_satellites_label, "Power");
     lv_obj_align(num_satellites_label, num_satellites_cont, LV_ALIGN_IN_LEFT_MID, 5, 0);
     num_satellites_value = lv_label_create(num_satellites_cont, NULL);
     lv_obj_add_style(num_satellites_value, LV_OBJ_PART_MAIN, &gps_status_value_style);
+    gps_status_config_value_label( num_satellites_value );
     lv_label_set_text(num_satellites_value, "n/a");
     lv_obj_align(num_satellites_value, num_satellites_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0);
     /*
@@ -146,10 +157,11 @@ void gps_status_main_setup(uint32_t tile_num) {
     lv_obj_align(satellite_type_cont, num_satellites_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
     lv_obj_t *satellite_type_label = lv_label_create(satellite_type_cont, NULL);
     lv_obj_add_style(satellite_type_label, LV_OBJ_PART_MAIN, &gps_status_value_style);
-    lv_label_set_text(satellite_type_label, "Sat type:");
+    lv_label_set_text(satellite_type_label, "Probe");
     lv_obj_align(satellite_type_label, satellite_type_cont, LV_ALIGN_IN_LEFT_MID, 5, 0);
     satellite_type = lv_label_create(satellite_type_cont, NULL);
     lv_obj_add_style(satellite_type, LV_OBJ_PART_MAIN, &gps_status_value_style);
+    gps_status_config_value_label( satellite_type );
     lv_label_set_text(satellite_type, "n/a");
     lv_obj_align(satellite_type, satellite_type_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0);
     /*
@@ -161,10 +173,11 @@ void gps_status_main_setup(uint32_t tile_num) {
     lv_obj_align(altitude_cont, satellite_type_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
     lv_obj_t *altitude_info_label = lv_label_create(altitude_cont, NULL);
     lv_obj_add_style(altitude_info_label, LV_OBJ_PART_MAIN, &gps_status_value_style);
-    lv_label_set_text(altitude_info_label, "Altitude");
+    lv_label_set_text(altitude_info_label, "Raw");
     lv_obj_align(altitude_info_label, altitude_cont, LV_ALIGN_IN_LEFT_MID, 5, 0);
     altitude_value = lv_label_create(altitude_cont, NULL);
     lv_obj_add_style(altitude_value, LV_OBJ_PART_MAIN, &gps_status_value_style);
+    gps_status_config_value_label( altitude_value );
     lv_label_set_text(altitude_value, "n/a");
     lv_obj_align(altitude_value, altitude_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0);
     /*
@@ -176,10 +189,11 @@ void gps_status_main_setup(uint32_t tile_num) {
     lv_obj_align(pos_longlat_cont, altitude_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
     lv_obj_t *pos_longlat_label = lv_label_create(pos_longlat_cont, NULL);
     lv_obj_add_style(pos_longlat_label, LV_OBJ_PART_MAIN, &gps_status_value_style);
-    lv_label_set_text(pos_longlat_label, "Long/Lat");
+    lv_label_set_text(pos_longlat_label, "Pos");
     lv_obj_align(pos_longlat_label, pos_longlat_cont, LV_ALIGN_IN_LEFT_MID, 5, 0);
     pos_longlat_value = lv_label_create(pos_longlat_cont, NULL);
     lv_obj_add_style(pos_longlat_value, LV_OBJ_PART_MAIN, &gps_status_value_style);
+    gps_status_config_value_label( pos_longlat_value );
     lv_label_set_text(pos_longlat_value, "n/a");
     lv_obj_align(pos_longlat_value, pos_longlat_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0);
     /*
@@ -191,10 +205,11 @@ void gps_status_main_setup(uint32_t tile_num) {
     lv_obj_align(speed_cont, pos_longlat_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
     lv_obj_t *speed_label = lv_label_create(speed_cont, NULL);
     lv_obj_add_style(speed_label, LV_OBJ_PART_MAIN, &gps_status_value_style);
-    lv_label_set_text(speed_label, "Speed");
+    lv_label_set_text(speed_label, "GPS UTC");
     lv_obj_align(speed_label, speed_cont, LV_ALIGN_IN_LEFT_MID, 5, 0);
     speed_value = lv_label_create(speed_cont, NULL);
     lv_obj_add_style(speed_value, LV_OBJ_PART_MAIN, &gps_status_value_style);
+    gps_status_config_value_label( speed_value );
     lv_label_set_text(speed_value, "n/a");
     lv_obj_align(speed_value, speed_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0);
     /*
@@ -206,12 +221,29 @@ void gps_status_main_setup(uint32_t tile_num) {
     lv_obj_align(source_cont, speed_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
     lv_obj_t *source_label = lv_label_create(source_cont, NULL);
     lv_obj_add_style(source_label, LV_OBJ_PART_MAIN, &gps_status_value_style);
-    lv_label_set_text(source_label, "Source");
+    lv_label_set_text(source_label, "Sync");
     lv_obj_align(source_label, source_cont, LV_ALIGN_IN_LEFT_MID, 5, 0);
     source_value = lv_label_create(source_cont, NULL);
     lv_obj_add_style(source_value, LV_OBJ_PART_MAIN, &gps_status_value_style);
+    gps_status_config_value_label( source_value );
     lv_label_set_text(source_value, "n/a");
     lv_obj_align(source_value, source_cont, LV_ALIGN_IN_RIGHT_MID, -5, 0);
+
+    for ( uint8_t i = 0; i < 5; i++ ) {
+        gps_status_debug_rows[i] = lv_label_create(gps_status_main_tile, NULL);
+        lv_obj_add_style(gps_status_debug_rows[i], LV_OBJ_PART_MAIN, &gps_status_value_style);
+        lv_obj_set_width(gps_status_debug_rows[i], lv_disp_get_hor_res(NULL) - 20);
+        lv_label_set_long_mode(gps_status_debug_rows[i], LV_LABEL_LONG_CROP);
+        lv_label_set_align(gps_status_debug_rows[i], LV_LABEL_ALIGN_LEFT);
+        lv_label_set_text(gps_status_debug_rows[i], "");
+        if ( i == 0 ) {
+            lv_obj_align(gps_status_debug_rows[i], source_cont, LV_ALIGN_OUT_BOTTOM_LEFT, 10, THEME_PADDING);
+        }
+        else {
+            lv_obj_align(gps_status_debug_rows[i], gps_status_debug_rows[i - 1], LV_ALIGN_OUT_BOTTOM_LEFT, 0, 2);
+        }
+    }
+    gps_status_debug_label = gps_status_debug_rows[0];
     /*
      * create callback
      */
@@ -230,6 +262,8 @@ void gps_status_main_setup(uint32_t tile_num) {
     mainbar_add_tile_activate_cb( tile_num, gps_status_activate_cb );
     mainbar_add_tile_hibernate_cb( tile_num, gps_status_hibernate_cb );
     styles_register_cb( STYLE_CHANGE, style_change_event_cb, "gps status style");
+    gps_status_debug_task = lv_task_create( gps_status_debug_task_cb, 1000, LV_TASK_PRIO_LOW, NULL );
+    gps_status_update_debug_label();
 }
 
 bool style_change_event_cb( EventBits_t event, void *arg ) {
@@ -239,9 +273,161 @@ bool style_change_event_cb( EventBits_t event, void *arg ) {
                             lv_style_set_bg_opa(&gps_status_value_style, LV_OBJ_PART_MAIN, LV_OPA_0);
                             lv_style_set_border_width(&gps_status_value_style, LV_OBJ_PART_MAIN, 0);
                             lv_style_set_text_font(&gps_status_value_style, LV_STATE_DEFAULT, &Ubuntu_16px);
+                            gps_status_update_debug_label();
                             break;
     }
     return( true );
+}
+
+static void gps_status_config_value_label( lv_obj_t *label ) {
+    if ( !label ) {
+        return;
+    }
+
+    lv_obj_set_width( label, lv_disp_get_hor_res( NULL ) - 88 );
+    lv_label_set_long_mode( label, LV_LABEL_LONG_CROP );
+    lv_label_set_align( label, LV_LABEL_ALIGN_RIGHT );
+}
+
+static void gps_status_format_age( uint32_t age_ms, char *buf, size_t len ) {
+    if ( !buf || len == 0 ) {
+        return;
+    }
+
+    if ( age_ms == UINT32_MAX ) {
+        snprintf( buf, len, "never" );
+    }
+    else if ( age_ms < 1000 ) {
+        snprintf( buf, len, "%lums", (unsigned long)age_ms );
+    }
+    else {
+        snprintf( buf, len, "%lus", (unsigned long)( age_ms / 1000 ) );
+    }
+}
+
+static void gps_status_update_debug_label( void ) {
+    if ( !gps_status_debug_rows[0] ) {
+        return;
+    }
+
+    gpsctl_debug_t debug;
+    char rx_age[12] = "";
+    char sentence_age[12] = "";
+    char sync_age[12] = "";
+
+    gpsctl_get_debug( &debug );
+    gps_status_format_age( debug.last_rx_age_ms, rx_age, sizeof( rx_age ) );
+    gps_status_format_age( debug.last_sentence_age_ms, sentence_age, sizeof( sentence_age ) );
+    gps_status_format_age( debug.last_time_sync_age_ms, sync_age, sizeof( sync_age ) );
+
+    const char *probe = debug.probe_done ? ( debug.probe_ok ? "ok" : "fail" ) : "wait";
+    uint32_t active_baud = debug.active_baud ? debug.active_baud : debug.baud;
+    const char *last_sentence = debug.last_sentence[0] ? debug.last_sentence : "none";
+
+    lv_obj_set_hidden( satfix_value_on, !debug.valid_location );
+    lv_obj_set_hidden( satfix_value_off, debug.valid_location );
+    lv_label_set_text_fmt(
+        num_satellites_value,
+        "%s uart:%s",
+        debug.enabled ? "on" : "off",
+        debug.serial_available ? "ok" : "none"
+    );
+    lv_label_set_text_fmt(
+        satellite_type,
+        "%s %s @%lu",
+        probe,
+        debug.probe_model,
+        (unsigned long)active_baud
+    );
+    lv_label_set_text_fmt(
+        altitude_value,
+        "%lu last:%s",
+        (unsigned long)debug.rx_bytes,
+        rx_age
+    );
+    if ( debug.valid_location ) {
+        char pos_buf[36] = "";
+        snprintf( pos_buf, sizeof( pos_buf ), "%.5f %.5f", debug.lat, debug.lon );
+        lv_label_set_text( pos_longlat_value, pos_buf );
+    }
+    else {
+        lv_label_set_text_fmt(
+            pos_longlat_value,
+            "no pos sats:%lu",
+            (unsigned long)debug.satellites
+        );
+    }
+    if ( debug.valid_date && debug.valid_time ) {
+        lv_label_set_text_fmt(
+            speed_value,
+            "%02u:%02u:%02u %02u/%02u",
+            (unsigned)debug.hour,
+            (unsigned)debug.minute,
+            (unsigned)debug.second,
+            (unsigned)debug.month,
+            (unsigned)debug.day
+        );
+    }
+    else {
+        lv_label_set_text( speed_value, "no gps time" );
+    }
+    if ( debug.time_sync_count > 0 ) {
+        lv_label_set_text_fmt(
+            source_value,
+            "#%lu %s",
+            (unsigned long)debug.time_sync_count,
+            sync_age
+        );
+    }
+    else {
+        lv_label_set_text( source_value, "none" );
+    }
+
+    lv_label_set_text_fmt(
+        gps_status_debug_rows[0],
+        "UART RX%ld TX%ld @%lu",
+        (long)debug.rx_pin,
+        (long)debug.tx_pin,
+        (unsigned long)active_baud
+    );
+    lv_label_set_text_fmt(
+        gps_status_debug_rows[1],
+        "NMEA ok/bad:%lu/%lu",
+        (unsigned long)debug.passed_checksum,
+        (unsigned long)debug.failed_checksum
+    );
+    lv_label_set_text_fmt(
+        gps_status_debug_rows[2],
+        "Sentence:%s age:%s",
+        last_sentence,
+        sentence_age
+    );
+    lv_label_set_text_fmt(
+        gps_status_debug_rows[3],
+        "Chars:%lu fixSeen:%lu",
+        (unsigned long)debug.chars_processed,
+        (unsigned long)debug.sentences_with_fix
+    );
+    lv_label_set_text_fmt(
+        gps_status_debug_rows[4],
+        "Sats:%lu G%lu L%lu B%lu",
+        (unsigned long)debug.satellites,
+        (unsigned long)debug.gps_satellites,
+        (unsigned long)debug.glonass_satellites,
+        (unsigned long)debug.baidou_satellites
+    );
+
+    lv_obj_align( pos_longlat_value, lv_obj_get_parent( pos_longlat_value ), LV_ALIGN_IN_RIGHT_MID, -5, 0);
+    lv_obj_align( num_satellites_value, lv_obj_get_parent( num_satellites_value ), LV_ALIGN_IN_RIGHT_MID, -5, 0);
+    lv_obj_align( satellite_type, lv_obj_get_parent( satellite_type ), LV_ALIGN_IN_RIGHT_MID, -5, 0);
+    lv_obj_align( speed_value, lv_obj_get_parent( speed_value ), LV_ALIGN_IN_RIGHT_MID, -5, 0);
+    lv_obj_align( altitude_value, lv_obj_get_parent( altitude_value ), LV_ALIGN_IN_RIGHT_MID, -5, 0);
+    lv_obj_align( source_value, lv_obj_get_parent( source_value ), LV_ALIGN_IN_RIGHT_MID, -5, 0);
+}
+
+void gps_status_debug_task_cb(lv_task_t *task) {
+    (void)task;
+    gps_status_update_debug_label();
 }
 
 bool gpsctl_gps_status_event_cb( EventBits_t event, void *arg ) {
@@ -258,6 +444,7 @@ bool gpsctl_gps_status_event_cb( EventBits_t event, void *arg ) {
             lv_obj_set_hidden( satfix_value_off, false );
             lv_label_set_text( pos_longlat_value, "n/a" );
             lv_label_set_text( num_satellites_value, "n/a" );
+            lv_label_set_text( satellite_type, "n/a" );
             lv_label_set_text( altitude_value, "n/a" );
             lv_label_set_text( speed_value, "n/a" );
             lv_label_set_text( source_value, "n/a" );
@@ -307,6 +494,7 @@ bool gpsctl_gps_status_event_cb( EventBits_t event, void *arg ) {
     lv_obj_align( speed_value, lv_obj_get_parent( speed_value ), LV_ALIGN_IN_RIGHT_MID, -5, 0);
     lv_obj_align( altitude_value, lv_obj_get_parent( altitude_value ), LV_ALIGN_IN_RIGHT_MID, -5, 0);
     lv_obj_align( source_value, lv_obj_get_parent( source_value ), LV_ALIGN_IN_RIGHT_MID, -5, 0);
+    gps_status_update_debug_label();
 
     return( true );
 }
@@ -315,6 +503,13 @@ void gps_status_hibernate_cb(void)
 {
     /** restore old "block the maintile value */
     display_set_block_return_maintile( gps_status_block_return_maintile );
+    if ( gps_status_forced_gps ) {
+        gpsctl_set_enable_on_standby( gps_status_prev_enable_on_standby );
+        if ( !gps_status_prev_autoon ) {
+            gpsctl_off();
+        }
+        gps_status_forced_gps = false;
+    }
 }
 void gps_status_activate_cb(void)
 {
@@ -322,4 +517,10 @@ void gps_status_activate_cb(void)
     gps_status_block_return_maintile = display_get_block_return_maintile();
     /** overwrite "block the maintile" value */
     display_set_block_return_maintile( true );
+    gps_status_prev_autoon = gpsctl_get_autoon();
+    gps_status_prev_enable_on_standby = gpsctl_get_enable_on_standby();
+    gps_status_forced_gps = true;
+    gpsctl_set_enable_on_standby( true );
+    gpsctl_on();
+    gps_status_update_debug_label();
 }

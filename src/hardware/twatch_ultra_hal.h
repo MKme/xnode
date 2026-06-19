@@ -27,6 +27,8 @@
 #define BOARD_I2C_SDA               (3)
 #define BOARD_I2C_SCL               (2)
 #define BOARD_PMU_INT               (7)
+#define BOARD_BHI260_INT            (8)
+#define BOARD_BHI260_RST            (-1)
 
 #define BOARD_TOUCH_INT             (12)
 #define BOARD_TOUCH_ADDR            (0x1A)
