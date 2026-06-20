@@ -41,11 +41,14 @@
 
     #elif defined( LILYGO_WATCH_ULTRA )
         #include "hardware/twatch_ultra_hal.h"
-        #include <SensorQMI8658.hpp>
+        #include <SensorBHI260AP.hpp>
 
-        static SensorQMI8658 bma_ultra_qmi;
+        static SensorBHI260AP bma_ultra_bhi;
         static bool bma_ultra_ready = false;
         static uint32_t bma_ultra_last_counter = 0xffffffff;
+        static uint32_t bma_ultra_counter_base = 0;
+        static bool bma_ultra_stepcounter_event = false;
+        static bool bma_ultra_motion_event = false;
 
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
@@ -113,42 +116,106 @@ bool bma_powermgm_loop_cb( EventBits_t event, void *arg );
 void bma_notify_stepcounter( void );
 
 #if !defined( NATIVE_64BIT ) && defined( LILYGO_WATCH_ULTRA )
-static bool bma_ultra_setup_sensor( void ) {
-    uint32_t retained_counter = stepcounter_before_reset;
+static bool bma_ultra_motion_wake_enabled( void ) {
+    return bma_config.enable[ BMA_DOUBLECLICK ] || bma_config.enable[ BMA_TILT ];
+}
 
-    if ( !bma_ultra_qmi.init( Wire, BOARD_I2C_SDA, BOARD_I2C_SCL, QMI8658_L_SLAVE_ADDRESS ) &&
-         !bma_ultra_qmi.init( Wire, BOARD_I2C_SDA, BOARD_I2C_SCL, QMI8658_H_SLAVE_ADDRESS ) ) {
-        log_w("QMI8658 was not found. stepcounter disabled");
+static void bma_ultra_step_counter_cb( uint8_t sensor_id, uint8_t *data_ptr, uint32_t len ) {
+    (void)sensor_id;
+    (void)len;
+
+    if ( data_ptr == NULL ) {
+        return;
+    }
+
+    uint32_t raw_counter = bhy2_parse_step_counter( data_ptr );
+    uint32_t counter = raw_counter >= bma_ultra_counter_base ? raw_counter - bma_ultra_counter_base : raw_counter;
+    if ( bma_ultra_last_counter == 0xffffffff ) {
+        uint32_t retained_counter = stepcounter_before_reset;
+        if ( counter < retained_counter ) {
+            stepcounter = stepcounter + retained_counter;
+        }
+    }
+    else if ( raw_counter < bma_ultra_last_counter ) {
+        stepcounter = stepcounter + stepcounter_before_reset;
+        bma_ultra_counter_base = 0;
+        counter = raw_counter;
+    }
+
+    if ( raw_counter != bma_ultra_last_counter ) {
+        stepcounter_before_reset = counter;
+        bma_ultra_last_counter = raw_counter;
+        bma_ultra_stepcounter_event = true;
+    }
+}
+
+static void bma_ultra_motion_cb( uint8_t sensor_id, uint8_t *data_ptr, uint32_t len ) {
+    (void)sensor_id;
+    (void)data_ptr;
+    (void)len;
+
+    bma_ultra_motion_event = true;
+}
+
+static void bma_ultra_update_sensor( void ) {
+    if ( bma_ultra_ready ) {
+        bma_ultra_bhi.update();
+    }
+}
+
+static void bma_ultra_configure_stepcounter( void ) {
+    if ( !bma_ultra_ready ) {
+        return;
+    }
+
+    if ( bma_config.enable[ BMA_STEPCOUNTER ] ) {
+        bma_ultra_bhi.configure( SENSOR_ID_ACC_PASS, 25.0f, 0 );
+        bma_ultra_bhi.configure( SENSOR_ID_STC, 25.0f, 0 );
+    }
+    else {
+        bma_ultra_bhi.configure( SENSOR_ID_STC, 0.0f, 0 );
+    }
+}
+
+static void bma_ultra_configure_motion_wake( void ) {
+    if ( !bma_ultra_ready ) {
+        return;
+    }
+
+    if ( bma_ultra_motion_wake_enabled() ) {
+        bma_ultra_bhi.configure( SENSOR_ID_ACC_PASS, 25.0f, 0 );
+        bma_ultra_bhi.configure( SENSOR_ID_ANY_MOTION_WU, 1.0f, 0 );
+    }
+    else {
+        bma_ultra_bhi.configure( SENSOR_ID_ANY_MOTION_WU, 0.0f, 0 );
+    }
+}
+
+static bool bma_ultra_setup_sensor( void ) {
+    bma_ultra_bhi.setPins( BOARD_BHI260_RST, -1 );
+    pinMode( BOARD_BHI260_INT, INPUT );
+
+    if ( !bma_ultra_bhi.init( Wire, BOARD_I2C_SDA, BOARD_I2C_SCL, BHI260AP_SLAVE_ADDRESS_L ) &&
+         !bma_ultra_bhi.init( Wire, BOARD_I2C_SDA, BOARD_I2C_SCL, BHI260AP_SLAVE_ADDRESS_H ) ) {
+        log_w("BHI260AP was not found. motion sensor disabled");
         return false;
     }
 
-    bma_ultra_qmi.configAccelerometer( SensorQMI8658::ACC_RANGE_4G,
-                                       SensorQMI8658::ACC_ODR_125Hz,
-                                       SensorQMI8658::LPF_MODE_0,
-                                       true );
-    bma_ultra_qmi.enableAccelerometer();
-    bma_ultra_qmi.configPedometer( 0x007D, 0x00CC, 0x0066, 0x00C8, 0x14, 0x0A, 0, 0x04 );
+    bma_ultra_bhi.setInterruptCtrl( 0 );
+    bma_ultra_bhi.onResultEvent( SENSOR_ID_STC, bma_ultra_step_counter_cb );
+    bma_ultra_bhi.onResultEvent( SENSOR_ID_ANY_MOTION_WU, bma_ultra_motion_cb );
 
-    if ( bma_config.enable[ BMA_STEPCOUNTER ] ) {
-        bma_ultra_qmi.enablePedometer();
-    }
-    else {
-        bma_ultra_qmi.disablePedometer();
-    }
+    bma_ultra_ready = true;
+    bma_ultra_configure_stepcounter();
+    bma_ultra_configure_motion_wake();
+    bma_ultra_update_sensor();
 
-    stepcounter_before_reset = bma_ultra_qmi.getPedometerCounter();
-    if ( stepcounter_before_reset < retained_counter ) {
-        stepcounter = stepcounter + retained_counter;
-    }
-    bma_ultra_last_counter = stepcounter_before_reset;
-    log_i("QMI8658 stepcounter ready");
+    log_i("BHI260AP motion sensor ready");
     return true;
 }
 
 static void bma_ultra_update_stepcounter( void ) {
-    if ( bma_ultra_ready ) {
-        stepcounter_before_reset = bma_ultra_qmi.getPedometerCounter();
-    }
+    bma_ultra_update_sensor();
 }
 #endif
 
@@ -348,9 +415,6 @@ bool bma_powermgm_loop_cb( EventBits_t event , void *arg ) {
     static bool BMA_tilt = false;
     static bool BMA_doubleclick = false;
     static bool BMA_stepcounter = false;
-    #if !defined( NATIVE_64BIT ) && defined( LILYGO_WATCH_ULTRA )
-        static uint32_t bma_ultra_next_poll = 0;
-    #endif
     bool temp_bma_irq_flag = false;
     /*
      * handle IRQ event
@@ -457,11 +521,19 @@ bool bma_powermgm_loop_cb( EventBits_t event , void *arg ) {
         }
     }
     #if !defined( NATIVE_64BIT ) && defined( LILYGO_WATCH_ULTRA )
-        if ( ( event & POWERMGM_WAKEUP ) && bma_ultra_ready && bma_get_config( BMA_STEPCOUNTER ) && millis() >= bma_ultra_next_poll ) {
-            bma_ultra_next_poll = millis() + 2000;
-            uint32_t counter = bma_ultra_qmi.getPedometerCounter();
-            if ( counter != bma_ultra_last_counter ) {
-                bma_ultra_last_counter = counter;
+        if ( bma_ultra_ready ) {
+            bma_ultra_update_sensor();
+
+            if ( bma_ultra_motion_event ) {
+                bma_ultra_motion_event = false;
+                if ( !powermgm_get_event( POWERMGM_WAKEUP ) ) {
+                    powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
+                }
+                BMA_tilt = true;
+            }
+
+            if ( bma_ultra_stepcounter_event ) {
+                bma_ultra_stepcounter_event = false;
                 bma_notify_stepcounter();
                 log_i("stepcounter");
             }
@@ -528,6 +600,14 @@ void bma_standby( void ) {
     #ifdef NATIVE_64BIT
         #else
             #ifdef M5PAPER
+            #elif defined( LILYGO_WATCH_ULTRA )
+                if ( bma_ultra_ready && bma_ultra_motion_wake_enabled() ) {
+                    bma_ultra_motion_event = false;
+                    bma_ultra_configure_motion_wake();
+                    bma_ultra_update_sensor();
+                    gpio_wakeup_enable( (gpio_num_t)BOARD_BHI260_INT, GPIO_INTR_HIGH_LEVEL );
+                    esp_sleep_enable_gpio_wakeup();
+                }
             #elif defined( LILYGO_WATCH_S3 )
                 gpio_wakeup_enable ( (gpio_num_t)BOARD_BMA423_INT1, GPIO_INTR_HIGH_LEVEL);
                 esp_sleep_enable_gpio_wakeup ();
@@ -556,9 +636,8 @@ void bma_wakeup( void ) {
             #elif defined( LILYGO_WATCH_S3 )
                 watch.configreFeatureInterrupt( SensorBMA423::INT_STEP_CNTR, true );
             #elif defined( LILYGO_WATCH_ULTRA )
-                if ( bma_ultra_ready ) {
-                    bma_ultra_qmi.enablePedometer();
-                }
+                bma_ultra_configure_stepcounter();
+                bma_ultra_update_sensor();
             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                 TTGOClass *ttgo = TTGOClass::getWatch();
                 ttgo->bma->enableStepCountInterrupt( true );
@@ -601,8 +680,8 @@ void bma_wakeup( void ) {
                     watch.resetPedometer();
                 #elif defined( LILYGO_WATCH_ULTRA )
                     if ( bma_ultra_ready ) {
-                        bma_ultra_qmi.clearPedometerCounter();
-                        bma_ultra_last_counter = 0;
+                        bma_ultra_update_sensor();
+                        bma_ultra_counter_base = bma_ultra_last_counter != 0xffffffff ? bma_ultra_last_counter : 0;
                     }
                 #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                     TTGOClass *ttgo = TTGOClass::getWatch();
@@ -632,14 +711,8 @@ void bma_reload_settings( void ) {
     #else
         #ifdef M5PAPER
         #elif defined( LILYGO_WATCH_ULTRA )
-            if ( bma_ultra_ready ) {
-                if ( bma_config.enable[ BMA_STEPCOUNTER ] ) {
-                    bma_ultra_qmi.enablePedometer();
-                }
-                else {
-                    bma_ultra_qmi.disablePedometer();
-                }
-            }
+            bma_ultra_configure_stepcounter();
+            bma_ultra_configure_motion_wake();
         #elif defined( LILYGO_WATCH_S3 )
             watch.configreFeatureInterrupt( SensorBMA423::INT_STEP_CNTR, bma_config.enable[ BMA_STEPCOUNTER ] );
             watch.configreFeatureInterrupt( SensorBMA423::INT_WAKEUP, bma_config.enable[ BMA_DOUBLECLICK ] );
@@ -800,8 +873,8 @@ void bma_reset_stepcounter( void ) {
         #ifdef M5PAPER
         #elif defined( LILYGO_WATCH_ULTRA )
             if ( bma_ultra_ready ) {
-                bma_ultra_qmi.clearPedometerCounter();
-                bma_ultra_last_counter = 0;
+                bma_ultra_update_sensor();
+                bma_ultra_counter_base = bma_ultra_last_counter != 0xffffffff ? bma_ultra_last_counter : 0;
             }
         #elif defined( LILYGO_WATCH_S3 )
             watch.resetPedometer();

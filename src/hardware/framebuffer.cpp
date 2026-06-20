@@ -302,8 +302,10 @@ void framebuffer_refresh( void ) {
 }
 
 static void framebuffer_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p) {
-    if( !framebuffer_drawing )
-            lv_disp_flush_ready( disp_drv );
+    if( !framebuffer_drawing ) {
+        lv_disp_flush_ready( disp_drv );
+        return;
+    }
 
     #ifdef NATIVE_64BIT
         /**
@@ -465,17 +467,31 @@ static void framebuffer_rounder_cb( lv_disp_drv_t *disp_drv, lv_area_t *area ) {
     (void)disp_drv;
 
     #if defined( LILYGO_WATCH_ULTRA )
+        area->x1 = 0;
+        area->x2 = RES_X_MAX - 1;
         if ( area->x1 & 1 ) {
             area->x1--;
         }
         if ( !( area->x2 & 1 ) ) {
             area->x2++;
         }
+        if ( area->y1 & 1 ) {
+            area->y1--;
+        }
+        if ( !( area->y2 & 1 ) ) {
+            area->y2++;
+        }
         if ( area->x1 < 0 ) {
             area->x1 = 0;
         }
         if ( area->x2 >= RES_X_MAX ) {
             area->x2 = RES_X_MAX - 1;
+        }
+        if ( area->y1 < 0 ) {
+            area->y1 = 0;
+        }
+        if ( area->y2 >= RES_Y_MAX ) {
+            area->y2 = RES_Y_MAX - 1;
         }
     #else
         (void)area;
