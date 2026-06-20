@@ -249,7 +249,6 @@ bool timesync_wifictl_event_cb( EventBits_t event, void *arg ) {
 bool timesync_blectl_event_cb( EventBits_t event, void *arg ) {
     char *settime_str = NULL;
     time_t now;
-    struct timeval new_now;
 
 #ifndef NATIVE_64BIT
     switch( event ) {
@@ -259,15 +258,13 @@ bool timesync_blectl_event_cb( EventBits_t event, void *arg ) {
                 settime_str = settime_str + 8;
                 time( &now );
                 log_d("old time: %d", now );
-                new_now.tv_sec = atol( settime_str );
-                new_now.tv_usec = 0;
-                if ( settimeofday(&new_now, NULL) == 0 ) {
-                    log_d("new time: %d", new_now.tv_sec );
+                time_t external_time = atol( settime_str );
+                if ( timesync_apply_external_time( external_time ) ) {
+                    log_d("new time: %d", external_time );
                 }
                 else {
-                    log_e("set new time failed, errno = %d", errno );
+                    log_e("set new time failed" );
                 }
-                xEventGroupSetBits( time_event_handle, TIME_SYNC_OK );
             }
     }
 #endif
@@ -404,9 +401,11 @@ bool timesync_apply_external_time( time_t epoch_seconds ) {
     if ( time_event_handle != NULL ) {
         xEventGroupSetBits( time_event_handle, TIME_SYNC_OK );
     }
+    timesyncToRTC();
+#else
+    timesync_send_event_cb( TIME_SYNC_UPDATE, (void *)NULL );
 #endif
 
-    timesync_send_event_cb( TIME_SYNC_UPDATE, (void *)NULL );
     return( true );
 }
 

@@ -88,7 +88,11 @@ void gps_settings_tile_setup( void ) {
     lv_obj_t *fakegps_cont = wf_add_labeled_switch( gps_settings_tile, "fake gps via ip", &fakegps_onoff, gpsctl_get_gps_over_ip(), fakegps_onoff_event_handler, SETUP_STYLE );
     lv_obj_align( fakegps_cont, app_use_gps_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, THEME_PADDING );
 
-    lv_obj_t *gps_port_cont = wf_add_labeled_list( gps_settings_tile, "gps port (need reboot)", &gps_port_list, "PORT.A\nPORT.B\nPORT.C\nNONE", gps_port_list_event_handler, SETUP_STYLE );
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_obj_t *gps_port_cont = wf_add_labeled_list( gps_settings_tile, "gps port", &gps_port_list, "ULTRA RX44/TX43", gps_port_list_event_handler, SETUP_STYLE );
+    #else
+        lv_obj_t *gps_port_cont = wf_add_labeled_list( gps_settings_tile, "gps port (need reboot)", &gps_port_list, "PORT.A\nPORT.B\nPORT.C\nNONE", gps_port_list_event_handler, SETUP_STYLE );
+    #endif
     lv_obj_align( gps_port_cont, fakegps_cont, LV_ALIGN_OUT_BOTTOM_MID, 0, THEME_PADDING );
 
     gps_latlon_label = lv_label_create( gps_settings_tile, NULL);
@@ -127,7 +131,9 @@ bool gps_settings_config_update_cb( EventBits_t event, void *arg ) {
             else
                 lv_switch_off( fakegps_onoff, LV_ANIM_OFF );
 
-            #if defined( M5PAPER )
+            #if defined( LILYGO_WATCH_ULTRA )
+                lv_dropdown_set_selected( gps_port_list, 0 );
+            #elif defined( M5PAPER )
                 int8_t rx,tx;
                 gpsctl_get_gps_rx_tx_pin( &rx, &tx );
                 switch( rx ) {
@@ -190,17 +196,22 @@ static void exit_gps_setup_event_cb( lv_obj_t * obj, lv_event_t event ) {
 static void gps_port_list_event_handler( lv_obj_t *obj, lv_event_t event ) {
     switch( event ) {
         case( LV_EVENT_VALUE_CHANGED ):
-            uint16_t port = lv_dropdown_get_selected( obj );
-            switch( port ) {
-                case 0:     gpsctl_set_gps_rx_tx_pin( 32, 25 );
-                            break;
-                case 1:     gpsctl_set_gps_rx_tx_pin( 33, 26 );
-                            break;
-                case 2:     gpsctl_set_gps_rx_tx_pin( 19, 18 );
-                            break;
-                default:    gpsctl_set_gps_rx_tx_pin( -1, -1 );
-                            break;
-            }
+            #if defined( LILYGO_WATCH_ULTRA )
+                gpsctl_set_gps_rx_tx_pin( 44, 43 );
+                lv_dropdown_set_selected( obj, 0 );
+            #else
+                uint16_t port = lv_dropdown_get_selected( obj );
+                switch( port ) {
+                    case 0:     gpsctl_set_gps_rx_tx_pin( 32, 25 );
+                                break;
+                    case 1:     gpsctl_set_gps_rx_tx_pin( 33, 26 );
+                                break;
+                    case 2:     gpsctl_set_gps_rx_tx_pin( 19, 18 );
+                                break;
+                    default:    gpsctl_set_gps_rx_tx_pin( -1, -1 );
+                                break;
+                }
+            #endif
             break;
     }    
 }

@@ -3,6 +3,7 @@
 #include "meshtastic_service.h"
 
 #include "gui/app.h"
+#include "gui/keyboard.h"
 #include "gui/mainbar/mainbar.h"
 #include "gui/mainbar/setup_tile/bluetooth_settings/bluetooth_message.h"
 #include "gui/statusbar.h"
@@ -30,8 +31,6 @@ static lv_obj_t *meshtastic_input = NULL;
 static lv_obj_t *meshtastic_send_btn = NULL;
 static lv_obj_t *meshtastic_inbox_btn = NULL;
 static lv_obj_t *meshtastic_exit_btn = NULL;
-static lv_obj_t *meshtastic_keyboard = NULL;
-static bool meshtastic_keyboard_visible = false;
 
 LV_IMG_DECLARE(message_64px);
 
@@ -40,10 +39,6 @@ static void enter_meshtastic_app_event_cb( lv_obj_t * obj, lv_event_t event );
 static void exit_meshtastic_app_event_cb( lv_obj_t * obj, lv_event_t event );
 static void meshtastic_channel_event_cb( lv_obj_t * obj, lv_event_t event );
 static void meshtastic_input_event_cb( lv_obj_t * obj, lv_event_t event );
-static void meshtastic_keyboard_event_cb( lv_obj_t * obj, lv_event_t event );
-static void meshtastic_keyboard_show( void );
-static void meshtastic_keyboard_hide( void );
-static void meshtastic_layout_controls( bool keyboard_visible );
 static void meshtastic_send_event_cb( lv_obj_t * obj, lv_event_t event );
 static void meshtastic_inbox_event_cb( lv_obj_t * obj, lv_event_t event );
 static bool meshtastic_app_loop_cb( EventBits_t event, void *arg );
@@ -90,7 +85,7 @@ void meshtastic_app_setup( void ) {
     lv_textarea_set_text( meshtastic_input, "" );
     lv_textarea_set_pwd_mode( meshtastic_input, false );
     lv_textarea_set_one_line( meshtastic_input, false );
-    lv_textarea_set_cursor_hidden( meshtastic_input, true );
+    lv_textarea_set_cursor_hidden( meshtastic_input, false );
     lv_textarea_set_max_length( meshtastic_input, 80 );
     lv_textarea_set_placeholder_text( meshtastic_input, "Compose mesh message" );
     lv_obj_add_style( meshtastic_input, LV_OBJ_PART_MAIN, ws_get_button_style() );
@@ -114,15 +109,6 @@ void meshtastic_app_setup( void ) {
     lv_obj_t *inbox_label = lv_label_create( meshtastic_inbox_btn, NULL );
     lv_label_set_text( inbox_label, "inbox" );
     lv_obj_align( inbox_label, meshtastic_inbox_btn, LV_ALIGN_CENTER, 0, 0 );
-
-    meshtastic_keyboard = lv_keyboard_create( meshtastic_app_tile, NULL );
-    lv_obj_add_style( meshtastic_keyboard, LV_OBJ_PART_ALL, SETUP_STYLE );
-    lv_obj_add_style( meshtastic_keyboard, LV_KEYBOARD_PART_BTN, ws_get_button_style() );
-    lv_keyboard_set_cursor_manage( meshtastic_keyboard, true );
-    lv_keyboard_set_textarea( meshtastic_keyboard, meshtastic_input );
-    lv_obj_set_event_cb( meshtastic_keyboard, meshtastic_keyboard_event_cb );
-    lv_obj_set_hidden( meshtastic_keyboard, true );
-    meshtastic_layout_controls( false );
 
     meshtastic_service_setup();
     meshtastic_app_refresh();
@@ -192,13 +178,11 @@ static void meshtastic_app_refresh( void ) {
     lv_dropdown_set_selected( meshtastic_channel_dropdown, meshtastic_service_get_active_channel() );
     lv_label_set_text( meshtastic_last_label, link );
     lv_obj_set_width( meshtastic_last_label, link_width );
-    meshtastic_layout_controls( meshtastic_keyboard_visible );
 }
 
 static void enter_meshtastic_app_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
         case LV_EVENT_CLICKED:
-            meshtastic_keyboard_hide();
             meshtastic_app_refresh();
             mainbar_jump_to_tilenumber( meshtastic_app_tile_num, LV_ANIM_OFF, true );
             app_hide_indicator( meshtastic_app );
@@ -209,7 +193,6 @@ static void enter_meshtastic_app_event_cb( lv_obj_t * obj, lv_event_t event ) {
 static void exit_meshtastic_app_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
         case LV_EVENT_CLICKED:
-            meshtastic_keyboard_hide();
             mainbar_jump_back();
             break;
     }
@@ -218,7 +201,6 @@ static void exit_meshtastic_app_event_cb( lv_obj_t * obj, lv_event_t event ) {
 static void meshtastic_channel_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
         case LV_EVENT_VALUE_CHANGED:
-            meshtastic_keyboard_hide();
             meshtastic_service_set_active_channel( lv_dropdown_get_selected( obj ) );
             meshtastic_app_refresh();
             break;
@@ -227,102 +209,9 @@ static void meshtastic_channel_event_cb( lv_obj_t * obj, lv_event_t event ) {
 
 static void meshtastic_input_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
-        case LV_EVENT_FOCUSED:
         case LV_EVENT_CLICKED:
-            meshtastic_keyboard_show();
+            keyboard_set_textarea( obj );
             break;
-    }
-}
-
-static void meshtastic_keyboard_event_cb( lv_obj_t * obj, lv_event_t event ) {
-    lv_keyboard_def_event_cb( obj, event );
-
-    switch( event ) {
-        case LV_EVENT_CANCEL:
-        case LV_EVENT_APPLY:
-            meshtastic_keyboard_hide();
-            break;
-    }
-}
-
-static void meshtastic_keyboard_show( void ) {
-    if ( meshtastic_keyboard == NULL || meshtastic_input == NULL ) {
-        return;
-    }
-
-    meshtastic_keyboard_visible = true;
-    meshtastic_layout_controls( true );
-    lv_textarea_set_cursor_hidden( meshtastic_input, false );
-    lv_keyboard_set_mode( meshtastic_keyboard, LV_KEYBOARD_MODE_TEXT_LOWER );
-    lv_keyboard_set_textarea( meshtastic_keyboard, meshtastic_input );
-    lv_obj_set_hidden( meshtastic_keyboard, false );
-    lv_obj_move_foreground( meshtastic_keyboard );
-}
-
-static void meshtastic_keyboard_hide( void ) {
-    meshtastic_keyboard_visible = false;
-
-    if ( meshtastic_keyboard != NULL ) {
-        lv_keyboard_set_textarea( meshtastic_keyboard, NULL );
-        lv_obj_set_hidden( meshtastic_keyboard, true );
-    }
-
-    if ( meshtastic_input != NULL ) {
-        lv_textarea_set_cursor_hidden( meshtastic_input, true );
-    }
-
-    meshtastic_layout_controls( false );
-}
-
-static void meshtastic_layout_controls( bool keyboard_visible ) {
-    if (
-        meshtastic_input == NULL ||
-        meshtastic_send_btn == NULL ||
-        meshtastic_inbox_btn == NULL
-    ) {
-        return;
-    }
-
-    const lv_coord_t screen_width = lv_disp_get_hor_res( NULL );
-    const lv_coord_t screen_height = lv_disp_get_ver_res( NULL );
-    const lv_coord_t content_width = screen_width - ( THEME_PADDING * 2 );
-    const lv_coord_t half_button_width = ( screen_width - ( THEME_PADDING * 3 ) ) / 2;
-    const bool compact = screen_height < 400;
-
-    if ( !keyboard_visible ) {
-        lv_obj_set_hidden( meshtastic_status_label, false );
-        lv_obj_set_hidden( meshtastic_channel_dropdown, false );
-        lv_obj_set_hidden( meshtastic_last_label, false );
-        lv_obj_set_hidden( meshtastic_inbox_btn, false );
-
-        lv_obj_set_size( meshtastic_input, content_width, 72 );
-        lv_obj_align( meshtastic_input, meshtastic_last_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, THEME_PADDING );
-        lv_obj_set_size( meshtastic_send_btn, half_button_width, 36 );
-        lv_obj_align( meshtastic_send_btn, meshtastic_input, LV_ALIGN_OUT_BOTTOM_LEFT, 0, THEME_PADDING );
-        lv_obj_set_size( meshtastic_inbox_btn, half_button_width, 36 );
-        lv_obj_align( meshtastic_inbox_btn, meshtastic_send_btn, LV_ALIGN_OUT_RIGHT_MID, THEME_PADDING, 0 );
-        return;
-    }
-
-    lv_obj_set_hidden( meshtastic_status_label, compact );
-    lv_obj_set_hidden( meshtastic_channel_dropdown, compact );
-    lv_obj_set_hidden( meshtastic_last_label, compact );
-    lv_obj_set_hidden( meshtastic_inbox_btn, true );
-
-    lv_obj_set_size( meshtastic_input, content_width, compact ? 42 : 74 );
-    if ( compact ) {
-        lv_obj_align( meshtastic_input, meshtastic_node_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, THEME_PADDING / 2 );
-    }
-    else {
-        lv_obj_align( meshtastic_input, meshtastic_last_label, LV_ALIGN_OUT_BOTTOM_LEFT, 0, THEME_PADDING );
-    }
-
-    lv_obj_set_size( meshtastic_send_btn, content_width, compact ? 28 : 42 );
-    lv_obj_align( meshtastic_send_btn, meshtastic_input, LV_ALIGN_OUT_BOTTOM_LEFT, 0, THEME_PADDING / 2 );
-
-    if ( meshtastic_keyboard != NULL ) {
-        lv_obj_set_size( meshtastic_keyboard, screen_width, compact ? 120 : 240 );
-        lv_obj_align( meshtastic_keyboard, meshtastic_app_tile, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
     }
 }
 
@@ -331,7 +220,6 @@ static void meshtastic_send_event_cb( lv_obj_t * obj, lv_event_t event ) {
         case LV_EVENT_CLICKED:
             if ( meshtastic_service_send_text( lv_textarea_get_text( meshtastic_input ) ) ) {
                 lv_textarea_set_text( meshtastic_input, "" );
-                meshtastic_keyboard_hide();
             }
             meshtastic_app_refresh();
             break;
@@ -341,7 +229,6 @@ static void meshtastic_send_event_cb( lv_obj_t * obj, lv_event_t event ) {
 static void meshtastic_inbox_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
         case LV_EVENT_CLICKED:
-            meshtastic_keyboard_hide();
             bluetooth_message_open();
             break;
     }

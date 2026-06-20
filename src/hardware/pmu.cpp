@@ -314,7 +314,46 @@ void pmu_loop( void ) {
         if ( temp_pmu_irq_flag ) {
             log_e("hello Mc Fly, witch AXP irq on M5Core2?");
         }
-    #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_ULTRA )
+    #elif defined( LILYGO_WATCH_ULTRA )
+        static bool plug = watch.isVbusIn();
+        static bool charging = watch.isCharging();
+        static bool battery = watch.isBatteryConnect();
+
+        if ( temp_pmu_irq_flag ) {
+            watch.readPMU();
+            if ( watch.isBatInsertIrq() ) {
+                log_d("AXP2101: BatInsertIrq");
+                battery = true;
+                pmu_update = true;
+            }
+            if ( watch.isBatRemoveIrq() ) {
+                log_d("AXP2101: BatRemoveIrq");
+                battery = false;
+                pmu_update = true;
+            }
+            if ( watch.isPekeyShortPressIrq() ) {
+                watch.clearPMU();
+                pmu_send_cb( PMUCTL_SHORT_PRESS, NULL );
+                return;
+            }
+            if ( watch.isPekeyLongPressIrq() ) {
+                watch.clearPMU();
+                pmu_send_cb( PMUCTL_LONG_PRESS, NULL );
+                return;
+            }
+            watch.clearPMU();
+        }
+
+        const bool current_plug = watch.isVbusIn();
+        const bool current_charging = watch.isCharging();
+        const bool current_battery = watch.isBatteryConnect();
+        if ( current_plug != plug || current_charging != charging || current_battery != battery ) {
+            plug = current_plug;
+            charging = current_charging;
+            battery = current_battery;
+            pmu_update = true;
+        }
+    #elif defined( LILYGO_WATCH_S3 )
         static bool plug = watch.isVbusIn();
         static bool charging = watch.isCharging();
         static bool battery = watch.isBatteryConnect();

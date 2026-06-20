@@ -72,6 +72,21 @@
 
 static bool gpsctl_init = false;
 static bool gpsctl_enable = false;
+static bool gpsctl_probe_done = false;
+static bool gpsctl_probe_ok = false;
+static uint32_t gpsctl_active_baud = 0;
+static char gpsctl_probe_model[12] = "unknown";
+static char gpsctl_last_sentence[12] = "";
+static char gpsctl_sentence_token[12] = "";
+static uint8_t gpsctl_sentence_token_len = 0;
+static bool gpsctl_sentence_token_active = false;
+static uint32_t gpsctl_rx_bytes = 0;
+static uint32_t gpsctl_last_rx_millis = 0;
+static uint32_t gpsctl_last_sentence_millis = 0;
+static uint32_t gpsctl_last_sentence_total = 0;
+static uint32_t gpsctl_time_sync_count = 0;
+static time_t gpsctl_last_time_sync_epoch = 0;
+static uint32_t gpsctl_last_time_sync_millis = 0;
 
 gpsctl_config_t gpsctl_config;
 callback_t *gpsctl_callback = NULL;
@@ -82,10 +97,324 @@ bool gpsctl_powermgm_event_cb( EventBits_t event, void *arg );
 bool gpsctl_send_cb( EventBits_t event, void *arg );
 void gpsctl_autoon_on( void );
 void gpsctl_autoon_off( void );
+static uint32_t gpsctl_get_configured_baud( void );
+static void gpsctl_reset_debug_counters( void );
 
 #ifndef NATIVE_64BIT
+static void gpsctl_begin_serial( uint32_t baud );
+static void gpsctl_note_serial_byte( int c );
+static int gpsctl_read_serial_byte( void );
+static void gpsctl_prepare_receiver_after_power_on( void );
 static time_t gpsctl_get_gps_epoch_utc( void );
 static void gpsctl_sync_time_from_gps( void );
+#endif
+
+static uint32_t gpsctl_get_configured_baud( void ) {
+#ifdef NATIVE_64BIT
+    return( 0 );
+#elif defined( LILYGO_WATCH_ULTRA )
+    return( BOARD_GPS_BAUDRATE );
+#elif defined( LILYGO_WATCH_S3 )
+    return( 38400 );
+#else
+    return( GPSBaud );
+#endif
+}
+
+static void gpsctl_reset_debug_counters( void ) {
+    gpsctl_probe_done = false;
+    gpsctl_probe_ok = false;
+    gpsctl_active_baud = 0;
+    snprintf( gpsctl_probe_model, sizeof( gpsctl_probe_model ), "unknown" );
+    gpsctl_rx_bytes = 0;
+    gpsctl_last_rx_millis = 0;
+    gpsctl_last_sentence_millis = 0;
+    gpsctl_last_sentence[0] = '\0';
+    gpsctl_sentence_token[0] = '\0';
+    gpsctl_sentence_token_len = 0;
+    gpsctl_sentence_token_active = false;
+#ifdef NATIVE_64BIT
+    gpsctl_last_sentence_total = 0;
+#else
+    gpsctl_last_sentence_total = gps.passedChecksum() + gps.failedChecksum();
+#endif
+}
+
+#ifndef NATIVE_64BIT
+static void gpsctl_note_serial_byte( int c ) {
+    if ( c == '$' ) {
+        gpsctl_sentence_token_active = true;
+        gpsctl_sentence_token_len = 0;
+        gpsctl_sentence_token[gpsctl_sentence_token_len++] = '$';
+        gpsctl_sentence_token[gpsctl_sentence_token_len] = '\0';
+        return;
+    }
+
+    if ( !gpsctl_sentence_token_active ) {
+        return;
+    }
+
+    if ( c == ',' || c == '\r' || c == '\n' ) {
+        gpsctl_sentence_token[gpsctl_sentence_token_len] = '\0';
+        if ( gpsctl_sentence_token_len > 1 ) {
+            snprintf( gpsctl_last_sentence, sizeof( gpsctl_last_sentence ), "%s", gpsctl_sentence_token );
+        }
+        gpsctl_sentence_token_active = false;
+        gpsctl_sentence_token_len = 0;
+        return;
+    }
+
+    if ( gpsctl_sentence_token_len < sizeof( gpsctl_sentence_token ) - 1 ) {
+        gpsctl_sentence_token[gpsctl_sentence_token_len++] = (char)c;
+        gpsctl_sentence_token[gpsctl_sentence_token_len] = '\0';
+    }
+    else {
+        gpsctl_sentence_token_active = false;
+        gpsctl_sentence_token_len = 0;
+    }
+}
+
+static void gpsctl_begin_serial( uint32_t baud ) {
+    if ( !gps_serial ) {
+        return;
+    }
+
+    gpsctl_active_baud = baud;
+#if defined( USE_SOFTWARE_SERIAL )
+    gps_serial->begin( GPSBaud );
+    gpsctl_active_baud = GPSBaud;
+#else
+    gps_serial->begin( baud, SERIAL_8N1, gpsctl_config.RXPin, gpsctl_config.TXPin );
+#endif
+}
+
+static int gpsctl_read_serial_byte( void ) {
+    if ( !gps_serial ) {
+        return( -1 );
+    }
+
+    int c = gps_serial->read();
+    if ( c >= 0 ) {
+        gpsctl_rx_bytes++;
+        gpsctl_last_rx_millis = millis();
+        gpsctl_note_serial_byte( c );
+    }
+    return( c );
+}
+
+#if defined( LILYGO_WATCH_ULTRA ) && !defined( USE_SOFTWARE_SERIAL )
+static void gpsctl_set_probe_model( const char *model ) {
+    if ( !model ) {
+        model = "unknown";
+    }
+    snprintf( gpsctl_probe_model, sizeof( gpsctl_probe_model ), "%s", model );
+}
+
+static bool gpsctl_wait_for_ubx( uint8_t requested_class, uint8_t requested_id, uint32_t timeout_ms ) {
+    uint8_t state = 0;
+    uint16_t payload_len = 0;
+    uint16_t bytes_to_skip = 0;
+    uint32_t start = millis();
+
+    while ( (uint32_t)( millis() - start ) < timeout_ms ) {
+        while ( gps_serial && gps_serial->available() > 0 ) {
+            int c = gpsctl_read_serial_byte();
+            if ( c < 0 ) {
+                continue;
+            }
+
+            switch ( state ) {
+                case 0:
+                    state = ( c == 0xB5 ) ? 1 : 0;
+                    break;
+                case 1:
+                    state = ( c == 0x62 ) ? 2 : 0;
+                    break;
+                case 2:
+                    state = ( c == requested_class ) ? 3 : 0;
+                    break;
+                case 3:
+                    state = ( c == requested_id ) ? 4 : 0;
+                    break;
+                case 4:
+                    payload_len = (uint8_t)c;
+                    state = 5;
+                    break;
+                case 5:
+                    payload_len |= ( (uint16_t)(uint8_t)c << 8 );
+                    if ( payload_len > 512 ) {
+                        state = 0;
+                    }
+                    else {
+                        bytes_to_skip = payload_len + 2;
+                        state = ( bytes_to_skip == 0 ) ? 0 : 6;
+                    }
+                    break;
+                case 6:
+                    if ( bytes_to_skip > 0 ) {
+                        bytes_to_skip--;
+                    }
+                    if ( bytes_to_skip == 0 ) {
+                        return( true );
+                    }
+                    break;
+                default:
+                    state = 0;
+                    break;
+            }
+        }
+        delay( 2 );
+    }
+    return( false );
+}
+
+static bool gpsctl_wait_for_ls550g_version( uint32_t timeout_ms ) {
+    char line[128] = "";
+    size_t line_len = 0;
+    uint32_t start = millis();
+
+    while ( (uint32_t)( millis() - start ) < timeout_ms ) {
+        while ( gps_serial && gps_serial->available() > 0 ) {
+            int c = gpsctl_read_serial_byte();
+            if ( c < 0 ) {
+                continue;
+            }
+
+            if ( c == '\r' ) {
+                continue;
+            }
+            if ( c == '\n' ) {
+                line[line_len] = '\0';
+                if ( strstr( line, "$PQTMQVER,OK,1,MODULE,LS550G" ) != NULL ) {
+                    return( true );
+                }
+                line_len = 0;
+                continue;
+            }
+            if ( line_len < sizeof( line ) - 1 ) {
+                line[line_len++] = (char)c;
+            }
+            else {
+                line_len = 0;
+            }
+        }
+        delay( 2 );
+    }
+
+    line[line_len] = '\0';
+    return( strstr( line, "$PQTMQVER,OK,1,MODULE,LS550G" ) != NULL );
+}
+
+static void gpsctl_drain_serial_for( uint32_t duration_ms ) {
+    uint32_t start = millis();
+    while ( (uint32_t)( millis() - start ) < duration_ms ) {
+        bool drained = false;
+        while ( gps_serial && gps_serial->available() > 0 ) {
+            gpsctl_read_serial_byte();
+            drained = true;
+        }
+        if ( !drained ) {
+            delay( 2 );
+        }
+    }
+}
+
+static bool gpsctl_probe_ultra_baud( uint32_t baud, bool *saw_rx ) {
+    static const uint8_t cfg_get_hw[] = { 0xB5, 0x62, 0x0A, 0x04, 0x00, 0x00, 0x0E, 0x34 };
+    const uint32_t start_rx_bytes = gpsctl_rx_bytes;
+
+    if ( saw_rx ) {
+        *saw_rx = false;
+    }
+
+    gpsctl_begin_serial( baud );
+    delay( 50 );
+    gpsctl_drain_serial_for( 100 );
+
+    gps_serial->write( cfg_get_hw, sizeof( cfg_get_hw ) );
+    gps_serial->flush();
+    bool ok = gpsctl_wait_for_ubx( 0x0A, 0x04, 800 );
+    if ( saw_rx ) {
+        *saw_rx = gpsctl_rx_bytes > start_rx_bytes;
+    }
+    return( ok );
+}
+
+static bool gpsctl_probe_ls550g( void ) {
+    gpsctl_begin_serial( 115200 );
+    delay( 50 );
+    gpsctl_drain_serial_for( 100 );
+
+    gps_serial->write( "$PQTMGNSSSTOP*09\r\n" );
+    gps_serial->flush();
+    delay( 250 );
+    while ( gps_serial && gps_serial->available() > 0 ) {
+        gpsctl_read_serial_byte();
+    }
+
+    gps_serial->write( "$PQTMQVER*08\r\n" );
+    gps_serial->flush();
+    if ( !gpsctl_wait_for_ls550g_version( 700 ) ) {
+        return( false );
+    }
+
+    gps_serial->write( "$PQTMCFGCNST,W,1,1,1,1,0,0*2B\r\n" );
+    delay( 50 );
+    gps_serial->write( "$PQTMCFGPPS,W,1,1,100,1,1,0*73\r\n" );
+    delay( 50 );
+    gps_serial->write( "$PQTMGNSSSTART*51\r\n" );
+    gps_serial->flush();
+    return( true );
+}
+#endif
+
+static void gpsctl_prepare_receiver_after_power_on( void ) {
+    if ( !gps_serial ) {
+        return;
+    }
+
+#if defined( LILYGO_WATCH_ULTRA ) && !defined( USE_SOFTWARE_SERIAL )
+    const uint32_t probe_bauds[] = { BOARD_GPS_BAUDRATE, 57600, 115200, 9600 };
+    uint32_t nmea_baud = 0;
+
+    delay( 750 );
+    gpsctl_probe_done = true;
+    gpsctl_probe_ok = false;
+    gpsctl_set_probe_model( "unknown" );
+
+    for ( size_t i = 0; i < sizeof( probe_bauds ) / sizeof( probe_bauds[0] ); i++ ) {
+        bool saw_rx = false;
+        if ( gpsctl_probe_ultra_baud( probe_bauds[i], &saw_rx ) ) {
+            gpsctl_probe_ok = true;
+            gpsctl_set_probe_model( "ublox" );
+            GPSCTL_INFO_LOG( "T-Watch Ultra GPS probe ok at %lu baud", (unsigned long)probe_bauds[i] );
+            return;
+        }
+        if ( saw_rx && nmea_baud == 0 ) {
+            nmea_baud = probe_bauds[i];
+        }
+    }
+
+    if ( gpsctl_probe_ls550g() ) {
+        gpsctl_probe_ok = true;
+        gpsctl_set_probe_model( "LS550G" );
+        GPSCTL_INFO_LOG( "T-Watch Ultra GPS probe ok as LS550G at 115200 baud" );
+        return;
+    }
+    if ( nmea_baud != 0 ) {
+        gpsctl_begin_serial( nmea_baud );
+        gpsctl_probe_ok = true;
+        gpsctl_set_probe_model( "nmea" );
+        GPSCTL_INFO_LOG( "T-Watch Ultra GPS raw NMEA detected at %lu baud", (unsigned long)nmea_baud );
+        return;
+    }
+
+    gpsctl_begin_serial( BOARD_GPS_BAUDRATE );
+    GPSCTL_ERROR_LOG( "T-Watch Ultra GPS probe failed" );
+#else
+    gpsctl_begin_serial( gpsctl_get_configured_baud() );
+#endif
+}
 #endif
 
 void gpsctl_setup( void ) {
@@ -100,8 +429,17 @@ void gpsctl_setup( void ) {
      */
     gpsctl_config.load();
     #if defined( LILYGO_WATCH_ULTRA )
+        bool config_changed = false;
         if ( !gpsctl_config.autoon ) {
             gpsctl_config.autoon = true;
+            config_changed = true;
+        }
+        if ( gpsctl_config.RXPin != SHIELD_GPS_RX || gpsctl_config.TXPin != SHIELD_GPS_TX ) {
+            gpsctl_config.RXPin = SHIELD_GPS_RX;
+            gpsctl_config.TXPin = SHIELD_GPS_TX;
+            config_changed = true;
+        }
+        if ( config_changed ) {
             gpsctl_config.save();
         }
     #endif
@@ -145,14 +483,14 @@ void gpsctl_setup( void ) {
             
             #if defined( USE_SOFTWARE_SERIAL )
                 gps_serial = new SoftwareSerial( gpsctl_config.RXPin, gpsctl_config.TXPin );
-                gps_serial->begin( GPSBaud );
+                gpsctl_begin_serial( GPSBaud );
             #else
-                gps_serial = &Serial2;
-#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_WATCH_S3 )
-                gps_serial->begin( 38400, SERIAL_8N1, gpsctl_config.RXPin, gpsctl_config.TXPin );
-#else
-                gps_serial->begin( GPSBaud, SERIAL_8N1, gpsctl_config.RXPin, gpsctl_config.TXPin );
-#endif
+                #if defined( LILYGO_WATCH_ULTRA )
+                    gps_serial = &Serial1;
+                #else
+                    gps_serial = &Serial2;
+                #endif
+                gpsctl_begin_serial( gpsctl_get_configured_baud() );
             #endif
 
             TGC_sats_in_view_gps.begin( gps, "GPGSV", 3);
@@ -183,6 +521,77 @@ bool gpsctl_get_available( void ) {
             return( false );
         }
     #endif
+}
+
+void gpsctl_get_debug( gpsctl_debug_t *debug ) {
+    if ( !debug ) {
+        return;
+    }
+
+    memset( debug, 0, sizeof( gpsctl_debug_t ) );
+    debug->init = gpsctl_init;
+    debug->enabled = gpsctl_enable;
+    debug->rx_pin = gpsctl_config.RXPin;
+    debug->tx_pin = gpsctl_config.TXPin;
+    debug->baud = gpsctl_get_configured_baud();
+    debug->active_baud = gpsctl_active_baud;
+    debug->probe_done = gpsctl_probe_done;
+    debug->probe_ok = gpsctl_probe_ok;
+    snprintf( debug->probe_model, sizeof( debug->probe_model ), "%s", gpsctl_probe_model );
+    snprintf( debug->last_sentence, sizeof( debug->last_sentence ), "%s", gpsctl_last_sentence );
+    debug->valid_location = gps_data.valid_location;
+    debug->valid_satellite = gps_data.valid_satellite;
+    debug->satellites = gps_data.satellites;
+    debug->gps_satellites = gps_data.satellite_types.gps_satellites;
+    debug->glonass_satellites = gps_data.satellite_types.glonass_satellites;
+    debug->baidou_satellites = gps_data.satellite_types.baidou_satellites;
+    debug->lat = gps_data.lat;
+    debug->lon = gps_data.lon;
+
+    const uint32_t now = millis();
+    debug->rx_bytes = gpsctl_rx_bytes;
+    debug->last_rx_age_ms = gpsctl_last_rx_millis == 0 ? UINT32_MAX : now - gpsctl_last_rx_millis;
+    debug->last_sentence_age_ms = gpsctl_last_sentence_millis == 0 ? UINT32_MAX : now - gpsctl_last_sentence_millis;
+
+#ifdef NATIVE_64BIT
+    debug->serial_available = false;
+    debug->chars_processed = 0;
+    debug->passed_checksum = 0;
+    debug->failed_checksum = 0;
+    debug->sentences_with_fix = 0;
+    debug->location_age_ms = UINT32_MAX;
+    debug->valid_date = false;
+    debug->valid_time = false;
+#else
+    debug->serial_available = gps_serial != NULL;
+    if ( gps_serial ) {
+        debug->chars_processed = gps.charsProcessed();
+        debug->passed_checksum = gps.passedChecksum();
+        debug->failed_checksum = gps.failedChecksum();
+        debug->sentences_with_fix = gps.sentencesWithFix();
+        debug->location_age_ms = gps.location.age();
+        debug->valid_date = gps.date.isValid();
+        debug->valid_time = gps.time.isValid();
+        if ( debug->valid_date ) {
+            debug->year = gps.date.year();
+            debug->month = gps.date.month();
+            debug->day = gps.date.day();
+        }
+        if ( debug->valid_time ) {
+            debug->hour = gps.time.hour();
+            debug->minute = gps.time.minute();
+            debug->second = gps.time.second();
+        }
+        time_t gps_epoch = gpsctl_get_gps_epoch_utc();
+        debug->gps_epoch = gps_epoch > 0 ? static_cast<uint32_t>( gps_epoch ) : 0;
+        debug->time_sync_count = gpsctl_time_sync_count;
+        debug->last_time_sync_epoch = gpsctl_last_time_sync_epoch > 0 ? static_cast<uint32_t>( gpsctl_last_time_sync_epoch ) : 0;
+        debug->last_time_sync_age_ms = gpsctl_last_time_sync_millis == 0 ? UINT32_MAX : millis() - gpsctl_last_time_sync_millis;
+    }
+    else {
+        debug->location_age_ms = UINT32_MAX;
+    }
+#endif
 }
 
 #ifndef NATIVE_64BIT
@@ -255,7 +664,9 @@ static void gpsctl_sync_time_from_gps( void ) {
     if ( timesync_apply_external_time( gps_epoch ) ) {
         last_sync_millis = now_millis;
         last_sync_epoch = gps_epoch;
-        timesyncToRTC();
+        gpsctl_time_sync_count++;
+        gpsctl_last_time_sync_epoch = gps_epoch;
+        gpsctl_last_time_sync_millis = now_millis;
         gpsctl_send_cb( GPSCTL_UPDATE_DATE, (void*)&gps_data );
         gpsctl_send_cb( GPSCTL_UPDATE_TIME, (void*)&gps_data );
         GPSCTL_INFO_LOG( "synced system time from GPS UTC epoch %ld", static_cast<long>( gps_epoch ) );
@@ -285,8 +696,17 @@ bool gpsctl_powermgm_loop_cb( EventBits_t event, void *arg ) {
             /**
              * check for serial data and read
              */
-            while ( gps_serial->available() > 0 )
-                gps.encode( gps_serial->read() );
+            while ( gps_serial->available() > 0 ) {
+                int c = gpsctl_read_serial_byte();
+                if ( c >= 0 ) {
+                    gps.encode( c );
+                }
+            }
+            const uint32_t sentence_total = gps.passedChecksum() + gps.failedChecksum();
+            if ( sentence_total != gpsctl_last_sentence_total ) {
+                gpsctl_last_sentence_total = sentence_total;
+                gpsctl_last_sentence_millis = millis();
+            }
         }
     #endif
     /**
@@ -503,6 +923,10 @@ void gpsctl_on( void ) {
         gps_data.satellite_types.gps_satellites = 0;
         gps_data.satellite_types.glonass_satellites = 0;
         gps_data.satellite_types.baidou_satellites = 0;
+        gpsctl_reset_debug_counters();
+        #ifndef NATIVE_64BIT
+            gpsctl_prepare_receiver_after_power_on();
+        #endif
         gpsctl_config.autoon = true;
         gpsctl_config.save();
         gpsctl_enable = true;
@@ -510,6 +934,12 @@ void gpsctl_on( void ) {
         gpsctl_send_cb( GPSCTL_ENABLE, NULL );
         gpsctl_send_cb( GPSCTL_NOFIX, NULL );
     }
+#ifndef NATIVE_64BIT
+    else if ( gps_serial && ( gpsctl_last_rx_millis == 0 || (uint32_t)( millis() - gpsctl_last_rx_millis ) > 5000 ) ) {
+        gpsctl_reset_debug_counters();
+        gpsctl_prepare_receiver_after_power_on();
+    }
+#endif
 }
 
 void gpsctl_off( void ) {
@@ -568,6 +998,7 @@ void gpsctl_autoon_on( void ) {
 
     if ( gpsctl_config.autoon ) {
         if ( !gpsctl_enable ) {
+            gpsctl_reset_debug_counters();
             #ifdef NATIVE_64BIT
             #else
                 #if defined( M5PAPER )
@@ -587,6 +1018,9 @@ void gpsctl_autoon_on( void ) {
                 #endif
             #endif
             gpsctl_enable = true;
+            #ifndef NATIVE_64BIT
+                gpsctl_prepare_receiver_after_power_on();
+            #endif
             gpsctl_send_cb( GPSCTL_ENABLE, NULL );
             gpsctl_send_cb( GPSCTL_NOFIX, NULL );
             powermgm_set_lightsleep( true );
@@ -658,6 +1092,10 @@ bool gpsctl_get_gps_over_ip( void ) {
 }
 
 void gpsctl_set_gps_rx_tx_pin( int8_t rx, int8_t tx ) {
+    #if defined( LILYGO_WATCH_ULTRA )
+        rx = SHIELD_GPS_RX;
+        tx = SHIELD_GPS_TX;
+    #endif
     gpsctl_config.RXPin = rx;
     gpsctl_config.TXPin = tx;
     gpsctl_config.save();

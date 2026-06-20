@@ -87,6 +87,48 @@
             uint32_t baidou_satellites = 0;             /** @brief number of baidou satellits in view */
         } satellite_types;
     } gps_data_t;
+
+    typedef struct {
+        bool init = false;
+        bool enabled = false;
+        bool serial_available = false;
+        int32_t rx_pin = -1;
+        int32_t tx_pin = -1;
+        uint32_t baud = 0;
+        uint32_t active_baud = 0;
+        bool probe_done = false;
+        bool probe_ok = false;
+        char probe_model[12] = "";
+        char last_sentence[12] = "";
+        uint32_t rx_bytes = 0;
+        uint32_t chars_processed = 0;
+        uint32_t passed_checksum = 0;
+        uint32_t failed_checksum = 0;
+        uint32_t sentences_with_fix = 0;
+        uint32_t last_rx_age_ms = UINT32_MAX;
+        uint32_t last_sentence_age_ms = UINT32_MAX;
+        uint32_t location_age_ms = UINT32_MAX;
+        bool valid_location = false;
+        bool valid_satellite = false;
+        bool valid_date = false;
+        bool valid_time = false;
+        uint16_t year = 0;
+        uint8_t month = 0;
+        uint8_t day = 0;
+        uint8_t hour = 0;
+        uint8_t minute = 0;
+        uint8_t second = 0;
+        uint32_t gps_epoch = 0;
+        uint32_t time_sync_count = 0;
+        uint32_t last_time_sync_epoch = 0;
+        uint32_t last_time_sync_age_ms = UINT32_MAX;
+        uint32_t satellites = 0;
+        uint32_t gps_satellites = 0;
+        uint32_t glonass_satellites = 0;
+        uint32_t baidou_satellites = 0;
+        double lat = 0.0;
+        double lon = 0.0;
+    } gpsctl_debug_t;
     /**
      * @brief setup gps
      */
@@ -101,6 +143,7 @@
      * @return  true if success, false if failed
      */
     bool gpsctl_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id );
+    void gpsctl_get_debug( gpsctl_debug_t *debug );
     /**
      * @brief enabled GPS
      */

@@ -89,6 +89,7 @@ lv_obj_t *osmmap_app_tile_img = NULL;                           /** @brief osm t
 lv_obj_t *osmmap_app_pos_img = NULL;                            /** @brief osm position point obj */
 lv_obj_t *osmmap_ext_pos_img = NULL;                            /** @brief external marker obj */
 lv_obj_t *osmmap_lonlat_label = NULL;                           /** @brief osm exit icon/button obj */
+lv_obj_t *osmmap_gps_status_panel = NULL;                       /** @brief gps status panel obj */
 lv_obj_t *osmmap_north_btn = NULL;                              /** @brief osm exit icon/button obj */
 lv_obj_t *osmmap_south_btn = NULL;                              /** @brief osm exit icon/button obj */
 lv_obj_t *osmmap_west_btn = NULL;                               /** @brief osm exit icon/button obj */
@@ -127,6 +128,16 @@ static double osmmap_external_marker_lat = 0.0;
 static char osmmap_external_marker_label[ 32 ] = { 0 };
 static lv_obj_t *osmmap_overlay_layer = NULL;
 static bool osmmap_have_local_position = false;
+static double osmmap_local_lon = 0.0;
+static double osmmap_local_lat = 0.0;
+static bool osmmap_have_local_heading = false;
+static double osmmap_local_heading = 0.0;
+static bool osmmap_gps_enabled_seen = false;
+static bool osmmap_gps_fix_seen = false;
+static uint32_t osmmap_gps_satellites = 0;
+static bool osmmap_local_marker_visible = false;
+static uint32_t osmmap_last_gps_marker_refresh_ms = 0;
+static char osmmap_last_gps_status_text[ 80 ] = { 0 };
 static bool osmmap_watch_flash_mode = false;
 static uint32_t osmmap_watch_flash_base_zoom = 10;
 static uint32_t osmmap_watch_flash_projection_zoom = 9;
@@ -158,6 +169,12 @@ static char osmmap_watch_flash_image_uri[ 160 ] = { 0 };
 static const size_t OSMMAP_OVERLAY_MAX_ITEMS = 96;
 static const size_t OSMMAP_OVERLAY_KEY_LEN = 48;
 static const size_t OSMMAP_OVERLAY_LABEL_LEN = 32;
+#if defined( LILYGO_WATCH_ULTRA )
+static const lv_coord_t OSMMAP_LOCAL_MARKER_SIZE = 64;
+static uint8_t osmmap_local_marker_image_buf[ LV_IMG_BUF_SIZE_TRUE_COLOR_ALPHA( OSMMAP_LOCAL_MARKER_SIZE, OSMMAP_LOCAL_MARKER_SIZE ) ] = { 0 };
+static lv_img_dsc_t osmmap_local_marker_image;
+static bool osmmap_local_marker_image_ready = false;
+#endif
 
 typedef enum {
     OSMMAP_OVERLAY_KIND_TEAM = 0,
@@ -264,6 +281,7 @@ static bool osmmap_load_watch_flash_image( bool force_reload );
 static uint16_t osmmap_get_viewport_width( void );
 static uint16_t osmmap_get_viewport_height( void );
 static uint32_t osmmap_get_watch_flash_min_render_zoom( void );
+static void osmmap_update_gps_status_label( void );
 static void osmmap_update_watch_flash_status_label( void );
 static void osmmap_clamp_watch_flash_pan( void );
 static uint16_t osmmap_get_watch_flash_lvgl_zoom( void );
@@ -275,6 +293,7 @@ static bool osmmap_watch_flash_pixel_to_view( double pixel_x, double pixel_y, ui
 static bool osmmap_project_watch_flash_current_lon_lat( double lon, double lat, uint16_t *x, uint16_t *y );
 static bool osmmap_project_marker_lon_lat( double lon, double lat, uint16_t *x, uint16_t *y );
 static void osmmap_place_marker( lv_obj_t *marker_obj, uint16_t marker_x, uint16_t marker_y );
+static void osmmap_refresh_local_position_marker( void );
 static void osmmap_refresh_marker_positions( void );
 static bool osmmap_adjust_watch_flash_zoom( int delta );
 static bool osmmap_adjust_watch_flash_pan( int32_t delta_x, int32_t delta_y );
@@ -290,10 +309,23 @@ static bool osmmap_overlay_parse_color( const char *value, uint8_t *r, uint8_t *
 static lv_color_t osmmap_overlay_item_bg_color( const osmmap_overlay_item_t *item );
 static lv_color_t osmmap_overlay_item_text_color( const osmmap_overlay_item_t *item );
 static lv_color_t osmmap_overlay_item_border_color( const osmmap_overlay_item_t *item );
+static bool osmmap_overlay_kind_uses_square_marker( osmmap_overlay_kind_t kind );
+static uint16_t osmmap_overlay_marker_border_width( void );
+static const lv_font_t *osmmap_overlay_marker_font( void );
 static uint16_t osmmap_overlay_marker_size( osmmap_overlay_kind_t kind );
+static uint16_t osmmap_overlay_marker_radius( osmmap_overlay_kind_t kind, uint16_t marker_size );
 static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item );
 static void osmmap_hide_overlay_marker( osmmap_overlay_item_t *item );
 static void osmmap_reset_overlay_item( osmmap_overlay_item_t *item );
+static double osmmap_normalize_heading( double heading );
+static bool osmmap_point_inside_triangle( int32_t x, int32_t y, const lv_point_t *a, const lv_point_t *b, const lv_point_t *c );
+static void osmmap_set_local_marker_pixel( lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa );
+static void osmmap_prepare_local_marker_image( void );
+static void osmmap_update_local_position_marker_heading( void );
+static void osmmap_set_local_position_from_gps( const gps_data_t *gps_data );
+static void osmmap_set_local_heading_from_gps( const gps_data_t *gps_data );
+static void osmmap_raise_local_position_marker( void );
+static void osmmap_create_local_position_marker( lv_obj_t *parent );
 
 static const char *osmmap_overlay_menu_label( osmmap_overlay_kind_t kind ) {
     switch ( kind ) {
@@ -489,15 +521,48 @@ static lv_color_t osmmap_overlay_item_border_color( const osmmap_overlay_item_t 
     return( osmmap_overlay_border_color( item ? item->kind : OSMMAP_OVERLAY_KIND_UNKNOWN ) );
 }
 
-static uint16_t osmmap_overlay_marker_size( osmmap_overlay_kind_t kind ) {
+static bool osmmap_overlay_kind_uses_square_marker( osmmap_overlay_kind_t kind ) {
     switch ( kind ) {
         case OSMMAP_OVERLAY_KIND_ZONE:
         case OSMMAP_OVERLAY_KIND_PHASELINE:
         case OSMMAP_OVERLAY_KIND_ROUTE:
-            return( 14 );
+            return( true );
         default:
-            return( 16 );
+            return( false );
     }
+}
+
+static uint16_t osmmap_overlay_marker_border_width( void ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    return( 4 );
+#else
+    return( 2 );
+#endif
+}
+
+static const lv_font_t *osmmap_overlay_marker_font( void ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    return( &Ubuntu_16px );
+#else
+    return( &Ubuntu_12px );
+#endif
+}
+
+static uint16_t osmmap_overlay_marker_size( osmmap_overlay_kind_t kind ) {
+    const uint16_t base_size = osmmap_overlay_kind_uses_square_marker( kind ) ? 14 : 16;
+
+#if defined( LILYGO_WATCH_ULTRA )
+    return( base_size * 2 );
+#else
+    return( base_size );
+#endif
+}
+
+static uint16_t osmmap_overlay_marker_radius( osmmap_overlay_kind_t kind, uint16_t marker_size ) {
+    if ( osmmap_overlay_kind_uses_square_marker( kind ) ) {
+        return( (uint16_t)fmax( 3.0, (double)marker_size / 4.0 ) );
+    }
+    return( LV_RADIUS_CIRCLE );
 }
 
 static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item ) {
@@ -510,26 +575,26 @@ static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item ) {
     if ( !item->marker_obj ) {
         item->marker_obj = lv_obj_create( parent, NULL );
         lv_obj_set_click( item->marker_obj, false );
-        lv_obj_set_style_local_border_width( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, 2 );
         lv_obj_set_style_local_pad_all( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, 0 );
         lv_obj_set_style_local_bg_opa( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, LV_OPA_COVER );
         lv_obj_set_style_local_shadow_width( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, 0 );
         item->marker_label_obj = lv_label_create( item->marker_obj, NULL );
         lv_obj_set_style_local_bg_opa( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, LV_OPA_TRANSP );
-        lv_obj_set_style_local_text_font( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &Ubuntu_12px );
         lv_obj_set_hidden( item->marker_obj, true );
     }
     lv_obj_set_size( item->marker_obj, marker_size, marker_size );
+    lv_obj_set_style_local_border_width( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_marker_border_width() );
     lv_obj_set_style_local_radius(
         item->marker_obj,
         LV_OBJ_PART_MAIN,
         LV_STATE_DEFAULT,
-        marker_size <= 14 ? 3 : LV_RADIUS_CIRCLE
+        osmmap_overlay_marker_radius( item->kind, marker_size )
     );
     lv_obj_set_style_local_bg_color( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_item_bg_color( item ) );
     lv_obj_set_style_local_border_color( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_item_border_color( item ) );
     if ( item->marker_label_obj ) {
         lv_label_set_text( item->marker_label_obj, osmmap_overlay_badge_text( item->kind ) );
+        lv_obj_set_style_local_text_font( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_marker_font() );
         lv_obj_set_style_local_text_color( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_item_text_color( item ) );
         lv_obj_align( item->marker_label_obj, item->marker_obj, LV_ALIGN_CENTER, 0, 0 );
     }
@@ -563,6 +628,174 @@ static void osmmap_reset_overlay_item( osmmap_overlay_item_t *item ) {
     item->key[ 0 ] = '\0';
     item->label[ 0 ] = '\0';
     osmmap_hide_overlay_marker( item );
+}
+
+static double osmmap_normalize_heading( double heading ) {
+    if ( !std::isfinite( heading ) ) {
+        return( 0.0 );
+    }
+
+    if ( fabs( heading ) > 360.0 ) {
+        heading = heading / 100.0;
+    }
+
+    heading = fmod( heading, 360.0 );
+    if ( heading < 0.0 ) {
+        heading += 360.0;
+    }
+    return( heading );
+}
+
+static bool osmmap_point_inside_triangle( int32_t x, int32_t y, const lv_point_t *a, const lv_point_t *b, const lv_point_t *c ) {
+    const int32_t edge_ab = ( x - a->x ) * ( b->y - a->y ) - ( y - a->y ) * ( b->x - a->x );
+    const int32_t edge_bc = ( x - b->x ) * ( c->y - b->y ) - ( y - b->y ) * ( c->x - b->x );
+    const int32_t edge_ca = ( x - c->x ) * ( a->y - c->y ) - ( y - c->y ) * ( a->x - c->x );
+
+    return( ( edge_ab >= 0 && edge_bc >= 0 && edge_ca >= 0 ) ||
+            ( edge_ab <= 0 && edge_bc <= 0 && edge_ca <= 0 ) );
+}
+
+static void osmmap_set_local_marker_pixel( lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    if ( x < 0 || y < 0 || x >= OSMMAP_LOCAL_MARKER_SIZE || y >= OSMMAP_LOCAL_MARKER_SIZE ) {
+        return;
+    }
+    lv_img_buf_set_px_color( &osmmap_local_marker_image, x, y, color );
+    lv_img_buf_set_px_alpha( &osmmap_local_marker_image, x, y, opa );
+#endif
+}
+
+static void osmmap_prepare_local_marker_image( void ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    if ( osmmap_local_marker_image_ready ) {
+        return;
+    }
+
+    for ( size_t i = 0; i < sizeof( osmmap_local_marker_image_buf ); i++ ) {
+        osmmap_local_marker_image_buf[ i ] = 0;
+    }
+
+    osmmap_local_marker_image.header.always_zero = 0;
+    osmmap_local_marker_image.header.w = OSMMAP_LOCAL_MARKER_SIZE;
+    osmmap_local_marker_image.header.h = OSMMAP_LOCAL_MARKER_SIZE;
+    osmmap_local_marker_image.header.cf = LV_IMG_CF_TRUE_COLOR_ALPHA;
+    osmmap_local_marker_image.data_size = sizeof( osmmap_local_marker_image_buf );
+    osmmap_local_marker_image.data = osmmap_local_marker_image_buf;
+
+    const lv_point_t outer_tip = { OSMMAP_LOCAL_MARKER_SIZE / 2, 2 };
+    const lv_point_t outer_right = { OSMMAP_LOCAL_MARKER_SIZE - 4, OSMMAP_LOCAL_MARKER_SIZE - 4 };
+    const lv_point_t outer_left = { 4, OSMMAP_LOCAL_MARKER_SIZE - 4 };
+    const lv_point_t inner_tip = { OSMMAP_LOCAL_MARKER_SIZE / 2, 8 };
+    const lv_point_t inner_right = { OSMMAP_LOCAL_MARKER_SIZE - 11, OSMMAP_LOCAL_MARKER_SIZE - 10 };
+    const lv_point_t inner_left = { 11, OSMMAP_LOCAL_MARKER_SIZE - 10 };
+
+    for ( lv_coord_t y = 0; y < OSMMAP_LOCAL_MARKER_SIZE; y++ ) {
+        for ( lv_coord_t x = 0; x < OSMMAP_LOCAL_MARKER_SIZE; x++ ) {
+            if ( osmmap_point_inside_triangle( x, y, &outer_tip, &outer_right, &outer_left ) ) {
+                osmmap_set_local_marker_pixel( x, y, LV_COLOR_BLACK, LV_OPA_80 );
+            }
+            if ( osmmap_point_inside_triangle( x, y, &inner_tip, &inner_right, &inner_left ) ) {
+                osmmap_set_local_marker_pixel( x, y, LV_COLOR_WHITE, LV_OPA_COVER );
+            }
+        }
+    }
+
+    osmmap_local_marker_image_ready = true;
+#endif
+}
+
+static void osmmap_update_local_position_marker_heading( void ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    if ( !osmmap_app_pos_img ) {
+        return;
+    }
+
+    const double heading = osmmap_have_local_heading ? osmmap_local_heading : 0.0;
+    lv_img_set_angle( osmmap_app_pos_img, (int16_t)lround( heading * 10.0 ) );
+#endif
+}
+
+static void osmmap_set_local_position_from_gps( const gps_data_t *gps_data ) {
+    if ( !gps_data || !gps_data->valid_location ) {
+        return;
+    }
+
+    osmmap_local_lon = gps_data->lon;
+    osmmap_local_lat = gps_data->lat;
+    osmmap_have_local_position = true;
+}
+
+static void osmmap_set_local_heading_from_gps( const gps_data_t *gps_data ) {
+    if ( !gps_data || !gps_data->valid_course ) {
+        return;
+    }
+
+    osmmap_local_heading = osmmap_normalize_heading( gps_data->course );
+    osmmap_have_local_heading = true;
+    osmmap_update_local_position_marker_heading();
+}
+
+static void osmmap_raise_local_position_marker( void ) {
+    if ( osmmap_app_pos_img ) {
+        lv_obj_move_foreground( osmmap_app_pos_img );
+    }
+}
+
+static void osmmap_create_local_position_marker( lv_obj_t *parent ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    osmmap_prepare_local_marker_image();
+
+    osmmap_app_pos_img = lv_img_create( parent, NULL );
+    lv_img_set_src( osmmap_app_pos_img, &osmmap_local_marker_image );
+    lv_img_set_pivot( osmmap_app_pos_img, OSMMAP_LOCAL_MARKER_SIZE / 2, OSMMAP_LOCAL_MARKER_SIZE / 2 );
+    lv_img_set_antialias( osmmap_app_pos_img, false );
+    lv_obj_set_click( osmmap_app_pos_img, false );
+    osmmap_update_local_position_marker_heading();
+#else
+    osmmap_app_pos_img = lv_img_create( parent, NULL );
+    lv_img_set_src( osmmap_app_pos_img, &info_fail_16px );
+#endif
+}
+
+static void osmmap_refresh_local_position_marker( void ) {
+    if ( !osmmap_location || !osmmap_app_pos_img ) {
+        osmmap_update_watch_flash_status_label();
+        return;
+    }
+
+    if ( osmmap_have_local_position ) {
+        uint16_t marker_x = 0;
+        uint16_t marker_y = 0;
+        bool local_marker_placed = false;
+
+        if ( osmmap_project_marker_lon_lat( osmmap_local_lon, osmmap_local_lat, &marker_x, &marker_y ) ) {
+            osmmap_place_marker( osmmap_app_pos_img, marker_x, marker_y );
+            local_marker_placed = true;
+        }
+        else if ( osmmap_location->tilexy_pos_valid &&
+                  fabs( osmmap_local_lon - osmmap_location->lon ) < 0.0000001 &&
+                  fabs( osmmap_local_lat - osmmap_location->lat ) < 0.0000001 ) {
+            osmmap_place_marker( osmmap_app_pos_img, osmmap_location->tilex_pos, osmmap_location->tiley_pos );
+            local_marker_placed = true;
+        }
+        else if ( fabs( osmmap_local_lon - osmmap_location->lon ) < 0.0000001 &&
+                  fabs( osmmap_local_lat - osmmap_location->lat ) < 0.0000001 ) {
+            osmmap_place_marker( osmmap_app_pos_img, osmmap_get_viewport_width() / 2, osmmap_get_viewport_height() / 2 );
+            local_marker_placed = true;
+        }
+
+        if ( !local_marker_placed ) {
+            lv_obj_set_hidden( osmmap_app_pos_img, true );
+        }
+        osmmap_local_marker_visible = local_marker_placed;
+    }
+    else {
+        lv_obj_set_hidden( osmmap_app_pos_img, true );
+        osmmap_local_marker_visible = false;
+    }
+
+    osmmap_raise_local_position_marker();
+    osmmap_update_gps_status_label();
 }
 
 static bool osmmap_is_watch_flash_source_name( const char *name ) {
@@ -792,12 +1025,56 @@ static double osmmap_get_view_cover_lvgl_zoom( void ) {
     return( fmax( 256.0, fmax( view_w, view_h ) ) );
 }
 
+static void osmmap_update_gps_status_label( void ) {
+    if ( !osmmap_lonlat_label ) {
+        return;
+    }
+
+    char status[ 80 ] = { 0 };
+
+    if ( osmmap_have_local_position ) {
+        if ( osmmap_local_marker_visible ) {
+            snprintf( status, sizeof( status ), "GPS POS\n%.5f %.5f", osmmap_local_lat, osmmap_local_lon );
+        }
+        else {
+            snprintf( status, sizeof( status ), "GPS OFFMAP\n%.5f %.5f", osmmap_local_lat, osmmap_local_lon );
+        }
+    }
+    else if ( !osmmap_gps_enabled_seen ) {
+        snprintf( status, sizeof( status ), "GPS OFF\nNO POS" );
+    }
+    else if ( osmmap_gps_fix_seen ) {
+        snprintf( status, sizeof( status ), "GPS FIX\nNO POS" );
+    }
+    else if ( osmmap_gps_satellites > 0 ) {
+        snprintf( status, sizeof( status ), "GPS NO POS\nSAT %lu", (unsigned long)osmmap_gps_satellites );
+    }
+    else {
+        snprintf( status, sizeof( status ), "GPS NO POS\nNO FIX" );
+    }
+
+    if ( strcmp( osmmap_last_gps_status_text, status ) != 0 ) {
+        strlcpy( osmmap_last_gps_status_text, status, sizeof( osmmap_last_gps_status_text ) );
+        lv_label_set_text( osmmap_lonlat_label, status );
+    }
+#if defined( LILYGO_WATCH_ULTRA )
+    if ( osmmap_gps_status_panel ) {
+        lv_obj_set_hidden( osmmap_gps_status_panel, false );
+        lv_obj_move_foreground( osmmap_gps_status_panel );
+        lv_obj_set_width( osmmap_lonlat_label, lv_obj_get_width( osmmap_gps_status_panel ) - 10 );
+        lv_obj_align( osmmap_lonlat_label, osmmap_gps_status_panel, LV_ALIGN_CENTER, 0, 0 );
+    }
+    lv_obj_set_hidden( osmmap_lonlat_label, false );
+    osmmap_raise_local_position_marker();
+#endif
+}
+
 static void osmmap_update_watch_flash_status_label( void ) {
     if ( !osmmap_lonlat_label || !osmmap_watch_flash_mode ) {
         return;
     }
 
-    lv_label_set_text( osmmap_lonlat_label, "" );
+    osmmap_update_gps_status_label();
 }
 
 static void osmmap_clamp_watch_flash_pan( void ) {
@@ -1000,22 +1277,35 @@ static void osmmap_refresh_marker_positions( void ) {
         return;
     }
 
-    if ( osmmap_watch_flash_uses_current_tile() && osmmap_app_pos_img ) {
+    if ( osmmap_have_local_position && osmmap_app_pos_img ) {
         uint16_t marker_x = 0;
         uint16_t marker_y = 0;
+        bool local_marker_placed = false;
 
-        if ( osmmap_have_local_position && osmmap_project_marker_lon_lat( osmmap_location->lon, osmmap_location->lat, &marker_x, &marker_y ) ) {
+        if ( osmmap_project_marker_lon_lat( osmmap_local_lon, osmmap_local_lat, &marker_x, &marker_y ) ) {
             osmmap_place_marker( osmmap_app_pos_img, marker_x, marker_y );
+            local_marker_placed = true;
         }
-        else {
+        else if ( osmmap_location->tilexy_pos_valid &&
+                  fabs( osmmap_local_lon - osmmap_location->lon ) < 0.0000001 &&
+                  fabs( osmmap_local_lat - osmmap_location->lat ) < 0.0000001 ) {
+            osmmap_place_marker( osmmap_app_pos_img, osmmap_location->tilex_pos, osmmap_location->tiley_pos );
+            local_marker_placed = true;
+        }
+        else if ( fabs( osmmap_local_lon - osmmap_location->lon ) < 0.0000001 &&
+                  fabs( osmmap_local_lat - osmmap_location->lat ) < 0.0000001 ) {
+            osmmap_place_marker( osmmap_app_pos_img, osmmap_get_viewport_width() / 2, osmmap_get_viewport_height() / 2 );
+            local_marker_placed = true;
+        }
+
+        if ( !local_marker_placed ) {
             lv_obj_set_hidden( osmmap_app_pos_img, true );
         }
-    }
-    else if ( osmmap_have_local_position && osmmap_location->tilexy_pos_valid && osmmap_app_pos_img ) {
-        osmmap_place_marker( osmmap_app_pos_img, osmmap_location->tilex_pos, osmmap_location->tiley_pos );
+        osmmap_local_marker_visible = local_marker_placed;
     }
     else if ( osmmap_app_pos_img ) {
         lv_obj_set_hidden( osmmap_app_pos_img, true );
+        osmmap_local_marker_visible = false;
     }
 
     if ( osmmap_external_marker_valid ) {
@@ -1067,7 +1357,8 @@ static void osmmap_refresh_marker_positions( void ) {
             osmmap_place_marker( item->marker_obj, marker_x, marker_y );
         }
     }
-    osmmap_update_watch_flash_status_label();
+    osmmap_raise_local_position_marker();
+    osmmap_update_gps_status_label();
 }
 
 static bool osmmap_adjust_watch_flash_zoom( int delta ) {
@@ -1184,8 +1475,7 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
     lv_obj_set_style_local_pad_all( osmmap_overlay_layer, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, 0 );
     lv_obj_align( osmmap_overlay_layer, osmmap_cont, LV_ALIGN_CENTER, 0, 0 );
 
-    osmmap_app_pos_img = lv_img_create( osmmap_overlay_layer, NULL );
-    lv_img_set_src( osmmap_app_pos_img, &info_fail_16px );
+    osmmap_create_local_position_marker( osmmap_overlay_layer );
     lv_obj_align( osmmap_app_pos_img, osmmap_overlay_layer, LV_ALIGN_IN_TOP_LEFT, 120, 120 );
     lv_obj_set_hidden( osmmap_app_pos_img, true );
 
@@ -1194,10 +1484,12 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
     lv_obj_align( osmmap_ext_pos_img, osmmap_overlay_layer, LV_ALIGN_IN_TOP_LEFT, 120, 120 );
     lv_obj_set_hidden( osmmap_ext_pos_img, true );
 
+#if !defined( LILYGO_WATCH_ULTRA )
     osmmap_lonlat_label = lv_label_create( osmmap_cont, NULL );
     lv_obj_add_style( osmmap_lonlat_label, LV_OBJ_PART_MAIN, &osmmap_app_label_style );
     lv_obj_align( osmmap_lonlat_label, osmmap_cont, LV_ALIGN_IN_TOP_LEFT, 3, 0 );
     lv_label_set_text( osmmap_lonlat_label, "0 / 0" );
+#endif
 
     osmmap_layers_btn = wf_add_menu_button( osmmap_cont, layers_btn_app_main_event_cb, &osmmap_app_btn_style );
     lv_obj_align( osmmap_layers_btn, osmmap_cont, LV_ALIGN_IN_TOP_LEFT, THEME_PADDING, THEME_PADDING );
@@ -1280,7 +1572,18 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
     mainbar_add_tile_activate_cb( tile_num, osmmap_activate_cb );
     mainbar_add_tile_hibernate_cb( tile_num, osmmap_hibernate_cb );
     mainbar_add_tile_button_cb( tile_num, osmmap_button_cb );
-    gpsctl_register_cb( GPSCTL_SET_APP_LOCATION | GPSCTL_UPDATE_LOCATION, osmmap_gpsctl_event_cb, "osm" );
+    gpsctl_register_cb(
+        GPSCTL_ENABLE |
+        GPSCTL_DISABLE |
+        GPSCTL_FIX |
+        GPSCTL_NOFIX |
+        GPSCTL_SET_APP_LOCATION |
+        GPSCTL_UPDATE_LOCATION |
+        GPSCTL_UPDATE_COURSE |
+        GPSCTL_UPDATE_SATELLITE,
+        osmmap_gpsctl_event_cb,
+        "osm"
+    );
     touch_register_cb( TOUCH_UPDATE , osmmap_app_touch_event_cb, "osm touch" );
 #ifdef NATIVE_64BIT
     eventmask = 0;
@@ -1478,18 +1781,47 @@ bool osmmap_gpsctl_event_cb( EventBits_t event, void *arg ) {
     char lonlat[64] = "";
     
     switch ( event ) {
+        case GPSCTL_ENABLE:
+            osmmap_gps_enabled_seen = true;
+            osmmap_update_gps_status_label();
+            break;
+        case GPSCTL_DISABLE:
+            osmmap_gps_enabled_seen = false;
+            osmmap_gps_fix_seen = false;
+            osmmap_have_local_position = false;
+            osmmap_have_local_heading = false;
+            osmmap_gps_satellites = 0;
+            osmmap_refresh_marker_positions();
+            break;
+        case GPSCTL_FIX:
+            osmmap_gps_enabled_seen = true;
+            osmmap_gps_fix_seen = true;
+            osmmap_update_gps_status_label();
+            break;
+        case GPSCTL_NOFIX:
+            osmmap_gps_enabled_seen = true;
+            osmmap_gps_fix_seen = false;
+            osmmap_update_gps_status_label();
+            break;
         case GPSCTL_SET_APP_LOCATION:
             /**
              * update location and tile map image on new location
              */
             OSMMAP_APP_LOG("get new gps coor.");
             gps_data = ( gps_data_t *)arg;
+            if ( !gps_data ) {
+                break;
+            }
+            osmmap_gps_enabled_seen = true;
+            osmmap_gps_fix_seen = true;
             osm_map_set_lon_lat( osmmap_location, gps_data->lon, gps_data->lat );
+            osmmap_set_local_position_from_gps( gps_data );
+            osmmap_set_local_heading_from_gps( gps_data );
             snprintf( lonlat, sizeof( lonlat ), "%f° / %f°", gps_data->lat, gps_data->lon );
             if ( osmmap_watch_flash_mode ) {
                 osmmap_update_watch_flash_status_label();
             }
-            else {
+            else if ( osmmap_lonlat_label ) {
                 lv_label_set_text( osmmap_lonlat_label, (const char*)lonlat );
             }
             osmmap_have_local_position = true;
@@ -1498,21 +1830,72 @@ bool osmmap_gpsctl_event_cb( EventBits_t event, void *arg ) {
             break;
         case GPSCTL_UPDATE_LOCATION:
             /**
-             * update location and tile map image on new location
+             * Move the local GPS marker. Do not request a map/tile refresh for
+             * every live GPS tick on Ultra; that makes touch lag badly.
              */
             OSMMAP_APP_LOG("get new gps coor.");
             gps_data = ( gps_data_t *)arg;
+            if ( !gps_data ) {
+                break;
+            }
+            osmmap_gps_enabled_seen = true;
+            osmmap_gps_fix_seen = true;
+        #if defined( LILYGO_WATCH_ULTRA )
+            {
+                const uint32_t now = millis();
+                const bool marker_changed =
+                    !osmmap_have_local_position ||
+                    fabs( gps_data->lon - osmmap_local_lon ) > 0.00001 ||
+                    fabs( gps_data->lat - osmmap_local_lat ) > 0.00001;
+
+                osmmap_set_local_position_from_gps( gps_data );
+                osmmap_set_local_heading_from_gps( gps_data );
+
+                if ( osmmap_app_active &&
+                     ( marker_changed || (uint32_t)( now - osmmap_last_gps_marker_refresh_ms ) >= 1000 ) ) {
+                    osmmap_refresh_local_position_marker();
+                    osmmap_last_gps_marker_refresh_ms = now;
+                }
+                else if ( !osmmap_app_active ) {
+                    osmmap_update_gps_status_label();
+                }
+            }
+        #else
             osm_map_set_lon_lat( osmmap_location, gps_data->lon, gps_data->lat );
+            osmmap_set_local_position_from_gps( gps_data );
+            osmmap_set_local_heading_from_gps( gps_data );
             snprintf( lonlat, sizeof( lonlat ), "%f° / %f°", gps_data->lat, gps_data->lon );
             if ( osmmap_watch_flash_mode ) {
                 osmmap_update_watch_flash_status_label();
             }
-            else {
+            else if ( osmmap_lonlat_label ) {
                 lv_label_set_text( osmmap_lonlat_label, (const char*)lonlat );
             }
             osmmap_have_local_position = true;
             if ( osmmap_app_active )
                 osmmap_update_request();
+        #endif
+            break;
+        case GPSCTL_UPDATE_COURSE:
+            gps_data = ( gps_data_t *)arg;
+            osmmap_set_local_heading_from_gps( gps_data );
+        #if defined( LILYGO_WATCH_ULTRA )
+            if ( osmmap_app_active ) {
+                osmmap_refresh_local_position_marker();
+            }
+        #else
+            osmmap_refresh_marker_positions();
+        #endif
+            break;
+        case GPSCTL_UPDATE_SATELLITE:
+            gps_data = ( gps_data_t *)arg;
+            if ( gps_data && gps_data->valid_satellite ) {
+                osmmap_gps_satellites = gps_data->satellites;
+            }
+            else {
+                osmmap_gps_satellites = 0;
+            }
+            osmmap_update_gps_status_label();
             break;
     }
     return( true );
@@ -1941,8 +2324,16 @@ void osmmap_activate_cb( void ) {
      */
     osmmap_gps_state = gpsctl_get_autoon();
     if( osmmap_config.gps_autoon ) {
+        osmmap_gps_enabled_seen = true;
         gpsctl_on();
     }
+    else {
+        osmmap_gps_enabled_seen = false;
+        osmmap_gps_fix_seen = false;
+        osmmap_have_local_position = false;
+        osmmap_have_local_heading = false;
+    }
+    osmmap_update_gps_status_label();
     /**
      * save block show messages state
      */

@@ -2,7 +2,6 @@
     #define _XNODE_H
 
     void xnode_setup( void );
-    const char *xnode_get_service_uuid( void );
     bool xnode_send_meshtastic_rx( const char *from, const char *text );
     bool xnode_send_location_update( double lat, double lon, const char *label );
     bool xnode_send_manual_sos( void );

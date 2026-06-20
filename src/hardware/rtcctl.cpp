@@ -20,6 +20,7 @@
  */
 #include "config.h"
 #include <time.h>
+#include <string.h>
 
 #include "rtcctl.h"
 #include "powermgm.h"
@@ -42,6 +43,8 @@
         #include <SPIFFS.h>
     #elif defined( M5CORE2 )
         #include <M5Core2.h>
+    #elif defined( LILYGO_WATCH_ULTRA )
+        #include "hardware/twatch_ultra_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -79,6 +82,119 @@ void rtcctl_store_data( void );
 
 callback_t *rtcctl_callback = NULL;
 
+#if !defined( NATIVE_64BIT ) && defined( LILYGO_WATCH_ULTRA )
+static constexpr uint8_t PCF85063A_REG_CONTROL_1 = 0x00;
+static constexpr uint8_t PCF85063A_REG_SECONDS = 0x04;
+
+static uint8_t rtcctl_ultra_bcd_to_dec( uint8_t value ) {
+    return( ( ( value >> 4 ) * 10 ) + ( value & 0x0f ) );
+}
+
+static uint8_t rtcctl_ultra_dec_to_bcd( uint8_t value ) {
+    return( ( ( value / 10 ) << 4 ) | ( value % 10 ) );
+}
+
+static bool rtcctl_ultra_read_regs( uint8_t reg, uint8_t *data, size_t len ) {
+    Wire.beginTransmission( BOARD_RTC_ADDR );
+    Wire.write( reg );
+    if ( Wire.endTransmission( false ) != 0 ) {
+        return( false );
+    }
+
+    if ( Wire.requestFrom( static_cast<int>( BOARD_RTC_ADDR ), static_cast<int>( len ) ) != static_cast<int>( len ) ) {
+        return( false );
+    }
+
+    for ( size_t i = 0 ; i < len ; i++ ) {
+        data[ i ] = Wire.read();
+    }
+    return( true );
+}
+
+static bool rtcctl_ultra_write_regs( uint8_t reg, const uint8_t *data, size_t len ) {
+    Wire.beginTransmission( BOARD_RTC_ADDR );
+    Wire.write( reg );
+    for ( size_t i = 0 ; i < len ; i++ ) {
+        Wire.write( data[ i ] );
+    }
+    return( Wire.endTransmission() == 0 );
+}
+
+static bool rtcctl_ultra_write_reg( uint8_t reg, uint8_t value ) {
+    return( rtcctl_ultra_write_regs( reg, &value, 1 ) );
+}
+
+static bool rtcctl_ultra_read_time( struct tm *t_tm ) {
+    uint8_t regs[ 7 ] = {};
+    if ( t_tm == NULL || !rtcctl_ultra_read_regs( PCF85063A_REG_SECONDS, regs, sizeof( regs ) ) ) {
+        return( false );
+    }
+
+    if ( regs[ 0 ] & 0x80 ) {
+        log_w( "Ultra RTC oscillator-stop flag set; ignoring RTC time" );
+        return( false );
+    }
+
+    const int second = rtcctl_ultra_bcd_to_dec( regs[ 0 ] & 0x7f );
+    const int minute = rtcctl_ultra_bcd_to_dec( regs[ 1 ] & 0x7f );
+    const int hour = rtcctl_ultra_bcd_to_dec( regs[ 2 ] & 0x3f );
+    const int day = rtcctl_ultra_bcd_to_dec( regs[ 3 ] & 0x3f );
+    const int wday = regs[ 4 ] & 0x07;
+    const int month = rtcctl_ultra_bcd_to_dec( regs[ 5 ] & 0x1f );
+    const int year = 2000 + rtcctl_ultra_bcd_to_dec( regs[ 6 ] );
+
+    if ( year < 2024 || year > 2099 || month < 1 || month > 12 || day < 1 || day > 31 ||
+         hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59 ) {
+        log_w( "Ultra RTC returned invalid time %04d-%02d-%02d %02d:%02d:%02d",
+               year, month, day, hour, minute, second );
+        return( false );
+    }
+
+    memset( t_tm, 0, sizeof( *t_tm ) );
+    t_tm->tm_sec = second;
+    t_tm->tm_min = minute;
+    t_tm->tm_hour = hour;
+    t_tm->tm_mday = day;
+    t_tm->tm_mon = month - 1;
+    t_tm->tm_year = year - 1900;
+    t_tm->tm_wday = wday;
+    t_tm->tm_isdst = 0;
+    return( true );
+}
+
+static bool rtcctl_ultra_write_time( const struct tm &t_tm ) {
+    const int year = t_tm.tm_year + 1900;
+    const int month = t_tm.tm_mon + 1;
+
+    if ( year < 2000 || year > 2099 || month < 1 || month > 12 || t_tm.tm_mday < 1 || t_tm.tm_mday > 31 ||
+         t_tm.tm_hour < 0 || t_tm.tm_hour > 23 || t_tm.tm_min < 0 || t_tm.tm_min > 59 || t_tm.tm_sec < 0 || t_tm.tm_sec > 59 ) {
+        log_w( "refusing invalid Ultra RTC write %04d-%02d-%02d %02d:%02d:%02d",
+               year, month, t_tm.tm_mday, t_tm.tm_hour, t_tm.tm_min, t_tm.tm_sec );
+        return( false );
+    }
+
+    uint8_t control = 0;
+    if ( rtcctl_ultra_read_regs( PCF85063A_REG_CONTROL_1, &control, 1 ) ) {
+        control &= ~( 0x20 | 0x02 );
+    }
+    if ( !rtcctl_ultra_write_reg( PCF85063A_REG_CONTROL_1, control ) ) {
+        return( false );
+    }
+
+    const uint8_t regs[ 7 ] = {
+        rtcctl_ultra_dec_to_bcd( static_cast<uint8_t>( t_tm.tm_sec ) ),
+        rtcctl_ultra_dec_to_bcd( static_cast<uint8_t>( t_tm.tm_min ) ),
+        rtcctl_ultra_dec_to_bcd( static_cast<uint8_t>( t_tm.tm_hour ) ),
+        rtcctl_ultra_dec_to_bcd( static_cast<uint8_t>( t_tm.tm_mday ) ),
+        static_cast<uint8_t>( t_tm.tm_wday & 0x07 ),
+        rtcctl_ultra_dec_to_bcd( static_cast<uint8_t>( month ) ),
+        rtcctl_ultra_dec_to_bcd( static_cast<uint8_t>( year - 2000 ) )
+    };
+
+    return( rtcctl_ultra_write_regs( PCF85063A_REG_SECONDS, regs, sizeof( regs ) ) );
+}
+#endif
+
 void rtcctl_setup( void ) {
 #ifdef NATIVE_64BIT
 
@@ -87,6 +203,8 @@ void rtcctl_setup( void ) {
         M5.RTC.begin();
     #elif defined( M5CORE2 )
         M5.Rtc.begin();
+    #elif defined( LILYGO_WATCH_ULTRA )
+        pinMode( BOARD_RTC_INT_PIN, INPUT_PULLUP );
     #elif defined( LILYGO_WATCH_S3 )
         watch.disableCLK();
         pinMode( BOARD_RTC_INT_PIN, INPUT_PULLUP );
@@ -548,6 +666,15 @@ void rtcctl_syncToSystem( void ) {
             val.tv_sec = mktime(&t_tm);
             val.tv_usec = 0;
             settimeofday(&val, NULL);
+        #elif defined( LILYGO_WATCH_ULTRA )
+            struct tm t_tm = {0};
+            struct timeval val;
+            if ( rtcctl_ultra_read_time( &t_tm ) ) {
+                val.tv_sec = mktime( &t_tm );
+                val.tv_usec = 0;
+                settimeofday( &val, NULL );
+                log_i( "synced system time from Ultra RTC" );
+            }
         #elif defined( LILYGO_WATCH_S3 )
             struct tm t_tm = {0};
             struct timeval val;
@@ -621,6 +748,17 @@ void rtcctl_syncToRtc( void ) {
             RTCDate.Month = t_tm.tm_mon + 1;
             RTCDate.Date = t_tm.tm_mday;
             M5.Rtc.SetDate( &RTCDate );
+        #elif defined( LILYGO_WATCH_ULTRA )
+            time_t now;
+            struct tm t_tm;
+            time( &now );
+            localtime_r( &now, &t_tm );
+            if ( rtcctl_ultra_write_time( t_tm ) ) {
+                log_i( "synced Ultra RTC from system time" );
+            }
+            else {
+                log_w( "Ultra RTC write failed" );
+            }
         #elif defined( LILYGO_WATCH_S3 )
             time_t now;
             struct tm t_tm;

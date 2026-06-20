@@ -36,6 +36,9 @@
 #define SHIELD_GPS_TX               (43)
 #define BOARD_GPS_BAUDRATE          (38400)
 
+#define BOARD_RTC_INT_PIN           (1)
+#define BOARD_RTC_ADDR              (0x51)
+
 #define DISP_CS                     (41)
 #define DISP_SCK                    (40)
 #define DISP_RESET                  (37)

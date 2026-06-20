@@ -88,6 +88,12 @@ LV_FONT_DECLARE(Ubuntu_16px);
     lv_font_t *info_font = &Ubuntu_32px;
     lv_font_t *temp_font = &Ubuntu_32px;
     lv_font_t *icon_font = &Ubuntu_16px;
+#elif defined( LILYGO_WATCH_ULTRA )
+    lv_font_t *time_font = &Ubuntu_144px;
+    lv_font_t *date_font = &Ubuntu_16px;
+    lv_font_t *info_font = &Ubuntu_16px;
+    lv_font_t *temp_font = &Ubuntu_16px;
+    lv_font_t *icon_font = &Ubuntu_16px;
 #else
     lv_font_t *time_font = &Ubuntu_72px;
     lv_font_t *date_font = &Ubuntu_16px;
@@ -145,6 +151,7 @@ void main_tile_setup( void ) {
         lv_style_set_text_color( &timestyle, LV_STATE_DEFAULT, LV_COLOR_WHITE );
         lv_style_set_text_color( &datestyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 220, 226, 235 ) );
         lv_style_set_text_color( &infostyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 150, 166, 184 ) );
+
     #endif
 
     clock_cont = mainbar_obj_create( main_cont );
@@ -165,7 +172,10 @@ void main_tile_setup( void ) {
     lv_obj_reset_style_list( timelabel, LV_OBJ_PART_MAIN );
     lv_obj_add_style( timelabel, LV_OBJ_PART_MAIN, &timestyle );
     #if defined( LILYGO_WATCH_ULTRA )
-        lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, -34 );
+        lv_label_set_long_mode( timelabel, LV_LABEL_LONG_CROP );
+        lv_obj_set_width( timelabel, lv_disp_get_hor_res( NULL ) );
+        lv_label_set_align( timelabel, LV_LABEL_ALIGN_CENTER );
+        lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, -58 );
     #else
         lv_obj_align(timelabel, NULL, LV_ALIGN_CENTER, 0, 0);
     #endif
@@ -182,7 +192,7 @@ void main_tile_setup( void ) {
     lv_obj_reset_style_list( datelabel, LV_OBJ_PART_MAIN );
     lv_obj_add_style( datelabel, LV_OBJ_PART_MAIN, &datestyle );
     #if defined( LILYGO_WATCH_ULTRA )
-        lv_obj_align( datelabel, timelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 4 );
+        lv_obj_align( datelabel, timelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, -4 );
     #else
         lv_obj_align( datelabel, clock_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
     #endif
@@ -199,7 +209,7 @@ void main_tile_setup( void ) {
     lv_obj_reset_style_list( infolabel, LV_OBJ_PART_MAIN );
     lv_obj_add_style( infolabel, LV_OBJ_PART_MAIN, &infostyle );
     #if defined( LILYGO_WATCH_ULTRA )
-        lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 18 );
+        lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 14 );
     #else
         lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_TOP_MID, 0, 0 );
     #endif
@@ -415,9 +425,9 @@ static void main_tile_ultra_align_clock( void ) {
         return;
     }
 
-    lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, -34 );
-    lv_obj_align( datelabel, timelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 4 );
-    lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 18 );
+    lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, -58 );
+    lv_obj_align( datelabel, timelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, -4 );
+    lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 14 );
 }
 #endif
 
