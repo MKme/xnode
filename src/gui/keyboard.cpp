@@ -46,7 +46,7 @@ static lv_style_t kb_textarea_style;
 static lv_style_t kb_button_style;
 static keyboard_page_t kb_page = KB_PAGE_AM;
 
-#define KB_CTRL_KEY ( LV_KEYBOARD_CTRL_BTN_FLAGS | 1 )
+#define KB_CTRL_KEY ( LV_BTNMATRIX_CTRL_NO_REPEAT | 1 )
 
 static const char * const kb_map_am[] = {
     "a", "b", "c", "d", "\n",
@@ -106,7 +106,7 @@ static const lv_btnmatrix_ctrl_t kb_ctrl_symbol[] = {
 
 static void kb_event_cb(lv_obj_t * ta, lv_event_t event);
 static void keyboard_set_page( keyboard_page_t page );
-static bool keyboard_handle_custom_key( lv_obj_t * keyboard, const char * txt );
+static bool keyboard_handle_text_key( lv_obj_t * keyboard, const char * txt );
 static void keyboard_layout_text( void );
 
 void keyboard_prelim( void ) {
@@ -190,7 +190,7 @@ static void kb_event_cb( lv_obj_t * ta, lv_event_t event ) {
         uint16_t btn_id = lv_btnmatrix_get_active_btn( ta );
         if ( btn_id != LV_BTNMATRIX_BTN_NONE ) {
             const char * txt = lv_btnmatrix_get_active_btn_text( ta );
-            if ( txt != NULL && keyboard_handle_custom_key( ta, txt ) ) {
+            if ( txt != NULL && keyboard_handle_text_key( ta, txt ) ) {
                 return;
             }
         }
@@ -295,15 +295,18 @@ static void keyboard_layout_text( void ) {
     lv_obj_set_size( kb_screen, screen_w, screen_h );
     lv_obj_align( kb_screen, lv_scr_act(), LV_ALIGN_IN_TOP_MID, 0, 0 );
 
-    lv_obj_set_size( kb_textarea, screen_w - ( THEME_PADDING * 2 ), 54 );
+    const lv_coord_t inset = THEME_PADDING;
+    const lv_coord_t keyboard_w = screen_w - ( inset * 2 );
+
+    lv_obj_set_size( kb_textarea, keyboard_w, 54 );
     lv_obj_align( kb_textarea, kb_screen, LV_ALIGN_IN_TOP_MID, 0, 2 );
 
     if ( kb != NULL ) {
-        lv_obj_set_size( kb, screen_w, screen_h - 58 );
+        lv_obj_set_size( kb, keyboard_w, screen_h - 58 );
         lv_obj_align( kb, kb_screen, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
     }
     if ( nkb != NULL ) {
-        lv_obj_set_size( nkb, screen_w, screen_h - 58 );
+        lv_obj_set_size( nkb, keyboard_w, screen_h - 58 );
         lv_obj_align( nkb, kb_screen, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
     }
 }
@@ -339,7 +342,11 @@ static void keyboard_set_page( keyboard_page_t page ) {
     }
 }
 
-static bool keyboard_handle_custom_key( lv_obj_t * keyboard, const char * txt ) {
+static bool keyboard_handle_text_key( lv_obj_t * keyboard, const char * txt ) {
+    if ( keyboard != kb ) {
+        return( false );
+    }
+
     if ( strcmp( txt, "A-M" ) == 0 ) {
         keyboard_set_page( KB_PAGE_AM );
         return( true );
@@ -360,13 +367,32 @@ static bool keyboard_handle_custom_key( lv_obj_t * keyboard, const char * txt ) 
         keyboard_set_page( KB_PAGE_SYMBOL );
         return( true );
     }
-    if ( strcmp( txt, "SPC" ) == 0 ) {
-        lv_obj_t * target = lv_keyboard_get_textarea( keyboard );
-        if ( target != NULL ) {
-            lv_textarea_add_char( target, ' ' );
-        }
+
+    lv_obj_t * target = lv_keyboard_get_textarea( keyboard );
+    if ( target == NULL ) {
         return( true );
     }
 
-    return( false );
+    if ( strcmp( txt, "SPC" ) == 0 ) {
+        lv_textarea_add_char( target, ' ' );
+        return( true );
+    }
+    if ( strcmp( txt, LV_SYMBOL_BACKSPACE ) == 0 ) {
+        lv_textarea_del_char( target );
+        return( true );
+    }
+    if ( strcmp( txt, LV_SYMBOL_CLOSE ) == 0 ) {
+        keyboard_hide();
+        return( true );
+    }
+    if ( strcmp( txt, LV_SYMBOL_OK ) == 0 ) {
+        if ( kb_user_textarea != NULL ) {
+            lv_textarea_set_text( kb_user_textarea, lv_textarea_get_text( target ) );
+        }
+        keyboard_hide();
+        return( true );
+    }
+
+    lv_textarea_add_text( target, txt );
+    return( true );
 }
