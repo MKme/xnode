@@ -1,12 +1,16 @@
 #include "config.h"
 #include "meshtastic_service.h"
 #include "meshtastic_channels_config.h"
+#include "meshtastic_user_config.h"
+
+#include <string.h>
 
 #if defined( USING_TWATCH_S3 ) || defined( USING_TWATCH_ULTRA )
 
     #include <Arduino.h>
     #include <ArduinoJson.h>
     #include <ESP.h>
+    #include <ctype.h>
     #if defined( USING_TWATCH_ULTRA )
         #include "hardware/twatch_ultra_hal.h"
     #else
@@ -22,6 +26,9 @@
     #include "gui/mainbar/setup_tile/bluetooth_settings/bluetooth_message.h"
     #include "hardware/ble/xnode.h"
     #include "hardware/powermgm.h"
+    #include "meshtastic/mesh.pb.h"
+    #include "pb_decode.h"
+    #include "pb_encode.h"
 
     #if !defined( NATIVE_64BIT )
         #include <SPIFFS.h>
@@ -31,6 +38,7 @@
         constexpr uint32_t MESHTASTIC_BROADCAST = 0xFFFFFFFFUL;
         constexpr uint8_t MESHTASTIC_TEXT_MESSAGE_APP = 1;
         constexpr uint8_t MESHTASTIC_POSITION_APP = 3;
+        constexpr uint8_t MESHTASTIC_NODEINFO_APP = 4;
         constexpr uint8_t MESHTASTIC_SYNC_WORD = 0x2B;
         constexpr uint8_t MESHTASTIC_HOP_RELIABLE = 3;
         constexpr uint8_t MESHTASTIC_FLAG_HOP_START_SHIFT = 5;
@@ -50,6 +58,10 @@
         constexpr const char *MESHTASTIC_DEFAULT_PRIMARY_CHANNEL = "LongFast";
         constexpr const char *MESHTASTIC_DEFAULT_PRIMARY_PSK = "AQ==";
         constexpr uint8_t MESHTASTIC_PRIMARY_CHANNEL_SLOT = 0;
+        constexpr uint32_t MESHTASTIC_NODEINFO_START_DELAY_MS = 5000;
+        constexpr uint32_t MESHTASTIC_NODEINFO_RETRY_DELAY_MS = 5000;
+        constexpr uint32_t MESHTASTIC_NODEINFO_INTERVAL_MS = 15UL * 60UL * 1000UL;
+        constexpr uint8_t MESHTASTIC_PEER_USER_COUNT = 24;
         constexpr size_t MESHTASTIC_MAX_RUNTIME_PSK_LEN = 32;
         constexpr uint8_t meshtastic_default_psk[ 16 ] = {
             0xd4, 0xf1, 0xbb, 0x3a, 0x20, 0x29, 0x07, 0x59,
@@ -92,6 +104,14 @@
             int32_t altitude = 0;
         };
 
+        struct meshtastic_peer_user_t {
+            bool valid = false;
+            uint32_t node_id = 0;
+            uint32_t last_seen = 0;
+            char long_name[ MESHTASTIC_SERVICE_LONG_NAME_LEN ] = { 0 };
+            char short_name[ MESHTASTIC_SERVICE_SHORT_NAME_LEN ] = { 0 };
+        };
+
         struct meshtastic_runtime_channel_t {
             bool enabled = false;
             char name[ MESHTASTIC_CHANNEL_NAME_LEN ] = { 0 };
@@ -123,11 +143,20 @@
         char meshtastic_last_message_text[ MESHTASTIC_MAX_TEXT_LEN + 1 ] = "";
 
         meshtastic_channels_config_t meshtastic_channels_config;
+        meshtastic_user_config_t meshtastic_user_config;
         meshtastic_runtime_channel_t meshtastic_channels[ MESHTASTIC_CHANNEL_COUNT ];
+        meshtastic_peer_user_t meshtastic_peer_users[ MESHTASTIC_PEER_USER_COUNT ];
         uint8_t meshtastic_enabled_channel_slots[ MESHTASTIC_CHANNEL_COUNT ] = { 0 };
         uint8_t meshtastic_enabled_channel_count = 0;
         uint8_t meshtastic_active_channel_slot = MESHTASTIC_PRIMARY_CHANNEL_SLOT;
         meshtastic_service_text_rx_cb_t meshtastic_text_rx_callback = NULL;
+        char meshtastic_long_name[ MESHTASTIC_SERVICE_LONG_NAME_LEN ] = "";
+        char meshtastic_short_name[ MESHTASTIC_SERVICE_SHORT_NAME_LEN ] = "";
+        bool meshtastic_is_licensed = false;
+        bool meshtastic_is_unmessageable = false;
+        bool meshtastic_user_loaded = false;
+        bool meshtastic_nodeinfo_due = false;
+        uint32_t meshtastic_nodeinfo_due_ms = 0;
 
         uint8_t meshtastic_xor_hash( const uint8_t *data, size_t len ) {
             uint8_t hash = 0;
@@ -470,6 +499,187 @@
             va_end( ap );
         }
 
+        void meshtastic_trim_copy( char *out, size_t out_size, const char *input ) {
+            const char *start = input ? input : "";
+            const char *end = NULL;
+            size_t len = 0;
+
+            if ( !out || out_size == 0 ) {
+                return;
+            }
+
+            while ( *start && isspace( (unsigned char)*start ) ) {
+                start++;
+            }
+
+            end = start + strlen( start );
+            while ( end > start && isspace( (unsigned char)*( end - 1 ) ) ) {
+                end--;
+            }
+
+            len = (size_t)( end - start );
+            if ( len >= out_size ) {
+                len = out_size - 1;
+            }
+            memcpy( out, start, len );
+            out[ len ] = '\0';
+        }
+
+        void meshtastic_build_default_user_names( char *long_name, size_t long_size, char *short_name, size_t short_size ) {
+            const uint32_t suffix = meshtastic_node_id ? meshtastic_node_id : (uint32_t)( ESP.getEfuseMac() & 0xFFFFFFFFULL );
+
+            if ( long_name && long_size ) {
+                snprintf( long_name, long_size, "XNODE-%04" PRIX32, suffix & 0xFFFFUL );
+            }
+            if ( short_name && short_size ) {
+                snprintf( short_name, short_size, "X%03" PRIX32, suffix & 0xFFFUL );
+            }
+        }
+
+        void meshtastic_apply_user_defaults_if_needed( void ) {
+            if ( meshtastic_long_name[ 0 ] == '\0' || meshtastic_short_name[ 0 ] == '\0' ) {
+                char default_long[ MESHTASTIC_SERVICE_LONG_NAME_LEN ] = "";
+                char default_short[ MESHTASTIC_SERVICE_SHORT_NAME_LEN ] = "";
+
+                meshtastic_build_default_user_names( default_long, sizeof( default_long ), default_short, sizeof( default_short ) );
+                if ( meshtastic_long_name[ 0 ] == '\0' ) {
+                    strlcpy( meshtastic_long_name, default_long, sizeof( meshtastic_long_name ) );
+                }
+                if ( meshtastic_short_name[ 0 ] == '\0' ) {
+                    strlcpy( meshtastic_short_name, default_short, sizeof( meshtastic_short_name ) );
+                }
+            }
+        }
+
+        void meshtastic_load_user( void ) {
+            if ( meshtastic_user_loaded ) {
+                return;
+            }
+
+            meshtastic_user_loaded = true;
+            meshtastic_user_config.load();
+            meshtastic_trim_copy( meshtastic_long_name, sizeof( meshtastic_long_name ), meshtastic_user_config.long_name );
+            meshtastic_trim_copy( meshtastic_short_name, sizeof( meshtastic_short_name ), meshtastic_user_config.short_name );
+            meshtastic_is_licensed = meshtastic_user_config.is_licensed;
+            meshtastic_is_unmessageable = meshtastic_user_config.is_unmessageable;
+            meshtastic_apply_user_defaults_if_needed();
+
+            if ( strcmp( meshtastic_user_config.long_name, meshtastic_long_name ) ||
+                 strcmp( meshtastic_user_config.short_name, meshtastic_short_name ) ) {
+                strlcpy( meshtastic_user_config.long_name, meshtastic_long_name, sizeof( meshtastic_user_config.long_name ) );
+                strlcpy( meshtastic_user_config.short_name, meshtastic_short_name, sizeof( meshtastic_user_config.short_name ) );
+                meshtastic_user_config.save();
+            }
+        }
+
+        bool meshtastic_save_user( void ) {
+            strlcpy( meshtastic_user_config.long_name, meshtastic_long_name, sizeof( meshtastic_user_config.long_name ) );
+            strlcpy( meshtastic_user_config.short_name, meshtastic_short_name, sizeof( meshtastic_user_config.short_name ) );
+            meshtastic_user_config.is_licensed = meshtastic_is_licensed;
+            meshtastic_user_config.is_unmessageable = meshtastic_is_unmessageable;
+            return( meshtastic_user_config.save() );
+        }
+
+        bool meshtastic_user_to_proto( meshtastic_User &user ) {
+            memset( &user, 0, sizeof( user ) );
+            meshtastic_load_user();
+
+            snprintf( user.id, sizeof( user.id ), "!%08" PRIX32, meshtastic_node_id );
+            strlcpy( user.long_name, meshtastic_long_name, sizeof( user.long_name ) );
+            strlcpy( user.short_name, meshtastic_short_name, sizeof( user.short_name ) );
+            #if defined( USING_TWATCH_ULTRA )
+                user.hw_model = meshtastic_HardwareModel_T_WATCH_ULTRA;
+            #else
+                user.hw_model = meshtastic_HardwareModel_T_WATCH_S3;
+            #endif
+            user.is_licensed = meshtastic_is_licensed;
+            user.role = meshtastic_Config_DeviceConfig_Role_CLIENT;
+            user.has_is_unmessagable = true;
+            user.is_unmessagable = meshtastic_is_unmessageable;
+            return( true );
+        }
+
+        bool meshtastic_encode_user_payload( uint8_t *payload, size_t payload_size, size_t &payload_len ) {
+            meshtastic_User user;
+            pb_ostream_t stream = pb_ostream_from_buffer( payload, payload_size );
+
+            payload_len = 0;
+            if ( !payload || payload_size == 0 || !meshtastic_user_to_proto( user ) ) {
+                return( false );
+            }
+            if ( !pb_encode( &stream, meshtastic_User_fields, &user ) ) {
+                return( false );
+            }
+            payload_len = stream.bytes_written;
+            return( payload_len > 0 );
+        }
+
+        bool meshtastic_decode_user_payload( const uint8_t *payload, size_t payload_len, meshtastic_User &user ) {
+            pb_istream_t stream = pb_istream_from_buffer( payload, payload_len );
+
+            memset( &user, 0, sizeof( user ) );
+            if ( !payload || payload_len == 0 ) {
+                return( false );
+            }
+            return( pb_decode( &stream, meshtastic_User_fields, &user ) );
+        }
+
+        meshtastic_peer_user_t *meshtastic_find_peer_user( uint32_t node_id ) {
+            for ( uint8_t i = 0; i < MESHTASTIC_PEER_USER_COUNT; i++ ) {
+                if ( meshtastic_peer_users[ i ].valid && meshtastic_peer_users[ i ].node_id == node_id ) {
+                    return( &meshtastic_peer_users[ i ] );
+                }
+            }
+            return( NULL );
+        }
+
+        void meshtastic_format_node_label( uint32_t node_id, char *out, size_t out_size ) {
+            meshtastic_peer_user_t *peer = meshtastic_find_peer_user( node_id );
+
+            if ( !out || out_size == 0 ) {
+                return;
+            }
+
+            if ( peer && peer->short_name[ 0 ] ) {
+                strlcpy( out, peer->short_name, out_size );
+                return;
+            }
+            if ( peer && peer->long_name[ 0 ] ) {
+                strlcpy( out, peer->long_name, out_size );
+                return;
+            }
+            snprintf( out, out_size, "!%08" PRIX32, node_id );
+        }
+
+        void meshtastic_store_peer_user( uint32_t node_id, const meshtastic_User &user ) {
+            meshtastic_peer_user_t *slot = meshtastic_find_peer_user( node_id );
+
+            if ( !slot ) {
+                uint8_t oldest = 0;
+
+                for ( uint8_t i = 0; i < MESHTASTIC_PEER_USER_COUNT; i++ ) {
+                    if ( !meshtastic_peer_users[ i ].valid ) {
+                        oldest = i;
+                        break;
+                    }
+                    if ( meshtastic_peer_users[ i ].last_seen < meshtastic_peer_users[ oldest ].last_seen ) {
+                        oldest = i;
+                    }
+                }
+                slot = &meshtastic_peer_users[ oldest ];
+            }
+
+            slot->valid = true;
+            slot->node_id = node_id;
+            slot->last_seen = millis();
+            meshtastic_trim_copy( slot->long_name, sizeof( slot->long_name ), user.long_name );
+            meshtastic_trim_copy( slot->short_name, sizeof( slot->short_name ), user.short_name );
+        }
+
+        bool meshtastic_time_due( uint32_t now, uint32_t target ) {
+            return( (int32_t)( now - target ) >= 0 );
+        }
+
         void meshtastic_store_last_message( const char *sender, const char *text ) {
             strncpy( meshtastic_last_message_sender, sender ? sender : "", sizeof( meshtastic_last_message_sender ) - 1 );
             meshtastic_last_message_sender[ sizeof( meshtastic_last_message_sender ) - 1 ] = '\0';
@@ -572,6 +782,61 @@
             offset += written;
             memcpy( &buffer[ offset ], text, text_len );
             offset += text_len;
+
+            if ( offset + 5 > max_len ) {
+                return( 0 );
+            }
+            buffer[ offset++ ] = 0x25;
+            memcpy( &buffer[ offset ], &dest, sizeof( dest ) );
+            offset += sizeof( dest );
+
+            if ( offset + 5 > max_len ) {
+                return( 0 );
+            }
+            buffer[ offset++ ] = 0x2D;
+            memcpy( &buffer[ offset ], &source, sizeof( source ) );
+            offset += sizeof( source );
+
+            return( offset );
+        }
+
+        size_t meshtastic_encode_data_message(
+            uint8_t *buffer,
+            size_t max_len,
+            uint32_t portnum,
+            const uint8_t *app_payload,
+            size_t app_payload_len,
+            uint32_t dest,
+            uint32_t source
+        ) {
+            size_t offset = 0;
+            size_t written = 0;
+
+            if ( portnum == 0 || !app_payload || app_payload_len == 0 || app_payload_len > MESHTASTIC_MAX_PACKET_LEN ) {
+                return( 0 );
+            }
+
+            if ( offset >= max_len ) {
+                return( 0 );
+            }
+            buffer[ offset++ ] = 0x08;
+            written = meshtastic_write_varint( portnum, &buffer[ offset ], max_len - offset );
+            if ( written == 0 ) {
+                return( 0 );
+            }
+            offset += written;
+
+            if ( offset >= max_len ) {
+                return( 0 );
+            }
+            buffer[ offset++ ] = 0x12;
+            written = meshtastic_write_varint( (uint32_t)app_payload_len, &buffer[ offset ], max_len - offset );
+            if ( written == 0 || offset + written + app_payload_len > max_len ) {
+                return( 0 );
+            }
+            offset += written;
+            memcpy( &buffer[ offset ], app_payload, app_payload_len );
+            offset += app_payload_len;
 
             if ( offset + 5 > max_len ) {
                 return( 0 );
@@ -821,7 +1086,18 @@
             meshtastic_last_rssi = (int32_t)lround( meshtastic_radio.getRSSI() );
             meshtastic_last_snr = meshtastic_radio.getSNR();
 
-            snprintf( sender, sizeof( sender ), "!%08" PRIX32, header->from );
+            meshtastic_format_node_label( header->from, sender, sizeof( sender ) );
+
+            if ( data.portnum == MESHTASTIC_NODEINFO_APP ) {
+                meshtastic_User user;
+
+                if ( meshtastic_decode_user_payload( data.payload, data.payload_len, user ) ) {
+                    meshtastic_store_peer_user( header->from, user );
+                    meshtastic_format_node_label( header->from, sender, sizeof( sender ) );
+                    meshtastic_update_status( "RX %s user %s", rx_channel->name, sender );
+                    return( true );
+                }
+            }
 
             if ( meshtastic_decode_text_message( data, decoded ) ) {
                 meshtastic_store_last_message( sender, decoded.text );
@@ -888,6 +1164,18 @@
         }
 
         bool meshtastic_powermgm_loop_cb( EventBits_t event, void *arg ) {
+            const uint32_t now = millis();
+
+            if ( meshtastic_radio_ready && meshtastic_nodeinfo_due && meshtastic_time_due( now, meshtastic_nodeinfo_due_ms ) ) {
+                if ( meshtastic_service_broadcast_node_info() ) {
+                    meshtastic_nodeinfo_due = true;
+                    meshtastic_nodeinfo_due_ms = now + MESHTASTIC_NODEINFO_INTERVAL_MS;
+                }
+                else if ( !meshtastic_tx_active ) {
+                    meshtastic_nodeinfo_due_ms = now + MESHTASTIC_NODEINFO_RETRY_DELAY_MS;
+                }
+            }
+
             if ( !meshtastic_radio_ready || !meshtastic_radio_irq ) {
                 return( true );
             }
@@ -927,6 +1215,7 @@
         if ( meshtastic_node_id == 0 || meshtastic_node_id == MESHTASTIC_BROADCAST ) {
             meshtastic_node_id ^= 0x5A5A1234UL;
         }
+        meshtastic_load_user();
         meshtastic_packet_counter = esp_random() & 0x3FF;
 
         meshtastic_update_status( "Initializing radio" );
@@ -955,6 +1244,7 @@
             meshtastic_radio.setDio1Action( meshtastic_radio_isr );
             meshtastic_start_receive();
             meshtastic_update_status( "Mesh ready" );
+            meshtastic_service_schedule_node_info_broadcast( MESHTASTIC_NODEINFO_START_DELAY_MS );
         }
 
         powermgm_register_cb(
@@ -969,7 +1259,14 @@
         );
     }
 
-    static bool meshtastic_service_send_text_internal( const char *text, uint32_t dest, uint8_t channel_slot ) {
+    static bool meshtastic_service_send_payload_internal(
+        uint32_t portnum,
+        const uint8_t *app_payload,
+        size_t app_payload_len,
+        uint32_t dest,
+        uint8_t channel_slot,
+        const char *pending_text
+    ) {
         uint8_t payload[ MESHTASTIC_MAX_PACKET_LEN ] = { 0 };
         uint8_t packet[ MESHTASTIC_MAX_PACKET_LEN ] = { 0 };
         meshtastic_packet_header_t *header = (meshtastic_packet_header_t *)packet;
@@ -993,10 +1290,12 @@
 
         tx_channel = &meshtastic_channels[ channel_slot ];
 
-        const size_t payload_len = meshtastic_encode_text_message(
+        const size_t payload_len = meshtastic_encode_data_message(
             payload,
             sizeof( payload ),
-            text,
+            portnum,
+            app_payload,
+            app_payload_len,
             dest,
             meshtastic_node_id
         );
@@ -1018,8 +1317,13 @@
         meshtastic_crypt_payload( header->from, header->id, payload, payload_len, tx_channel->psk, tx_channel->psk_len );
         memcpy( packet + sizeof( meshtastic_packet_header_t ), payload, payload_len );
 
-        strncpy( meshtastic_pending_text, text, sizeof( meshtastic_pending_text ) - 1 );
-        meshtastic_pending_text[ sizeof( meshtastic_pending_text ) - 1 ] = '\0';
+        if ( pending_text && pending_text[ 0 ] ) {
+            strncpy( meshtastic_pending_text, pending_text, sizeof( meshtastic_pending_text ) - 1 );
+            meshtastic_pending_text[ sizeof( meshtastic_pending_text ) - 1 ] = '\0';
+        }
+        else {
+            meshtastic_pending_text[ 0 ] = '\0';
+        }
         strlcpy( meshtastic_pending_channel_name, tx_channel->name, sizeof( meshtastic_pending_channel_name ) );
 
         const int state = meshtastic_radio.startTransmit( packet, sizeof( meshtastic_packet_header_t ) + payload_len );
@@ -1036,12 +1340,54 @@
         return( true );
     }
 
+    static bool meshtastic_service_send_text_internal( const char *text, uint32_t dest, uint8_t channel_slot ) {
+        const size_t text_len = text ? strlen( text ) : 0;
+
+        if ( text_len == 0 || text_len > MESHTASTIC_MAX_TEXT_LEN ) {
+            meshtastic_update_status( "Invalid message" );
+            return( false );
+        }
+
+        return( meshtastic_service_send_payload_internal(
+            MESHTASTIC_TEXT_MESSAGE_APP,
+            (const uint8_t *)text,
+            text_len,
+            dest,
+            channel_slot,
+            text
+        ) );
+    }
+
     bool meshtastic_service_send_text( const char *text ) {
         return( meshtastic_service_send_text_internal( text, MESHTASTIC_BROADCAST, meshtastic_active_channel_slot ) );
     }
 
     bool meshtastic_service_send_text_to( const char *text, uint32_t dest, uint8_t channel_slot ) {
         return( meshtastic_service_send_text_internal( text, dest, channel_slot ) );
+    }
+
+    bool meshtastic_service_broadcast_node_info( void ) {
+        uint8_t user_payload[ meshtastic_User_size ] = { 0 };
+        size_t user_payload_len = 0;
+
+        if ( !meshtastic_encode_user_payload( user_payload, sizeof( user_payload ), user_payload_len ) ) {
+            meshtastic_update_status( "Node info encode failed" );
+            return( false );
+        }
+
+        return( meshtastic_service_send_payload_internal(
+            MESHTASTIC_NODEINFO_APP,
+            user_payload,
+            user_payload_len,
+            MESHTASTIC_BROADCAST,
+            meshtastic_active_channel_slot,
+            NULL
+        ) );
+    }
+
+    void meshtastic_service_schedule_node_info_broadcast( uint32_t delay_ms ) {
+        meshtastic_nodeinfo_due = true;
+        meshtastic_nodeinfo_due_ms = millis() + delay_ms;
     }
 
     bool meshtastic_service_is_ready( void ) {
@@ -1102,6 +1448,52 @@
 
     uint32_t meshtastic_service_get_node_id( void ) {
         return( meshtastic_node_id );
+    }
+
+    const char *meshtastic_service_get_long_name( void ) {
+        meshtastic_load_user();
+        return( meshtastic_long_name );
+    }
+
+    const char *meshtastic_service_get_short_name( void ) {
+        meshtastic_load_user();
+        return( meshtastic_short_name );
+    }
+
+    bool meshtastic_service_get_user_info( meshtastic_service_user_info_t *info ) {
+        if ( !info ) {
+            return( false );
+        }
+
+        meshtastic_load_user();
+        memset( info, 0, sizeof( *info ) );
+        strlcpy( info->long_name, meshtastic_long_name, sizeof( info->long_name ) );
+        strlcpy( info->short_name, meshtastic_short_name, sizeof( info->short_name ) );
+        info->is_licensed = meshtastic_is_licensed;
+        info->is_unmessageable = meshtastic_is_unmessageable;
+        return( true );
+    }
+
+    bool meshtastic_service_set_user_info( const meshtastic_service_user_info_t *info ) {
+        if ( !info ) {
+            return( false );
+        }
+
+        meshtastic_load_user();
+        meshtastic_trim_copy( meshtastic_long_name, sizeof( meshtastic_long_name ), info->long_name );
+        meshtastic_trim_copy( meshtastic_short_name, sizeof( meshtastic_short_name ), info->short_name );
+        meshtastic_is_licensed = info->is_licensed;
+        meshtastic_is_unmessageable = info->is_unmessageable;
+        meshtastic_apply_user_defaults_if_needed();
+
+        if ( !meshtastic_save_user() ) {
+            return( false );
+        }
+
+        if ( meshtastic_radio_ready ) {
+            meshtastic_service_schedule_node_info_broadcast( 250 );
+        }
+        return( true );
     }
 
     uint32_t meshtastic_service_get_last_peer( void ) {
@@ -1278,6 +1670,34 @@
 
     uint32_t meshtastic_service_get_node_id( void ) {
         return( 0 );
+    }
+
+    const char *meshtastic_service_get_long_name( void ) {
+        return( "" );
+    }
+
+    const char *meshtastic_service_get_short_name( void ) {
+        return( "" );
+    }
+
+    bool meshtastic_service_get_user_info( meshtastic_service_user_info_t *info ) {
+        if ( info ) {
+            memset( info, 0, sizeof( *info ) );
+        }
+        return( false );
+    }
+
+    bool meshtastic_service_set_user_info( const meshtastic_service_user_info_t *info ) {
+        (void)info;
+        return( false );
+    }
+
+    bool meshtastic_service_broadcast_node_info( void ) {
+        return( false );
+    }
+
+    void meshtastic_service_schedule_node_info_broadcast( uint32_t delay_ms ) {
+        (void)delay_ms;
     }
 
     uint32_t meshtastic_service_get_last_peer( void ) {

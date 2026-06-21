@@ -6,9 +6,18 @@
 
     #define MESHTASTIC_SERVICE_MAX_CHANNEL_NAME_LEN 16
     #define MESHTASTIC_SERVICE_MAX_PSK_LEN 32
+    #define MESHTASTIC_SERVICE_LONG_NAME_LEN 40
+    #define MESHTASTIC_SERVICE_SHORT_NAME_LEN 5
     #define MESHTASTIC_SERVICE_CHANNEL_ROLE_DISABLED 0
     #define MESHTASTIC_SERVICE_CHANNEL_ROLE_PRIMARY 1
     #define MESHTASTIC_SERVICE_CHANNEL_ROLE_SECONDARY 2
+
+    typedef struct {
+        char long_name[ MESHTASTIC_SERVICE_LONG_NAME_LEN ];
+        char short_name[ MESHTASTIC_SERVICE_SHORT_NAME_LEN ];
+        bool is_licensed;
+        bool is_unmessageable;
+    } meshtastic_service_user_info_t;
 
     typedef struct {
         bool enabled;
@@ -42,6 +51,12 @@
     const char *meshtastic_service_get_primary_channel_name( void );
     float meshtastic_service_get_frequency_mhz( void );
     uint32_t meshtastic_service_get_node_id( void );
+    const char *meshtastic_service_get_long_name( void );
+    const char *meshtastic_service_get_short_name( void );
+    bool meshtastic_service_get_user_info( meshtastic_service_user_info_t *info );
+    bool meshtastic_service_set_user_info( const meshtastic_service_user_info_t *info );
+    bool meshtastic_service_broadcast_node_info( void );
+    void meshtastic_service_schedule_node_info_broadcast( uint32_t delay_ms );
     uint32_t meshtastic_service_get_last_peer( void );
     int32_t meshtastic_service_get_last_rssi( void );
     float meshtastic_service_get_last_snr( void );

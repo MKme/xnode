@@ -170,6 +170,15 @@
         }
 
         void meshtastic_ble_sync_owner_from_device( void ) {
+            meshtastic_service_user_info_t info;
+
+            memset( &info, 0, sizeof( info ) );
+            if ( meshtastic_service_get_user_info( &info ) ) {
+                snprintf( meshtastic_ble_owner_long_name, sizeof( meshtastic_ble_owner_long_name ), "%s", info.long_name );
+                snprintf( meshtastic_ble_owner_short_name, sizeof( meshtastic_ble_owner_short_name ), "%s", info.short_name );
+                return;
+            }
+
             if ( meshtastic_ble_owner_long_name[ 0 ] == '\0' ) {
                 snprintf(
                     meshtastic_ble_owner_long_name,
@@ -286,17 +295,25 @@
 
         bool meshtastic_ble_build_user( meshtastic_User &user ) {
             const uint32_t node_id = meshtastic_ble_current_node_id();
+            meshtastic_service_user_info_t info;
 
             memset( &user, 0, sizeof( user ) );
             meshtastic_ble_sync_owner_from_device();
+            memset( &info, 0, sizeof( info ) );
+            meshtastic_service_get_user_info( &info );
 
             snprintf( user.id, sizeof( user.id ), "!%08" PRIX32, node_id );
-            snprintf( user.long_name, sizeof( user.long_name ), "%s", meshtastic_ble_owner_long_name );
-            snprintf( user.short_name, sizeof( user.short_name ), "%s", meshtastic_ble_owner_short_name );
-            user.hw_model = meshtastic_HardwareModel_T_WATCH_S3;
+            snprintf( user.long_name, sizeof( user.long_name ), "%s", info.long_name[ 0 ] ? info.long_name : meshtastic_ble_owner_long_name );
+            snprintf( user.short_name, sizeof( user.short_name ), "%s", info.short_name[ 0 ] ? info.short_name : meshtastic_ble_owner_short_name );
+            #if defined( USING_TWATCH_ULTRA )
+                user.hw_model = meshtastic_HardwareModel_T_WATCH_ULTRA;
+            #else
+                user.hw_model = meshtastic_HardwareModel_T_WATCH_S3;
+            #endif
+            user.is_licensed = info.is_licensed;
             user.role = meshtastic_ble_config_store.device.role;
             user.has_is_unmessagable = true;
-            user.is_unmessagable = false;
+            user.is_unmessagable = info.is_unmessageable;
             return( true );
         }
 
@@ -766,18 +783,29 @@
         }
 
         void meshtastic_ble_apply_owner( const meshtastic_User &user ) {
+            meshtastic_service_user_info_t info;
+
+            memset( &info, 0, sizeof( info ) );
+            meshtastic_service_get_user_info( &info );
+
             if ( user.long_name[ 0 ] ) {
                 snprintf( meshtastic_ble_owner_long_name, sizeof( meshtastic_ble_owner_long_name ), "%s", user.long_name );
+                snprintf( info.long_name, sizeof( info.long_name ), "%s", user.long_name );
             }
             if ( user.short_name[ 0 ] ) {
                 snprintf( meshtastic_ble_owner_short_name, sizeof( meshtastic_ble_owner_short_name ), "%s", user.short_name );
+                snprintf( info.short_name, sizeof( info.short_name ), "%s", user.short_name );
             } else {
                 meshtastic_ble_build_short_name(
                     meshtastic_ble_owner_long_name,
                     meshtastic_ble_owner_short_name,
                     sizeof( meshtastic_ble_owner_short_name )
                 );
+                snprintf( info.short_name, sizeof( info.short_name ), "%s", meshtastic_ble_owner_short_name );
             }
+            info.is_licensed = user.is_licensed;
+            info.is_unmessageable = user.has_is_unmessagable ? user.is_unmessagable : info.is_unmessageable;
+            meshtastic_service_set_user_info( &info );
 
             if ( meshtastic_ble_owner_long_name[ 0 ] ) {
                 device_set_name( meshtastic_ble_owner_long_name );

@@ -117,7 +117,7 @@ void meshtastic_app_setup( void ) {
 }
 
 static void meshtastic_app_refresh( void ) {
-    char node[ 32 ];
+    char node[ 64 ];
     char status[ 96 ];
     char link[ 96 ];
     char channels[ 160 ] = "";
@@ -166,7 +166,13 @@ static void meshtastic_app_refresh( void ) {
         );
     }
 
-    snprintf( node, sizeof( node ), "me !%08" PRIX32, meshtastic_service_get_node_id() );
+    snprintf(
+        node,
+        sizeof( node ),
+        "me %s !%08" PRIX32,
+        meshtastic_service_get_short_name()[ 0 ] ? meshtastic_service_get_short_name() : "XN",
+        meshtastic_service_get_node_id()
+    );
     snprintf( status, sizeof( status ), "%s", meshtastic_service_get_status() );
 
     lv_label_set_text( meshtastic_node_label, node );

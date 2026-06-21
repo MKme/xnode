@@ -205,6 +205,57 @@
             return( changed );
         }
 
+        void xnode_fill_meshtastic_user_payload( JsonObject payload ) {
+            meshtastic_service_user_info_t info;
+
+            memset( &info, 0, sizeof( info ) );
+            meshtastic_service_get_user_info( &info );
+            payload[ "nodeId" ] = meshtastic_service_get_node_id();
+            payload[ "longName" ] = info.long_name;
+            payload[ "shortName" ] = info.short_name;
+            payload[ "isLicensed" ] = info.is_licensed;
+            payload[ "isUnmessageable" ] = info.is_unmessageable;
+        }
+
+        bool xnode_apply_meshtastic_user_payload( JsonObjectConst payload, bool *broadcast_requested ) {
+            meshtastic_service_user_info_t info;
+
+            if ( broadcast_requested ) {
+                *broadcast_requested = payload[ "broadcast" ] | false;
+            }
+
+            if ( !meshtastic_service_get_user_info( &info ) ) {
+                memset( &info, 0, sizeof( info ) );
+            }
+
+            if ( payload[ "longName" ].is<const char *>() ) {
+                strlcpy( info.long_name, payload[ "longName" ], sizeof( info.long_name ) );
+            }
+            if ( payload[ "long_name" ].is<const char *>() ) {
+                strlcpy( info.long_name, payload[ "long_name" ], sizeof( info.long_name ) );
+            }
+            if ( payload[ "shortName" ].is<const char *>() ) {
+                strlcpy( info.short_name, payload[ "shortName" ], sizeof( info.short_name ) );
+            }
+            if ( payload[ "short_name" ].is<const char *>() ) {
+                strlcpy( info.short_name, payload[ "short_name" ], sizeof( info.short_name ) );
+            }
+            if ( payload.containsKey( "isLicensed" ) ) {
+                info.is_licensed = payload[ "isLicensed" ] | false;
+            }
+            if ( payload.containsKey( "is_licensed" ) ) {
+                info.is_licensed = payload[ "is_licensed" ] | false;
+            }
+            if ( payload.containsKey( "isUnmessageable" ) ) {
+                info.is_unmessageable = payload[ "isUnmessageable" ] | false;
+            }
+            if ( payload.containsKey( "is_unmessageable" ) ) {
+                info.is_unmessageable = payload[ "is_unmessageable" ] | false;
+            }
+
+            return( meshtastic_service_set_user_info( &info ) );
+        }
+
         bool xnode_base64url_encode( const uint8_t *input, size_t input_len, String &output ) {
             const size_t encoded_capacity = ( ( input_len + 2 ) / 3 ) * 4 + 4;
             unsigned char *encoded = (unsigned char *)malloc( encoded_capacity );
@@ -1003,8 +1054,9 @@
         }
 
         bool xnode_send_hello_ack( void ) {
-            StaticJsonDocument< 768 > payload;
+            StaticJsonDocument< 1024 > payload;
             JsonArray capabilities = payload.createNestedArray( "capabilities" );
+            JsonObject mesh_user = payload.createNestedObject( "meshtasticUser" );
 
             payload[ "deviceName" ] = device_get_name();
             payload[ "protocolVersion" ] = 1;
@@ -1015,6 +1067,7 @@
             payload[ "nodeId" ] = meshtastic_service_get_node_id();
             payload[ "watchUnitId" ] = xnode_watch_unit_id;
             payload[ "sosToUnitId" ] = xnode_sos_to_unit_id;
+            xnode_fill_meshtastic_user_payload( mesh_user );
             payload[ "hasLocation" ] = xnode_has_location;
             if ( xnode_has_location ) {
                 payload[ "lat" ] = xnode_last_lat;
@@ -1027,6 +1080,7 @@
             capabilities.add( "mapOverlay" );
             capabilities.add( "newsNotifications" );
             capabilities.add( "manualSos" );
+            capabilities.add( "meshtasticNodeConfig" );
             capabilities.add( "ble" );
 
             return( xnode_send_event( "helloAck", payload ) );
@@ -1120,6 +1174,23 @@
                 reply[ "watchUnitId" ] = xnode_watch_unit_id;
                 reply[ "sosToUnitId" ] = xnode_sos_to_unit_id;
                 xnode_send_event( "sosConfigAck", reply );
+                return;
+            }
+
+            if ( strcmp( type, "setMeshtasticUser" ) == 0 ) {
+                StaticJsonDocument< 384 > reply;
+                bool broadcast_requested = false;
+                const bool saved = xnode_apply_meshtastic_user_payload( payload, &broadcast_requested );
+                JsonObject user = reply.createNestedObject( "meshtasticUser" );
+
+                if ( saved && broadcast_requested ) {
+                    meshtastic_service_schedule_node_info_broadcast( 250 );
+                }
+
+                reply[ "ok" ] = saved;
+                reply[ "broadcastQueued" ] = saved && broadcast_requested;
+                xnode_fill_meshtastic_user_payload( user );
+                xnode_send_event( "meshtasticUserAck", reply );
                 return;
             }
 
