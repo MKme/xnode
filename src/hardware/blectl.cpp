@@ -75,6 +75,39 @@ static bool blectl_powermgm_event_cb( EventBits_t event, void *arg );
     NimBLEServer *pServer = NULL;                          
     NimBLEAdvertising *pAdvertising = NULL;
     static uint32_t blectl_pair_passkey = 0;
+    static bool blectl_stack_ready = false;
+
+    static void blectl_apply_txpower( void ) {
+        switch( blectl_config.txpower ) {
+            case 0:             NimBLEDevice::setPower( ESP_PWR_LVL_N12 );
+                                break;
+            case 1:             NimBLEDevice::setPower( ESP_PWR_LVL_N9 );
+                                break;
+            case 2:             NimBLEDevice::setPower( ESP_PWR_LVL_N6 );
+                                break;
+            case 3:             NimBLEDevice::setPower( ESP_PWR_LVL_N3 );
+                                break;
+            case 4:             NimBLEDevice::setPower( ESP_PWR_LVL_N0 );
+                                break;
+            default:            NimBLEDevice::setPower( ESP_PWR_LVL_N9 );
+                                break;
+        }
+    }
+
+    static void blectl_start_advertising( void ) {
+        if ( !pServer || !pAdvertising ) {
+            return;
+        }
+        if ( !meshtastic_ble_configure_advertising() ) {
+            pAdvertising->start();
+        }
+    }
+
+    static void blectl_stop_advertising( void ) {
+        if ( pAdvertising ) {
+            pAdvertising->stop();
+        }
+    }
 
     static uint32_t blectl_prepare_pair_passkey( void ) {
         if ( !blectl_pair_passkey ) {
@@ -132,8 +165,8 @@ static bool blectl_powermgm_event_cb( EventBits_t event, void *arg );
             meshtastic_ble_on_disconnect();
             blectl_pair_passkey = 0;
 
-            if ( blectl_get_advertising() ) {
-                pServer->getAdvertising()->start();
+            if ( blectl_get_autoon() && blectl_get_advertising() ) {
+                blectl_start_advertising();
                 log_d("BLE advertising...");
             }
         };
@@ -180,6 +213,33 @@ static bool blectl_powermgm_event_cb( EventBits_t event, void *arg );
             powermgm_resume_from_ISR();
         };
     };
+
+    static void blectl_init_stack( void ) {
+        if ( blectl_stack_ready ) {
+            return;
+        }
+
+        char deviceName[ 64 ];
+        snprintf( deviceName, sizeof( deviceName ), "%s", device_get_name() );
+        NimBLEDevice::init( deviceName );
+        blectl_apply_txpower();
+        NimBLEDevice::setSecurityAuth( BLE_SM_PAIR_AUTHREQ_BOND | BLE_SM_PAIR_AUTHREQ_MITM | BLE_SM_PAIR_AUTHREQ_SC );
+        NimBLEDevice::setSecurityInitKey( BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID );
+        NimBLEDevice::setSecurityRespKey( BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID );
+        NimBLEDevice::setSecurityIOCap( BLE_HS_IO_DISPLAY_ONLY );
+
+        pServer = NimBLEDevice::createServer();
+        pServer->setCallbacks( new ServerCallbacks(), true );
+        pAdvertising = NimBLEDevice::getAdvertising();
+
+        deviceinfo_setup();
+        gadgetbridge_setup();
+        xnode_setup();
+        meshtastic_ble_setup();
+        blebatctl_setup();
+        blestepctl_setup();
+        blectl_stack_ready = true;
+    }
 #endif
 
 void blectl_setup( void ) {
@@ -190,58 +250,19 @@ void blectl_setup( void ) {
          */
         blectl_status = xEventGroupCreate();
         ASSERT( blectl_status, "Failed to allocate event group" );
-        /**
-         *  Create the BLE Device
-         */
-        char deviceName[ 64 ];
-        snprintf( deviceName, sizeof( deviceName ), "%s", device_get_name() );
-        NimBLEDevice::init( deviceName );
-        /*
-         * set power level from config
-         */
-        switch( blectl_config.txpower ) {
-            case 0:             NimBLEDevice::setPower( ESP_PWR_LVL_N12 );
-                                break;
-            case 1:             NimBLEDevice::setPower( ESP_PWR_LVL_N9 );
-                                break;
-            case 2:             NimBLEDevice::setPower( ESP_PWR_LVL_N6 );
-                                break;
-            case 3:             NimBLEDevice::setPower( ESP_PWR_LVL_N3 );
-                                break;
-            case 4:             NimBLEDevice::setPower( ESP_PWR_LVL_N0 );
-                                break;
-            default:            NimBLEDevice::setPower( ESP_PWR_LVL_N9 );
-                                break;
-        }
-        NimBLEDevice::setSecurityAuth( BLE_SM_PAIR_AUTHREQ_BOND | BLE_SM_PAIR_AUTHREQ_MITM | BLE_SM_PAIR_AUTHREQ_SC );
-        NimBLEDevice::setSecurityInitKey( BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID );
-        NimBLEDevice::setSecurityRespKey( BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID );
-        NimBLEDevice::setSecurityIOCap( BLE_HS_IO_DISPLAY_ONLY );
-        /*
-         * Create the BLE Server
-         */
-        pServer = NimBLEDevice::createServer();
-        pServer->setCallbacks( new ServerCallbacks(), true );
-        pAdvertising = NimBLEDevice::getAdvertising();
-        /**
-         * add services
-         */
-        deviceinfo_setup();
-        gadgetbridge_setup();
-        xnode_setup();
-        meshtastic_ble_setup();
-        blebatctl_setup();
-        blestepctl_setup();
-        /*
-         * Start advertising
-         */
-        if ( !meshtastic_ble_configure_advertising() ) {
-            pAdvertising->start();
-        }
     #endif
 
-    if( blectl_get_autoon() )
+    if( blectl_get_autoon() ) {
         blectl_on();
+    }
+    else {
+        #ifdef NATIVE_64BIT
+        #else
+            blectl_stop_advertising();
+        #endif
+        blectl_set_event( BLECTL_OFF );
+        blectl_clear_event( BLECTL_ON );
+    }
 
     powermgm_register_cb_with_prio( POWERMGM_STANDBY, blectl_powermgm_event_cb, "powermgm blectl", CALL_CB_FIRST );
     powermgm_register_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_WAKEUP, blectl_powermgm_event_cb, "powermgm blectl" );
@@ -379,10 +400,13 @@ void blectl_set_advertising( bool advertising ) {
 
     #ifdef NATIVE_64BIT
     #else
-        if ( advertising )
-            pServer->getAdvertising()->start();
-        else
-            pServer->getAdvertising()->stop();
+        if ( advertising && blectl_get_autoon() ) {
+            blectl_init_stack();
+            blectl_start_advertising();
+        }
+        else {
+            blectl_stop_advertising();
+        }
     #endif
 }
 
@@ -397,19 +421,8 @@ void blectl_set_txpower( int32_t txpower ) {
      */
     #ifdef NATIVE_64BIT
     #else
-        switch( blectl_config.txpower ) {
-            case 0:             NimBLEDevice::setPower( ESP_PWR_LVL_N12 );
-                                break;
-            case 1:             NimBLEDevice::setPower( ESP_PWR_LVL_N9 );
-                                break;
-            case 2:             NimBLEDevice::setPower( ESP_PWR_LVL_N6 );
-                                break;
-            case 3:             NimBLEDevice::setPower( ESP_PWR_LVL_N3 );
-                                break;
-            case 4:             NimBLEDevice::setPower( ESP_PWR_LVL_N0 );
-                                break;
-            default:            NimBLEDevice::setPower( ESP_PWR_LVL_N9 );
-                                break;
+        if ( blectl_stack_ready ) {
+            blectl_apply_txpower();
         }
     #endif
 
@@ -484,6 +497,16 @@ void blectl_save_config( void ) {
 
 void blectl_read_config( void ) {
     blectl_config.load();
+#if defined( LILYGO_WATCH_ULTRA )
+    if ( blectl_config.config_version < BLECTL_CONFIG_VERSION ) {
+        blectl_config.autoon = false;
+        blectl_config.advertising = false;
+        blectl_config.enable_on_standby = false;
+        blectl_config.disable_only_disconnected = false;
+        blectl_config.config_version = BLECTL_CONFIG_VERSION;
+        blectl_config.save();
+    }
+#endif
     blectl_send_event_cb( BLECTL_CONFIG_UPDATE, NULL );
 }
 
@@ -492,11 +515,12 @@ void blectl_on( void ) {
 
     #ifdef NATIVE_64BIT
     #else
+        blectl_init_stack();
         if ( blectl_config.advertising ) {
-            pServer->getAdvertising()->start();
+            blectl_start_advertising();
         }
         else {
-            pServer->getAdvertising()->stop();
+            blectl_stop_advertising();
         }
     #endif
 
@@ -510,7 +534,7 @@ void blectl_off( void ) {
 
     #ifdef NATIVE_64BIT
     #else
-        pServer->getAdvertising()->stop();
+        blectl_stop_advertising();
     #endif
 
     blectl_set_event( BLECTL_OFF );

@@ -25,6 +25,7 @@
     #include "utils/basejsonconfig.h"
 
     #define OSMMAP_JSON_COFIG_FILE         "/osmmap.json"   /** @brief defines json config file name */
+    #define OSMMAP_CONFIG_VERSION          1                /** @brief osmmap config schema version */
 
     /**
      * @brief blectl config structure
@@ -42,6 +43,7 @@
         double watch_flash_lon = 0.0;
         double watch_flash_lat = 0.0;
         uint32_t watch_flash_zoom = 10;
+        uint32_t config_version = OSMMAP_CONFIG_VERSION; /** @brief config schema version */
 
         protected:
         ////////////// Available for overloading: //////////////

@@ -430,8 +430,10 @@ void gpsctl_setup( void ) {
     gpsctl_config.load();
     #if defined( LILYGO_WATCH_ULTRA )
         bool config_changed = false;
-        if ( !gpsctl_config.autoon ) {
-            gpsctl_config.autoon = true;
+        if ( gpsctl_config.config_version < GPSCTL_CONFIG_VERSION ) {
+            gpsctl_config.autoon = false;
+            gpsctl_config.enable_on_standby = false;
+            gpsctl_config.config_version = GPSCTL_CONFIG_VERSION;
             config_changed = true;
         }
         if ( gpsctl_config.RXPin != SHIELD_GPS_RX || gpsctl_config.TXPin != SHIELD_GPS_TX ) {
@@ -688,7 +690,6 @@ bool gpsctl_powermgm_loop_cb( EventBits_t event, void *arg ) {
     #ifdef NATIVE_64BIT
 
     #else
-        powermgm_set_perf_mode();
         /**
          * abort if we have no serial init
          */
@@ -1027,6 +1028,12 @@ void gpsctl_autoon_on( void ) {
         }
     }
     else {
+        #ifdef NATIVE_64BIT
+        #else
+            #if defined( LILYGO_WATCH_ULTRA )
+                watch.powerIoctl( WATCH_POWER_GPS, false );
+            #endif
+        #endif
         gpsctl_enable = false;
         gpsctl_send_cb( GPSCTL_NOFIX, NULL );
         gpsctl_send_cb( GPSCTL_DISABLE, NULL );

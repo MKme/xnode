@@ -102,6 +102,16 @@ void wifictl_setup( void ) {
      */
     wifictl_config = new wifictl_config_t();
     wifictl_config->load();
+#if defined( LILYGO_WATCH_ULTRA )
+    if ( wifictl_config->config_version < WIFICTL_CONFIG_VERSION ) {
+        wifictl_config->autoon = false;
+        wifictl_config->enable_on_standby = false;
+        wifictl_config->webserver = false;
+        wifictl_config->ftpserver = false;
+        wifictl_config->config_version = WIFICTL_CONFIG_VERSION;
+        wifictl_config->save();
+    }
+#endif
 #ifdef NATIVE_64BIT
     wifictl_lv_task = lv_task_create( wifictl_Task, 500, LV_TASK_PRIO_MID, NULL );
 #else
@@ -248,8 +258,10 @@ void wifictl_setup( void ) {
      * change here your network for first use if WPS not work
      * or setup via display not possible
      */
+#if !defined( LILYGO_WATCH_ULTRA )
     if( !wifictl_is_known( "foo" ) )
         wifictl_insert_network( "foo", "bar" );
+#endif
 }
 
 bool wifictl_powermgm_event_cb( EventBits_t event, void *arg ) {

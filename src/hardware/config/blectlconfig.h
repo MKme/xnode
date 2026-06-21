@@ -26,6 +26,7 @@
 
     #define CUSTOM_AUDIO_ENTRYS            5
     #define BLECTL_JSON_COFIG_FILE         "/blectl.json"   /** @brief defines json config file name */
+    #define BLECTL_CONFIG_VERSION          1                /** @brief blectl config schema version */
 
     /**
      * @brief custom audio notification structure
@@ -56,6 +57,7 @@
         uint16_t maxInterval = 0x20;                            /** @brief connParams for maxInterval  0x20*1.25ms = 40ms */
         uint16_t latency = 20;                                  /** @brief skipped events */
         uint16_t timeout = 400;                                 /** @brief connParams for minInterval  0x10*1.25ms = 20ms */
+        uint32_t config_version = BLECTL_CONFIG_VERSION;        /** @brief config schema version */
         blectl_custom_audio* custom_audio_notifications = NULL; /** @brief timeout = 400*10ms = 4000ms */
 
         protected:

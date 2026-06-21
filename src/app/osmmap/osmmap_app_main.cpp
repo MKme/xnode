@@ -1454,6 +1454,14 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
      * load config
      */
     osmmap_config.load();
+#if defined( LILYGO_WATCH_ULTRA )
+    if ( osmmap_config.config_version < OSMMAP_CONFIG_VERSION ) {
+        osmmap_config.wifi_autoon = false;
+        osmmap_config.gps_on_standby = false;
+        osmmap_config.config_version = OSMMAP_CONFIG_VERSION;
+        osmmap_config.save();
+    }
+#endif
     osmmap_location = osm_map_create_location_obj();
     osmmap_location->load_ahead = osmmap_config.load_ahead;
     if ( osmmap_is_watch_flash_source_name( osmmap_config.osmmap ) ) {
@@ -2481,7 +2489,7 @@ void osmmap_activate_cb( void ) {
 #endif
     osmmap_update_request();
     lv_img_cache_invalidate_src( osmmap_app_tile_img );
-    powermgm_set_perf_mode();
+    powermgm_set_normal_mode();
 
     wf_image_button_fade_in( osmmap_exit_btn, 300, 0 );
     wf_image_button_fade_in( osmmap_zoom_in_btl, 300, 100 );

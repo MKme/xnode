@@ -30,12 +30,21 @@
     #include "utils/logging.h"
 #endif
 
+static bool wifictl_default_autoon( void ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    return false;
+#else
+    return true;
+#endif
+}
+
 wifictl_config_t::wifictl_config_t() : BaseJsonConfig( WIFICTL_JSON_CONFIG_FILE ) {}
 
 bool wifictl_config_t::onSave(JsonDocument& doc) {
     /*
      * save config structure into json file
      */
+    doc["config_version"] = WIFICTL_CONFIG_VERSION;
     doc["autoon"] = autoon;
     doc["hostname"] = hostname;
     doc["webserver"] = webserver;
@@ -80,7 +89,8 @@ bool wifictl_config_t::onLoad(JsonDocument& doc) {
     /*
      * read values from json
      */
-    autoon = doc["autoon"] | true;
+    config_version = doc["config_version"] | 0;
+    autoon = doc["autoon"] | wifictl_default_autoon();
     enable_on_standby = doc["enable_on_standby"] | false;
     if ( doc["hostname"] ) {
         strncpy( hostname, doc["hostname"], sizeof( hostname ) );
@@ -109,6 +119,7 @@ bool wifictl_config_t::onLoad(JsonDocument& doc) {
             strncpy( networklist[ i ].password, doc["networklist"][ i ]["psk"], sizeof( networklist[ i ].password ) );
         }
     }
+    config_version = config_version == 0 ? 0 : WIFICTL_CONFIG_VERSION;
 
     return true;
 }
@@ -135,7 +146,8 @@ bool wifictl_config_t::onDefault( void ) {
     /*
      * read values from json
      */
-    autoon = true;
+    config_version = WIFICTL_CONFIG_VERSION;
+    autoon = wifictl_default_autoon();
     enable_on_standby = false;
 
     webserver = false;

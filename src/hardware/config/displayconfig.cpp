@@ -21,6 +21,14 @@
  */
 #include "displayconfig.h"
 
+static uint32_t display_default_brightness( void ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    return DISPLAY_MAX_BRIGHTNESS / 2;
+#else
+    return DISPLAY_MAX_BRIGHTNESS / 2;
+#endif
+}
+
 display_config_t::display_config_t() : BaseJsonConfig(DISPLAY_JSON_CONFIG_FILE) {
 }
 
@@ -39,16 +47,25 @@ bool display_config_t::onSave(JsonDocument& doc) {
 }
 
 bool display_config_t::onLoad(JsonDocument& doc) {
-    config_version = doc["config_version"] | 0;
+    const uint32_t loaded_config_version = doc["config_version"] | 0;
+    config_version = loaded_config_version;
     migrated_legacy_timeout = false;
-    brightness = doc["brightness"] | DISPLAY_MAX_BRIGHTNESS / 2;
+    migrated_power_profile = false;
+    brightness = doc["brightness"] | display_default_brightness();
     rotation = doc["rotation"] | DISPLAY_MIN_ROTATE;
     timeout = doc["timeout"] | DISPLAY_MIN_TIMEOUT;
 
-    if ( config_version < DISPLAY_CONFIG_VERSION && timeout == DISPLAY_MAX_TIMEOUT ) {
+    if ( loaded_config_version < DISPLAY_CONFIG_VERSION && timeout == DISPLAY_MAX_TIMEOUT ) {
         timeout = DISPLAY_MIN_TIMEOUT;
         migrated_legacy_timeout = true;
     }
+
+#if defined( LILYGO_WATCH_ULTRA )
+    if ( loaded_config_version < DISPLAY_CONFIG_VERSION && brightness > display_default_brightness() ) {
+        brightness = display_default_brightness();
+        migrated_power_profile = true;
+    }
+#endif
 
     if ( timeout < DISPLAY_MIN_TIMEOUT ) {
         timeout = DISPLAY_MIN_TIMEOUT;
@@ -68,5 +85,16 @@ bool display_config_t::onLoad(JsonDocument& doc) {
 }
 
 bool display_config_t::onDefault( void ) {
+    config_version = DISPLAY_CONFIG_VERSION;
+    brightness = display_default_brightness();
+    timeout = DISPLAY_MIN_TIMEOUT;
+    rotation = DISPLAY_MIN_ROTATE;
+    block_return_maintile = false;
+    background_image = 4;
+    use_dma = true;
+    use_double_buffering = false;
+    vibe = true;
+    migrated_legacy_timeout = false;
+    migrated_power_profile = false;
     return true;
 }

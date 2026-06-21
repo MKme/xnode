@@ -25,6 +25,7 @@
     #include "utils/basejsonconfig.h"
 
     #define GPSCTL_JSON_CONFIG_FILE  "/gpsctl.json"           /** @brief defines json config file name */
+    #define GPSCTL_CONFIG_VERSION    1                        /** @brief gps config schema version */
 
     /**
      * @brief gpxctl config structure in memory
@@ -38,6 +39,7 @@
         bool gps_over_ip = false;               /** @brief enable gps over ip */
         int32_t TXPin = -1;                     /** @brief enable gps modules on M5stack use PIN as TX*/
         int32_t RXPin = -1;                     /** @brief enable gps modules on M5stack use PIN as RX */
+        uint32_t config_version = GPSCTL_CONFIG_VERSION; /** @brief config schema version */
 
         protected:
         ////////////// Available for overloading: //////////////

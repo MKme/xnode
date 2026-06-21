@@ -26,10 +26,27 @@
     #include "utils/logging.h"
 #endif
 
+static bool blectl_default_autoon( void ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    return false;
+#else
+    return true;
+#endif
+}
+
+static bool blectl_default_advertising( void ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    return false;
+#else
+    return true;
+#endif
+}
+
 blectl_config_t::blectl_config_t() : BaseJsonConfig(BLECTL_JSON_COFIG_FILE) {
 }
 
 bool blectl_config_t::onSave(JsonDocument& doc) {
+    doc["config_version"] = BLECTL_CONFIG_VERSION;
     doc["autoon"] = autoon;
     doc["advertising"] = advertising;
     doc["enable_on_standby"] = enable_on_standby;
@@ -72,8 +89,9 @@ bool blectl_config_t::onLoad(JsonDocument& doc) {
       custom_audio_notifications[ entry ].value[ 0 ] = '\0';
     }
 
-    autoon = doc["autoon"] | true;
-    advertising = doc["advertising"] | true;
+    config_version = doc["config_version"] | 0;
+    autoon = doc["autoon"] | blectl_default_autoon();
+    advertising = doc["advertising"] | blectl_default_advertising();
     enable_on_standby = doc["enable_on_standby"] | false;
     disable_only_disconnected = doc["disable_only_disconnected"] | false;
     timesync = doc["timesync"] | true;
@@ -94,6 +112,7 @@ bool blectl_config_t::onLoad(JsonDocument& doc) {
             strncpy( custom_audio_notifications[ i ].value  , doc["custom_audio_notifications"][ i ]["value"], sizeof( custom_audio_notifications[ i ].value ) );
         }
     }
+    config_version = config_version == 0 ? 0 : BLECTL_CONFIG_VERSION;
   
     return true;
 }
@@ -117,8 +136,9 @@ bool blectl_config_t::onDefault( void ) {
       custom_audio_notifications[ entry ].value[ 0 ] = '\0';
     }
 
-    autoon = true;
-    advertising = true;
+    config_version = BLECTL_CONFIG_VERSION;
+    autoon = blectl_default_autoon();
+    advertising = blectl_default_advertising();
     enable_on_standby = false;
     disable_only_disconnected = false;
     txpower = 1;

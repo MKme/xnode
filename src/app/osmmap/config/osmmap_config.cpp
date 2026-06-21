@@ -21,10 +21,19 @@
  */
 #include "osmmap_config.h"
 
+static bool osmmap_default_wifi_autoon( void ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    return false;
+#else
+    return true;
+#endif
+}
+
 osmmap_config_t::osmmap_config_t() : BaseJsonConfig( OSMMAP_JSON_COFIG_FILE ) {
 }
 
 bool osmmap_config_t::onSave(JsonDocument& doc) {
+    doc["config_version"] = OSMMAP_CONFIG_VERSION;
     doc["gps_autoon"] = gps_autoon;
     doc["gps_on_standby"] = gps_on_standby;
     doc["wifi_autoon"] = wifi_autoon;
@@ -39,9 +48,10 @@ bool osmmap_config_t::onSave(JsonDocument& doc) {
 }
 
 bool osmmap_config_t::onLoad(JsonDocument& doc) {
+    config_version = doc["config_version"] | 0;
     gps_autoon = doc["gps_autoon"] | true;
     gps_on_standby = doc["gps_on_standby"] | false;
-    wifi_autoon = doc["wifi_autoon"] | true;
+    wifi_autoon = doc["wifi_autoon"] | osmmap_default_wifi_autoon();
     load_ahead = doc["load_ahead"] | false;
     left_right_hand = doc["left_right_hand"] | false;
     strncpy( osmmap, doc["osmmap"] | "OSM Standard", sizeof( osmmap ) );
@@ -49,13 +59,15 @@ bool osmmap_config_t::onLoad(JsonDocument& doc) {
     watch_flash_lon = doc["watch_flash_lon"] | 0.0;
     watch_flash_lat = doc["watch_flash_lat"] | 0.0;
     watch_flash_zoom = doc["watch_flash_zoom"] | 10;
+    config_version = config_version == 0 ? 0 : OSMMAP_CONFIG_VERSION;
     return true;
 }
 
 bool osmmap_config_t::onDefault( void ) {
+    config_version = OSMMAP_CONFIG_VERSION;
     gps_autoon = true;
     gps_on_standby = false;
-    wifi_autoon = true;
+    wifi_autoon = osmmap_default_wifi_autoon();
     load_ahead = false;
     left_right_hand = false;
     strncpy( osmmap, "OSM Standard", sizeof( osmmap ) );

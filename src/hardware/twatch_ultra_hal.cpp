@@ -163,9 +163,9 @@ bool TWatchUltraHal::beginPower(Stream *stream) {
     power.setALDO4Voltage(1800);
     power.enableALDO4();
     power.setBLDO1Voltage(3300);
-    power.enableBLDO1();
+    power.disableBLDO1();
     power.setBLDO2Voltage(3300);
-    power.enableBLDO2();
+    power.disableBLDO2();
 
     power.disableDC2();
     power.disableDC3();
@@ -198,7 +198,7 @@ bool TWatchUltraHal::beginExpander() {
     }
 
     expanderPinMode(EXPANDS_DRV_EN, true);
-    expanderDigitalWrite(EXPANDS_DRV_EN, true);
+    expanderDigitalWrite(EXPANDS_DRV_EN, false);
     delay(1);
     expanderPinMode(EXPANDS_DISP_EN, true);
     expanderDigitalWrite(EXPANDS_DISP_EN, true);
@@ -303,6 +303,14 @@ void TWatchUltraHal::setBrightness(uint8_t level) {
     display.setBrightness(level);
 }
 
+void TWatchUltraHal::displaySleep() {
+    display.sleep();
+}
+
+void TWatchUltraHal::displayWakeup() {
+    display.wakeup();
+}
+
 bool TWatchUltraHal::getTouched() {
     return touch_ready && digitalRead(BOARD_TOUCH_INT) == LOW;
 }
@@ -358,6 +366,9 @@ void TWatchUltraHal::powerIoctl(PowerCtrlChannel ch, bool enable) {
             enable ? power.enableALDO3() : power.disableALDO3();
             break;
         case WATCH_POWER_DRV2605:
+            if ( expander_ready ) {
+                expanderDigitalWrite(EXPANDS_DRV_EN, enable);
+            }
             enable ? power.enableBLDO2() : power.disableBLDO2();
             break;
         case WATCH_POWER_GPS:

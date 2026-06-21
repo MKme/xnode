@@ -71,10 +71,16 @@ void display_setup( void ) {
     display_config.load();
     display_timeout = display_sanitize_timeout( display_config.timeout, false );
     display_config.timeout = display_timeout;
-    if ( display_config.migrated_legacy_timeout ) {
-        log_i( "migrating legacy display timeout 300->%u seconds", display_timeout );
+    if ( display_config.migrated_legacy_timeout || display_config.migrated_power_profile ) {
+        if ( display_config.migrated_legacy_timeout ) {
+            log_i( "migrating legacy display timeout 300->%u seconds", display_timeout );
+        }
+        if ( display_config.migrated_power_profile ) {
+            log_i( "migrating display brightness to %u", display_config.brightness );
+        }
         display_config.save();
         display_config.migrated_legacy_timeout = false;
+        display_config.migrated_power_profile = false;
     }
     display_note_activity();
     log_i( "display config: brightness=%u timeout=%u", display_config.brightness, display_timeout );
@@ -308,6 +314,7 @@ static void display_standby( void ) {
             M5.Lcd.sleep();
         #elif defined( LILYGO_WATCH_ULTRA )
             watch.setBrightness( 0 );
+            watch.displaySleep();
             brightness = 0;
             dest_brightness = 0;
         #elif defined( LILYGO_WATCH_S3 )
@@ -399,6 +406,7 @@ static void display_wakeup( bool silence ) {
                 M5.Lcd.wakeup();
                 M5.Axp.SetLcdVoltage( 2532 + display_get_brightness() );
             #elif defined( LILYGO_WATCH_ULTRA )
+                watch.displayWakeup();
                 brightness = 0;
                 dest_brightness = display_get_brightness();
             #elif defined( LILYGO_WATCH_S3 )

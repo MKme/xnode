@@ -66,6 +66,7 @@ static bool gps_status_block_return_maintile = false;
 static bool gps_status_prev_autoon = false;
 static bool gps_status_prev_enable_on_standby = false;
 static bool gps_status_forced_gps = false;
+static bool gps_status_active = false;
 /*
  * images
  */
@@ -471,12 +472,19 @@ static void gps_status_update_debug_label( void ) {
 
 void gps_status_debug_task_cb(lv_task_t *task) {
     (void)task;
+    if ( !gps_status_active ) {
+        return;
+    }
     gps_status_update_debug_label();
 }
 
 bool gpsctl_gps_status_event_cb( EventBits_t event, void *arg ) {
     char temp[30] = "";
     gps_data_t *gps_data = (gps_data_t*)arg;
+
+    if ( !gps_status_active ) {
+        return( true );
+    }
 
     #if defined( LILYGO_WATCH_ULTRA )
     if ( gps_status_debug_rows[11] ) {
@@ -552,6 +560,7 @@ bool gpsctl_gps_status_event_cb( EventBits_t event, void *arg ) {
 
 void gps_status_hibernate_cb(void)
 {
+    gps_status_active = false;
     /** restore old "block the maintile value */
     display_set_block_return_maintile( gps_status_block_return_maintile );
     if ( gps_status_forced_gps ) {
@@ -564,6 +573,7 @@ void gps_status_hibernate_cb(void)
 }
 void gps_status_activate_cb(void)
 {
+    gps_status_active = true;
     /** save "block the maintile" value */
     gps_status_block_return_maintile = display_get_block_return_maintile();
     /** overwrite "block the maintile" value */
@@ -571,7 +581,7 @@ void gps_status_activate_cb(void)
     gps_status_prev_autoon = gpsctl_get_autoon();
     gps_status_prev_enable_on_standby = gpsctl_get_enable_on_standby();
     gps_status_forced_gps = true;
-    gpsctl_set_enable_on_standby( true );
+    gpsctl_set_enable_on_standby( false );
     gpsctl_on();
     gps_status_update_debug_label();
 }

@@ -28,7 +28,7 @@
     
     #define DISPLAY_MIN_TIMEOUT         15              /** @brief min display timeout */
     #define DISPLAY_MAX_TIMEOUT         300             /** @brief max display timeout */
-    #define DISPLAY_CONFIG_VERSION      1               /** @brief display config schema version */
+    #define DISPLAY_CONFIG_VERSION      2               /** @brief display config schema version */
     #define DISPLAY_MIN_BRIGHTNESS      8               /** @brief min display brightness */
     #define DISPLAY_MAX_BRIGHTNESS      255             /** @brief max display brightness */
     #define DISPLAY_MIN_ROTATE          0               /** @brief min display rotation */
@@ -50,6 +50,7 @@
         uint32_t background_image = 4;                  /** @brief background image */
         uint32_t config_version = DISPLAY_CONFIG_VERSION; /** @brief config schema version */
         bool migrated_legacy_timeout = false;           /** @brief legacy timeout migration marker */
+        bool migrated_power_profile = false;            /** @brief power profile migration marker */
 
         protected:
         ////////////// Available for overloading: //////////////

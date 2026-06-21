@@ -30,6 +30,7 @@
     #include "utils/ftpserver/ftpserver.h"
     #define NETWORKLIST_ENTRYS          20
     #define WIFICTL_JSON_CONFIG_FILE    "/wificfg.json"
+    #define WIFICTL_CONFIG_VERSION      1
 
     /**
      * @brief network list structure
@@ -52,6 +53,7 @@
         bool ftpserver = false;                             /** @brief enable on ftpserver */
         char ftpuser[32] = FTPSERVER_USER;                  /** @brief ftpserver username*/
         char ftppass[32] = FTPSERVER_PASSWORD;              /** @brief ftpserver password*/
+        uint32_t config_version = WIFICTL_CONFIG_VERSION;   /** @brief config schema version */
         wifictl_networklist* networklist = NULL;            /** @brief network list config pointer */
         wifictl_networklist* networklist_tried = NULL;      /** @brief network list config pointer of networks a connection was tried */
 

@@ -681,6 +681,8 @@ void pmu_standby( void ) {
         if ( pmu_get_silence_wakeup() ) {
             esp_sleep_enable_timer_wakeup( pmu_config.silence_wakeup_interval * 60 * 1000000ULL );
         }
+        watch.powerIoctl( WATCH_POWER_GPS, false );
+        watch.powerIoctl( WATCH_POWER_DRV2605, false );
         watch.clearPMU();
         portENTER_CRITICAL(&PMU_IRQ_Mux);
         pmu_irq_flag = false;

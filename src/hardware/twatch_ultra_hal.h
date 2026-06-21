@@ -109,6 +109,8 @@ public:
     void setRotation(uint8_t rotation);
     uint8_t getRotation() const;
     void setBrightness(uint8_t level);
+    void displaySleep();
+    void displayWakeup();
 
     bool getTouched();
     uint8_t getPoint(int16_t *x, int16_t *y);
