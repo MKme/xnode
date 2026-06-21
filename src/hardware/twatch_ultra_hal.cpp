@@ -8,13 +8,41 @@ namespace {
     constexpr uint8_t XL9555_OUT1 = 0x03;
     constexpr uint8_t XL9555_CFG0 = 0x06;
     constexpr uint8_t XL9555_CFG1 = 0x07;
-    constexpr uint8_t CST92XX_ACK = 0xAB;
-    constexpr uint16_t CST92XX_READ_COMMAND = 0xD000;
+    constexpr uint8_t CST226_STATUS_REG = 0x00;
+    constexpr uint8_t CST226_SYNC = 0xAB;
+    constexpr uint8_t CST226_SINGLE_POINT_READ_LEN = 8;
+    constexpr uint8_t CST226_MAX_POINTS = 5;
 
     bool writeBytes(uint8_t addr, const uint8_t *data, size_t len) {
         Wire.beginTransmission(addr);
         Wire.write(data, len);
         return Wire.endTransmission() == 0;
+    }
+
+    bool readTouchStatus(uint8_t *data, size_t len) {
+        Wire.beginTransmission(BOARD_TOUCH_ADDR);
+        Wire.write(CST226_STATUS_REG);
+        if (Wire.endTransmission(false) != 0) {
+            return false;
+        }
+
+        const int read_len = Wire.requestFrom((int)BOARD_TOUCH_ADDR, (int)len);
+        if (read_len != (int)len) {
+            while (Wire.available()) {
+                Wire.read();
+            }
+            return false;
+        }
+
+        for (size_t i = 0; i < len; i++) {
+            data[i] = Wire.read();
+        }
+        return true;
+    }
+
+    void syncTouchStatus() {
+        uint8_t sync[2] = { CST226_STATUS_REG, CST226_SYNC };
+        writeBytes(BOARD_TOUCH_ADDR, sync, sizeof(sync));
     }
 }
 
@@ -284,46 +312,24 @@ uint8_t TWatchUltraHal::getPoint(int16_t *x, int16_t *y) {
         return 0;
     }
 
-    uint8_t read_buffer[15] = { 0 };
-    uint8_t command[2] = {
-        static_cast<uint8_t>(CST92XX_READ_COMMAND >> 8),
-        static_cast<uint8_t>(CST92XX_READ_COMMAND & 0xff)
-    };
-
-    Wire.beginTransmission(BOARD_TOUCH_ADDR);
-    Wire.write(command, sizeof(command));
-    if (Wire.endTransmission(false) != 0) {
+    uint8_t read_buffer[CST226_SINGLE_POINT_READ_LEN] = { 0 };
+    if (!readTouchStatus(read_buffer, sizeof(read_buffer))) {
         return 0;
     }
-    const int read_len = Wire.requestFrom((int)BOARD_TOUCH_ADDR, (int)sizeof(read_buffer));
-    if (read_len != (int)sizeof(read_buffer)) {
-        while (Wire.available()) {
-            Wire.read();
-        }
+
+    if (read_buffer[6] != CST226_SYNC || read_buffer[0] == CST226_SYNC || read_buffer[5] == 0x80) {
         return 0;
     }
-    for (uint8_t i = 0; i < sizeof(read_buffer); i++) {
-        read_buffer[i] = Wire.read();
-    }
 
-    uint8_t ack[3] = { command[0], command[1], CST92XX_ACK };
-    writeBytes(BOARD_TOUCH_ADDR, ack, sizeof(ack));
-
-    if (read_buffer[6] != CST92XX_ACK) {
-        return 0;
-    }
     const uint8_t points = read_buffer[5] & 0x7f;
-    if (points == 0 || points > 2) {
-        return 0;
-    }
-    const uint8_t pressed = read_buffer[0] & 0x0f;
-    if (pressed != 0x06) {
+    if (points == 0 || points > CST226_MAX_POINTS) {
+        syncTouchStatus();
         return 0;
     }
 
-    *x = (read_buffer[1] << 4) | (read_buffer[3] >> 4);
-    *y = (read_buffer[2] << 4) | (read_buffer[3] & 0x0f);
-    return 1;
+    *x = static_cast<int16_t>((read_buffer[1] << 4) | ((read_buffer[3] >> 4) & 0x0f));
+    *y = static_cast<int16_t>((read_buffer[2] << 4) | (read_buffer[3] & 0x0f));
+    return points;
 }
 
 void TWatchUltraHal::interruptTrigger() {
