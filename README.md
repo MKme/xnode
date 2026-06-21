@@ -6,6 +6,24 @@ Workspace paths:
 - Active project: `C:\GitHub\XNODE`
 - Archived legacy generations: `C:\GitHub\XNODE\obsolete\backup`
 
+## Watch screens
+
+These XNODE screens show the LilyGO T-Watch S3 firmware and the current T-Watch Ultra build in daily use.
+
+### Current T-Watch Ultra build
+
+| Current clock | GPS diagnostics | Map with GPS position | Map overlay close-up |
+| --- | --- | --- | --- |
+| <img src="site/images/IMG_6786.jpg" alt="T-Watch Ultra running the current XNODE clock screen with message shortcut" width="200"> | <img src="site/images/IMG_6765.jpg" alt="T-Watch Ultra GPS diagnostics screen showing fix, UART, baud, NMEA, and satellite status" width="200"> | <img src="site/images/IMG_6772.jpg" alt="T-Watch Ultra tactical map showing GPS position and synced overlay markers" width="200"> | <img src="site/images/IMG_6740.jpg" alt="T-Watch Ultra tactical map close-up showing GPS no-fix banner and synced overlay markers" width="200"> |
+| Current watchface/clock view on the Ultra hardware. | GPS status page for hardware bring-up and live receiver checks. | Tactical map with current position and XTOC/XCOM overlay markers. | Close-up map/GPS state with synced overlay symbols on the installed basemap. |
+
+### T-Watch S3 reference screens
+
+| Launcher | Tactical map | XNODE alerts |
+| --- | --- | --- |
+| <img src="images/xnode/IMG_6597.jpg" alt="XNODE launcher showing messages, mesh, Tac Map, media player, alert summary, and watchface manager apps" width="240"> | <img src="images/xnode/IMG_6590.jpg" alt="XNODE tactical map showing an installed basemap, synced markers, and map controls" width="240"> | <img src="images/xnode/IMG_6592.jpg" alt="XNODE alerts screen showing pushed XTOC news, check-ins, and operator alerts" width="240"> |
+| App launcher for messages, mesh, the tactical map, media controls, alert summary, and watchface management. | Tactical map view with the installed basemap, synced XTOC/XCOM markers, zoom controls, and map menu access. | Alert/news view for XTOC-pushed check-ins, operator alerts, and other watch-visible updates. |
+
 ## Buy the watch
 
 [![LILYGO T-Watch S3 Amazon listing](images/lilygo-t-watch-s3-amazon.jpg)](https://amzn.to/4sHfvgK)
@@ -170,24 +188,6 @@ After flashing, confirm the watch re-enumerates:
 ```powershell
 pio device list
 ```
-
-## Watch screens
-
-These XNODE screens show the LilyGO T-Watch S3 firmware and the current T-Watch Ultra build in daily use.
-
-### Current T-Watch Ultra build
-
-| Current clock | GPS diagnostics | Map with GPS position | Map overlay close-up |
-| --- | --- | --- | --- |
-| <img src="site/images/IMG_6786.jpg" alt="T-Watch Ultra running the current XNODE clock screen with message shortcut" width="200"> | <img src="site/images/IMG_6765.jpg" alt="T-Watch Ultra GPS diagnostics screen showing fix, UART, baud, NMEA, and satellite status" width="200"> | <img src="site/images/IMG_6772.jpg" alt="T-Watch Ultra tactical map showing GPS position and synced overlay markers" width="200"> | <img src="site/images/IMG_6740.jpg" alt="T-Watch Ultra tactical map close-up showing GPS no-fix banner and synced overlay markers" width="200"> |
-| Current watchface/clock view on the Ultra hardware. | GPS status page for hardware bring-up and live receiver checks. | Tactical map with current position and XTOC/XCOM overlay markers. | Close-up map/GPS state with synced overlay symbols on the installed basemap. |
-
-### T-Watch S3 reference screens
-
-| Launcher | Tactical map | XNODE alerts |
-| --- | --- | --- |
-| <img src="images/xnode/IMG_6597.jpg" alt="XNODE launcher showing messages, mesh, Tac Map, media player, alert summary, and watchface manager apps" width="240"> | <img src="images/xnode/IMG_6590.jpg" alt="XNODE tactical map showing an installed basemap, synced markers, and map controls" width="240"> | <img src="images/xnode/IMG_6592.jpg" alt="XNODE alerts screen showing pushed XTOC news, check-ins, and operator alerts" width="240"> |
-| App launcher for messages, mesh, the tactical map, media controls, alert summary, and watchface management. | Tactical map view with the installed basemap, synced XTOC/XCOM markers, zoom controls, and map menu access. | Alert/news view for XTOC-pushed check-ins, operator alerts, and other watch-visible updates. |
 
 ## Power management audit (2026-04-18)
 
