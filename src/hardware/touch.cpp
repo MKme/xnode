@@ -509,24 +509,14 @@ bool touch_getXY( int16_t &x, int16_t &y ) {
                 return( false );
             }
         #elif defined( LILYGO_WATCH_ULTRA )
-            static int16_t last_x = 0;
-            static int16_t last_y = 0;
-            static uint32_t last_touch_ms = 0;
             int16_t raw_x = 0;
             int16_t raw_y = 0;
             bool getTouchResult = false;
-            const uint32_t now = millis();
             if ( touch_lock_take() ) {
                 getTouchResult = watch.getPoint( &raw_x, &raw_y ) > 0;
                 touch_lock_give();
             }
             if ( !getTouchResult ) {
-                if ( last_touch_ms != 0 && (uint32_t)( now - last_touch_ms ) < 180 ) {
-                    x = last_x;
-                    y = last_y;
-                    touched = true;
-                    return( true );
-                }
                 touched = false;
                 return( false );
             }
@@ -556,9 +546,6 @@ bool touch_getXY( int16_t &x, int16_t &y ) {
             }
             x -= T_WATCH_ULTRA_SAFE_LEFT;
             y -= T_WATCH_ULTRA_SAFE_TOP;
-            last_x = x;
-            last_y = y;
-            last_touch_ms = now;
             touched = true;
         #elif defined( LILYGO_WATCH_S3 )
             int16_t raw_x = 0;

@@ -155,7 +155,11 @@ typedef int16_t lv_coord_t;
  * Can be changed in the Input device driver (`lv_indev_drv_t`)*/
 
 /* Input device read period in milliseconds */
+#if defined( LILYGO_WATCH_ULTRA )
+#define LV_INDEV_DEF_READ_PERIOD          10
+#else
 #define LV_INDEV_DEF_READ_PERIOD          30
+#endif
 
 /* Drag threshold in pixels */
 #define LV_INDEV_DEF_DRAG_LIMIT           10

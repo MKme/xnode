@@ -1881,7 +1881,11 @@ bool osmmap_gpsctl_event_cb( EventBits_t event, void *arg ) {
             osmmap_set_local_heading_from_gps( gps_data );
         #if defined( LILYGO_WATCH_ULTRA )
             if ( osmmap_app_active ) {
-                osmmap_refresh_local_position_marker();
+                const uint32_t now = millis();
+                if ( (uint32_t)( now - osmmap_last_gps_marker_refresh_ms ) >= 1000 ) {
+                    osmmap_refresh_local_position_marker();
+                    osmmap_last_gps_marker_refresh_ms = now;
+                }
             }
         #else
             osmmap_refresh_marker_positions();
