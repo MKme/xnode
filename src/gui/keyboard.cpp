@@ -52,40 +52,40 @@ static const char * const kb_map_am[] = {
     "a", "b", "c", "d", "\n",
     "e", "f", "g", "h", "\n",
     "i", "j", "k", "l", "\n",
-    "m", "N-Z", "SPC", LV_SYMBOL_BACKSPACE, "\n",
-    LV_SYMBOL_CLOSE, "CAP", "123", LV_SYMBOL_OK, ""
+    "m", "N-Z", "123", LV_SYMBOL_BACKSPACE, "\n",
+    LV_SYMBOL_CLOSE, "CAP", "space", LV_SYMBOL_OK, ""
 };
 
 static const char * const kb_map_nz[] = {
     "n", "o", "p", "q", "\n",
     "r", "s", "t", "u", "\n",
     "v", "w", "x", "y", "\n",
-    "z", "A-M", "SPC", LV_SYMBOL_BACKSPACE, "\n",
-    LV_SYMBOL_CLOSE, "CAP", "123", LV_SYMBOL_OK, ""
+    "z", "A-M", "123", LV_SYMBOL_BACKSPACE, "\n",
+    LV_SYMBOL_CLOSE, "CAP", "space", LV_SYMBOL_OK, ""
 };
 
 static const char * const kb_map_cap_am[] = {
     "A", "B", "C", "D", "\n",
     "E", "F", "G", "H", "\n",
     "I", "J", "K", "L", "\n",
-    "M", "N-Z", "SPC", LV_SYMBOL_BACKSPACE, "\n",
-    LV_SYMBOL_CLOSE, "low", "123", LV_SYMBOL_OK, ""
+    "M", "N-Z", "123", LV_SYMBOL_BACKSPACE, "\n",
+    LV_SYMBOL_CLOSE, "low", "space", LV_SYMBOL_OK, ""
 };
 
 static const char * const kb_map_cap_nz[] = {
     "N", "O", "P", "Q", "\n",
     "R", "S", "T", "U", "\n",
     "V", "W", "X", "Y", "\n",
-    "Z", "A-M", "SPC", LV_SYMBOL_BACKSPACE, "\n",
-    LV_SYMBOL_CLOSE, "low", "123", LV_SYMBOL_OK, ""
+    "Z", "A-M", "123", LV_SYMBOL_BACKSPACE, "\n",
+    LV_SYMBOL_CLOSE, "low", "space", LV_SYMBOL_OK, ""
 };
 
 static const char * const kb_map_symbol[] = {
     "1", "2", "3", "4", "\n",
     "5", "6", "7", "8", "\n",
     "9", "0", ".", ",", "\n",
-    "?", "!", "-", "_", "\n",
-    LV_SYMBOL_CLOSE, "A-M", "SPC", LV_SYMBOL_BACKSPACE, LV_SYMBOL_OK, ""
+    "?", "!", "-", LV_SYMBOL_BACKSPACE, "\n",
+    LV_SYMBOL_CLOSE, "A-M", "space", LV_SYMBOL_OK, ""
 };
 
 static const lv_btnmatrix_ctrl_t kb_ctrl_alpha[] = {
@@ -101,7 +101,7 @@ static const lv_btnmatrix_ctrl_t kb_ctrl_symbol[] = {
     KB_CTRL_KEY, KB_CTRL_KEY, KB_CTRL_KEY, KB_CTRL_KEY,
     KB_CTRL_KEY, KB_CTRL_KEY, KB_CTRL_KEY, KB_CTRL_KEY,
     KB_CTRL_KEY, KB_CTRL_KEY, KB_CTRL_KEY, KB_CTRL_KEY,
-    KB_CTRL_KEY, KB_CTRL_KEY, KB_CTRL_KEY, KB_CTRL_KEY, KB_CTRL_KEY
+    KB_CTRL_KEY, KB_CTRL_KEY, KB_CTRL_KEY, KB_CTRL_KEY
 };
 
 static void kb_event_cb(lv_obj_t * ta, lv_event_t event);
@@ -380,7 +380,7 @@ static bool keyboard_handle_text_key( lv_obj_t * keyboard, const char * txt ) {
         return( true );
     }
 
-    if ( strcmp( txt, "SPC" ) == 0 ) {
+    if ( strcmp( txt, "space" ) == 0 || strcmp( txt, "SPC" ) == 0 ) {
         lv_textarea_add_char( target, ' ' );
         return( true );
     }
