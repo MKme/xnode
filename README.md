@@ -173,7 +173,16 @@ pio device list
 
 ## Watch screens
 
-These XNODE screens show the LilyGO T-Watch S3 firmware in daily use.
+These XNODE screens show the LilyGO T-Watch S3 firmware and the current T-Watch Ultra build in daily use.
+
+### Current T-Watch Ultra build
+
+| Current clock | GPS diagnostics | Map with GPS position | Map overlay close-up |
+| --- | --- | --- | --- |
+| <img src="site/images/IMG_6786.jpg" alt="T-Watch Ultra running the current XNODE clock screen with message shortcut" width="200"> | <img src="site/images/IMG_6765.jpg" alt="T-Watch Ultra GPS diagnostics screen showing fix, UART, baud, NMEA, and satellite status" width="200"> | <img src="site/images/IMG_6772.jpg" alt="T-Watch Ultra tactical map showing GPS position and synced overlay markers" width="200"> | <img src="site/images/IMG_6740.jpg" alt="T-Watch Ultra tactical map close-up showing GPS no-fix banner and synced overlay markers" width="200"> |
+| Current watchface/clock view on the Ultra hardware. | GPS status page for hardware bring-up and live receiver checks. | Tactical map with current position and XTOC/XCOM overlay markers. | Close-up map/GPS state with synced overlay symbols on the installed basemap. |
+
+### T-Watch S3 reference screens
 
 | Launcher | Tactical map | XNODE alerts |
 | --- | --- | --- |

@@ -19,6 +19,22 @@ ASSETS = {
         "image/svg+xml",
         ROOT / "images" / "xnode-system-flow.svg",
     ),
+    "https://raw.githubusercontent.com/MKme/xnode/main/site/images/IMG_6786.jpg": (
+        "image/jpeg",
+        ROOT / "images" / "IMG_6786.jpg",
+    ),
+    "https://raw.githubusercontent.com/MKme/xnode/main/site/images/IMG_6765.jpg": (
+        "image/jpeg",
+        ROOT / "images" / "IMG_6765.jpg",
+    ),
+    "https://raw.githubusercontent.com/MKme/xnode/main/site/images/IMG_6772.jpg": (
+        "image/jpeg",
+        ROOT / "images" / "IMG_6772.jpg",
+    ),
+    "https://raw.githubusercontent.com/MKme/xnode/main/site/images/IMG_6740.jpg": (
+        "image/jpeg",
+        ROOT / "images" / "IMG_6740.jpg",
+    ),
 }
 
 

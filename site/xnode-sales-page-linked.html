@@ -35,6 +35,12 @@
   .xnode-dot.red{background:var(--red);box-shadow:0 0 0 4px rgba(201,76,76,.18)}
   .xnode-image{width:100%;height:auto;border-radius:12px;border:1px solid var(--line);display:block;background:#0f1719}
   .xnode-split{display:grid;grid-template-columns:1.05fr .95fr;gap:26px;align-items:center}
+  .xnode-photo-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:18px}
+  .xnode-photo-card{overflow:hidden;border:1px solid var(--line);border-radius:8px;background:#fff}
+  .xnode-photo-card img{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;background:#0f1719}
+  .xnode-photo-card div{padding:12px 13px}
+  .xnode-photo-card strong{display:block;margin-bottom:4px;color:#14262a}
+  .xnode-photo-card p{margin:0;color:#41575b}
   .xnode-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:16px}
   .xnode-mini{padding:16px;border-left:4px solid #6fbf73;background:#f7faf8;border-radius:6px}
   .xnode-mini strong{display:block;margin-bottom:4px;color:#14262a}
@@ -43,7 +49,8 @@
   .xnode-faq summary{cursor:pointer;font-weight:800;color:#182d31}
   .xnode-faq p{margin:10px 0 0;color:#445b5f}
   .xnode-note{font-size:14px;color:#637579}
-  @media (max-width:900px){.xnode-hero{min-height:auto}.xnode-hero-content{padding:44px 24px}.xnode-hero h1{font-size:38px}.xnode-hero p{font-size:18px}.xnode-proof,.xnode-grid,.xnode-grid.two,.xnode-split,.xnode-strip{grid-template-columns:1fr}}
+  @media (max-width:900px){.xnode-hero{min-height:auto}.xnode-hero-content{padding:44px 24px}.xnode-hero h1{font-size:38px}.xnode-hero p{font-size:18px}.xnode-proof,.xnode-grid,.xnode-grid.two,.xnode-split,.xnode-strip{grid-template-columns:1fr}.xnode-photo-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media (max-width:560px){.xnode-photo-grid{grid-template-columns:1fr}}
 </style>
 
 <div class="xnode-page">
@@ -97,6 +104,29 @@
           </div>
         </div>
         <img class="xnode-image" src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/xnode-watch-screens.webp" alt="Real XNODE watch screens showing launcher, tactical map, and alerts" width="1680" height="980" loading="lazy" decoding="async" />
+      </div>
+    </section>
+
+    <section class="xnode-section">
+      <h2>Current T-Watch Ultra photos</h2>
+      <p class="xnode-lead">The latest hardware photos show the Ultra build running the current clock, GPS diagnostics, and tactical map/GPS overlay screens on the watch.</p>
+      <div class="xnode-photo-grid">
+        <div class="xnode-photo-card">
+          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/IMG_6786.jpg" alt="T-Watch Ultra running the current XNODE clock screen with message shortcut" width="1062" height="1416" loading="lazy" decoding="async" />
+          <div><strong>Current clock</strong><p>Live Ultra clock screen with status bar and message shortcut.</p></div>
+        </div>
+        <div class="xnode-photo-card">
+          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/IMG_6765.jpg" alt="T-Watch Ultra GPS diagnostics screen showing fix, UART, baud, NMEA, and satellite status" width="1062" height="1416" loading="lazy" decoding="async" />
+          <div><strong>GPS diagnostics</strong><p>Receiver, UART, NMEA, fix, and satellite status on hardware.</p></div>
+        </div>
+        <div class="xnode-photo-card">
+          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/IMG_6772.jpg" alt="T-Watch Ultra tactical map showing GPS position and synced overlay markers" width="1062" height="1416" loading="lazy" decoding="async" />
+          <div><strong>Map/GPS position</strong><p>Tactical map with current GPS position and synced overlay markers.</p></div>
+        </div>
+        <div class="xnode-photo-card">
+          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/IMG_6740.jpg" alt="T-Watch Ultra tactical map close-up showing GPS no-fix banner and synced overlay markers" width="1062" height="1416" loading="lazy" decoding="async" />
+          <div><strong>Map overlay close-up</strong><p>Installed basemap, overlay symbols, and visible GPS state on the watch.</p></div>
+        </div>
       </div>
     </section>
 
