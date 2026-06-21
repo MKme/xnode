@@ -1191,9 +1191,15 @@ static void osmmap_raise_primary_controls( void ) {
 }
 
 static bool osmmap_accept_primary_control_event( lv_event_t event, uint32_t &last_event_ms ) {
-    if ( event != LV_EVENT_PRESSED && event != LV_EVENT_CLICKED && event != LV_EVENT_SHORT_CLICKED ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    if ( event != LV_EVENT_PRESSED ) {
         return( false );
     }
+#else
+    if ( event != LV_EVENT_CLICKED ) {
+        return( false );
+    }
+#endif
 
     const uint32_t now = millis();
     if ( last_event_ms != 0 && now - last_event_ms < 250 ) {
