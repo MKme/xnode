@@ -55,6 +55,121 @@ Known limits:
 - Manual SOS requires a configured watch Unit ID, a valid watch location, and a ready Meshtastic radio/channel before it can transmit.
 - CheckIn requires the same watch Unit ID, valid watch location, and ready Meshtastic radio/channel.
 
+## Power management status (2026-06-21)
+
+Current verified firmware baseline:
+- `t-watch-ultra`: built, flashed, and post-upload watchdog reset verified on the T-Watch Ultra.
+- `t-watch2020-v3-s3`: built successfully after the shared power/config changes to protect the other watch variant.
+- Latest power audit commit: `5ae38af Improve T-Watch Ultra battery life`.
+
+### Variant status
+
+| Area | T-Watch Ultra | T-Watch S3 / Gen3 |
+| --- | --- | --- |
+| Idle timeout | Uses the shared display activity timer and standby request path. | Uses the shared display activity timer and restored timeout-to-standby path. |
+| Display standby | AMOLED brightness is set to zero and the panel is put into `display.sleep()`. | Backlight/display is turned off through the S3/LilyGo path. |
+| Touch wake | Touch/display rail stays powered because it is shared; touch interrupt can wake the watch. | Uses LilyGo-style `ext1` wake on `BOARD_TOUCH_INT`. |
+| GPS at boot | Off by default after one-time config migration. | Existing behavior preserved. |
+| GPS while using map | Tac map can still auto-start GPS for the user-location marker. | Existing behavior preserved. |
+| GPS in standby | Off unless an app explicitly blocks standby. GPS status no longer enables standby GPS. | Existing tracker/status behavior preserved. |
+| WiFi at boot | Off by default after one-time config migration; dummy setup scan disabled. | Existing behavior preserved. |
+| BLE at boot | Off by default after one-time config migration; BLE stack is lazy-initialized. | Existing auto-on behavior preserved unless config says otherwise. |
+| LoRa / Meshtastic | Radio chip is put into sleep on standby; regulator rail is not cut yet to avoid a risky radio re-init path. | Existing behavior preserved. |
+| CPU performance mode | Watchface, GPS loop, and tac map no longer force 240 MHz/no-light-sleep. | Shared change applies; S3 build verified. |
+
+### What changed in the Ultra audit
+
+GPS:
+- Removed the Ultra-only code that forced `/gpsctl.json` `autoon=true` at every boot.
+- Added `GPSCTL_CONFIG_VERSION` and a one-time Ultra migration that sets `autoon=false` and `enable_on_standby=false`.
+- GPS BLDO1 is disabled at Ultra PMU boot instead of being left powered.
+- The Ultra auto-off path explicitly shuts down the GPS UART and GPS regulator.
+- The GPS loop no longer calls `powermgm_set_perf_mode()`, so GPS reads do not pin the CPU in full-speed mode.
+- The GPS status page powers GPS only while active and no longer requests GPS to stay on in standby.
+
+WiFi:
+- Added `WIFICTL_CONFIG_VERSION` and a one-time Ultra migration that turns off WiFi auto-on, standby WiFi, web server, and FTP server.
+- Ultra no longer inserts the dummy `foo` / `bar` network at setup, which prevented an unwanted boot-time WiFi scan.
+- WiFi can still be turned on from the UI/statusbar when needed.
+
+BLE:
+- Added `BLECTL_CONFIG_VERSION` and a one-time Ultra migration that turns off BLE auto-on, advertising, standby BLE, and disconnect-only standby blocking.
+- BLE advertising now only starts when BLE is actually on.
+- BLE stack initialization is lazy, so the controller is not brought up on Ultra boot when BLE is off.
+- Turning BLE on later still initializes the normal services, including Gadgetbridge, XNODE, battery/steps, and Meshtastic BLE.
+
+Display and PMU rails:
+- Ultra GPS BLDO1 and haptic BLDO2 start disabled at PMU boot.
+- Ultra haptic expander enable starts low; `WATCH_POWER_DRV2605` controls the rail and enable line together.
+- Ultra standby defensively cuts GPS and haptic power again before entering light sleep.
+- Ultra display standby now calls `display.sleep()` after setting brightness to zero, and wake calls `display.wakeup()`.
+- The shared display/touch rail is intentionally not cut on Ultra because touch wake depends on it.
+
+Apps and CPU mode:
+- Tac map activation now uses normal power mode instead of forcing performance mode.
+- Watchface activation now uses normal power mode instead of forcing performance mode on the normal idle screen.
+- Tac map still auto-starts GPS when its `autostart gps` option is enabled so the large GPS triangle can appear.
+- Tac map WiFi auto-start defaults off on Ultra after a one-time `OSMMAP_CONFIG_VERSION` migration.
+
+Display brightness:
+- `DISPLAY_CONFIG_VERSION` was bumped to `2`.
+- On Ultra only, old configs above half brightness are migrated once down to `DISPLAY_MAX_BRIGHTNESS / 2`.
+- The user can still raise brightness after the migration; the firmware does not force it down every boot.
+
+### Expected Ultra behavior now
+
+Normal idle:
+- Screen fades after the configured display timeout, the AMOLED panel sleeps, and the watch enters light sleep if no subsystem blocks standby.
+- GPS, WiFi, BLE advertising, and the unused haptic rail should not be running on a clean idle boot.
+- The watch should wake by touch/power/PMU events without requiring a reboot.
+
+Opening the tac map:
+- GPS may power on if map `autostart gps` is enabled.
+- WiFi should not auto-start unless the map/user config explicitly enables it.
+- The map no longer keeps the whole watch in forced performance mode.
+
+Opening GPS status:
+- GPS powers on so live debug fields can update.
+- Leaving the page restores the previous GPS auto-on and standby settings.
+- The page does not keep GPS alive through standby.
+
+Turning BLE or WiFi on manually:
+- BLE and WiFi still work from the normal UI/statusbar paths.
+- Those radios will cost battery while enabled, especially BLE advertising and WiFi scanning/connection attempts.
+
+### Known power tradeoffs still open
+
+- Meshtastic LoRa regulator power is not cut in standby. The SX1262 is put to sleep, but cutting the rail safely needs a full radio re-init path on wake.
+- OTA/update still uses `powermgm_set_perf_mode()` intentionally while flashing or updating.
+- `powermgm_set_lightsleep(false)` users in OTA and battery calibration still need a paired release audit, as noted in the older S3 audit.
+- Any app that explicitly enables GPS-on-standby, WiFi-on-standby, BLE always-on, or long display timeout will reduce battery life by design.
+
+### Power verification commands
+
+Build Ultra:
+
+```powershell
+pio run -e t-watch-ultra
+```
+
+Build S3 / Gen3 regression target:
+
+```powershell
+pio run -e t-watch2020-v3-s3
+```
+
+Flash Ultra from this repo:
+
+```powershell
+pio run -e t-watch-ultra -t upload
+```
+
+After flashing, confirm the watch re-enumerates:
+
+```powershell
+pio device list
+```
+
 ## Watch screens
 
 These XNODE screens show the LilyGO T-Watch S3 firmware in daily use.
