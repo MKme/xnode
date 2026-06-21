@@ -73,6 +73,7 @@ lv_task_t *watchface_tile_task;
 volatile bool watchface_active = false;
 volatile bool watchface_tile_block_show_messages = false;
 volatile bool watchface_test = false;
+static volatile bool watchface_standby_activation = false;
 volatile uint32_t watchface_return_tile = 0;
 volatile bool watchface_enable_after_wakeup = false;
 /**
@@ -270,7 +271,7 @@ void watchface_tile_setup( void ) {
     /**
      * setup powermgm and touch callback function
      */
-    powermgm_register_cb( POWERMGM_STANDBY, watchface_powermgm_event_cb, "watchface powermgm" );
+    powermgm_register_cb( POWERMGM_STANDBY | POWERMGM_SILENCE_WAKEUP | POWERMGM_WAKEUP, watchface_powermgm_event_cb, "watchface powermgm" );
     /**
      * setup watchface background task
      */
@@ -787,6 +788,7 @@ lv_align_t watchface_get_align( char *align ) {
 bool watchface_powermgm_event_cb( EventBits_t event, void *arg ) {
     switch ( event ) {
         case POWERMGM_STANDBY:
+            powermgm_set_normal_mode();
             /**
              * switch on standby to watchface for better wakeup perfomance
              */
@@ -794,7 +796,9 @@ bool watchface_powermgm_event_cb( EventBits_t event, void *arg ) {
                 watchface_app_tile_update();
                 powermgm_clear_event( POWERMGM_STANDBY );
                 powermgm_set_event( POWERMGM_WAKEUP );
+                watchface_standby_activation = true;
                 mainbar_jump_to_tilenumber( watchface_app_tile_num, LV_ANIM_OFF, true );
+                watchface_standby_activation = false;
                 powermgm_clear_event( POWERMGM_WAKEUP );
                 powermgm_set_event( POWERMGM_STANDBY );
                 lv_obj_invalidate( lv_scr_act() );
@@ -803,6 +807,16 @@ bool watchface_powermgm_event_cb( EventBits_t event, void *arg ) {
                  * disable redraw on next gui cycle
                  */
                 gui_force_redraw( false );
+            }
+            break;
+        case POWERMGM_WAKEUP:
+            if ( watchface_active ) {
+                powermgm_set_perf_mode();
+            }
+            break;
+        case POWERMGM_SILENCE_WAKEUP:
+            if ( watchface_active ) {
+                powermgm_set_normal_mode();
             }
             break;
     }
@@ -819,7 +833,12 @@ void watchface_avtivate_cb( void ) {
      */
     watchface_tile_block_show_messages = blectl_get_show_notification();
     blectl_set_show_notification( blectl_get_show_notification() ? watchface_setup_get_allow_notifications() : false );
-    powermgm_set_normal_mode();
+    if ( watchface_standby_activation || powermgm_get_event( POWERMGM_STANDBY | POWERMGM_SILENCE_WAKEUP ) ) {
+        powermgm_set_normal_mode();
+    }
+    else {
+        powermgm_set_perf_mode();
+    }
 }
 
 void watchface_hibernate_cb( void ) {

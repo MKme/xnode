@@ -75,7 +75,7 @@ Current verified firmware baseline:
 | WiFi at boot | Off by default after one-time config migration; dummy setup scan disabled. | Existing behavior preserved. |
 | BLE at boot | Off by default after one-time config migration; BLE stack is lazy-initialized. | Existing auto-on behavior preserved unless config says otherwise. |
 | LoRa / Meshtastic | Radio chip is put into sleep on standby; regulator rail is not cut yet to avoid a risky radio re-init path. | Existing behavior preserved. |
-| CPU performance mode | Watchface, GPS loop, and tac map no longer force 240 MHz/no-light-sleep. | Shared change applies; S3 build verified. |
+| CPU performance mode | Active tac map and normal awake watchface use performance mode; standby handoff, hibernate, and the GPS loop do not globally pin performance. | Shared change applies; S3 build verified. |
 
 ### What changed in the Ultra audit
 
@@ -106,8 +106,9 @@ Display and PMU rails:
 - The shared display/touch rail is intentionally not cut on Ultra because touch wake depends on it.
 
 Apps and CPU mode:
-- Tac map activation now uses normal power mode instead of forcing performance mode.
-- Watchface activation now uses normal power mode instead of forcing performance mode on the normal idle screen.
+- Tac map activation uses performance mode while the map is open so zoom, pan, and map buttons stay responsive; closing/hibernating the map returns normal mode.
+- Watchface activation uses performance mode for normal awake use, but the standby handoff and hibernate path force normal mode so the idle sleep path is not pinned high.
+- The GPS loop no longer calls `powermgm_set_perf_mode()`, so background GPS reads do not pin the CPU in full-speed mode.
 - Tac map still auto-starts GPS when its `autostart gps` option is enabled so the large GPS triangle can appear.
 - Tac map WiFi auto-start defaults off on Ultra after a one-time `OSMMAP_CONFIG_VERSION` migration.
 
@@ -126,7 +127,7 @@ Normal idle:
 Opening the tac map:
 - GPS may power on if map `autostart gps` is enabled.
 - WiFi should not auto-start unless the map/user config explicitly enables it.
-- The map no longer keeps the whole watch in forced performance mode.
+- The map uses performance mode while open and returns normal mode when closed.
 
 Opening GPS status:
 - GPS powers on so live debug fields can update.

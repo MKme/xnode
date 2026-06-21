@@ -2489,7 +2489,7 @@ void osmmap_activate_cb( void ) {
 #endif
     osmmap_update_request();
     lv_img_cache_invalidate_src( osmmap_app_tile_img );
-    powermgm_set_normal_mode();
+    powermgm_set_perf_mode();
 
     wf_image_button_fade_in( osmmap_exit_btn, 300, 0 );
     wf_image_button_fade_in( osmmap_zoom_in_btl, 300, 100 );
