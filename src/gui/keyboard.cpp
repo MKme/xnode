@@ -187,9 +187,10 @@ void num_keyboard_setup( void ) {
 static void kb_event_cb( lv_obj_t * ta, lv_event_t event ) {
 
     if ( event == LV_EVENT_VALUE_CHANGED ) {
-        uint16_t btn_id = lv_btnmatrix_get_active_btn( ta );
+        const uint32_t *event_btn = (const uint32_t*)lv_event_get_data();
+        uint16_t btn_id = event_btn != NULL ? (uint16_t)( *event_btn ) : lv_btnmatrix_get_active_btn( ta );
         if ( btn_id != LV_BTNMATRIX_BTN_NONE ) {
-            const char * txt = lv_btnmatrix_get_active_btn_text( ta );
+            const char * txt = lv_btnmatrix_get_btn_text( ta, btn_id );
             if ( txt != NULL && keyboard_handle_text_key( ta, txt ) ) {
                 return;
             }
@@ -320,26 +321,32 @@ static void keyboard_set_page( keyboard_page_t page ) {
     kb_page = page;
     switch ( page ) {
         case KB_PAGE_AM:
-            lv_btnmatrix_set_map( kb, (const char **)kb_map_am );
-            lv_btnmatrix_set_ctrl_map( kb, kb_ctrl_alpha );
+            lv_keyboard_set_map( kb, LV_KEYBOARD_MODE_TEXT_LOWER, (const char **)kb_map_am );
+            lv_keyboard_set_ctrl_map( kb, LV_KEYBOARD_MODE_TEXT_LOWER, kb_ctrl_alpha );
+            lv_keyboard_set_mode( kb, LV_KEYBOARD_MODE_TEXT_LOWER );
             break;
         case KB_PAGE_NZ:
-            lv_btnmatrix_set_map( kb, (const char **)kb_map_nz );
-            lv_btnmatrix_set_ctrl_map( kb, kb_ctrl_alpha );
+            lv_keyboard_set_map( kb, LV_KEYBOARD_MODE_TEXT_LOWER, (const char **)kb_map_nz );
+            lv_keyboard_set_ctrl_map( kb, LV_KEYBOARD_MODE_TEXT_LOWER, kb_ctrl_alpha );
+            lv_keyboard_set_mode( kb, LV_KEYBOARD_MODE_TEXT_LOWER );
             break;
         case KB_PAGE_CAP_AM:
-            lv_btnmatrix_set_map( kb, (const char **)kb_map_cap_am );
-            lv_btnmatrix_set_ctrl_map( kb, kb_ctrl_alpha );
+            lv_keyboard_set_map( kb, LV_KEYBOARD_MODE_TEXT_LOWER, (const char **)kb_map_cap_am );
+            lv_keyboard_set_ctrl_map( kb, LV_KEYBOARD_MODE_TEXT_LOWER, kb_ctrl_alpha );
+            lv_keyboard_set_mode( kb, LV_KEYBOARD_MODE_TEXT_LOWER );
             break;
         case KB_PAGE_CAP_NZ:
-            lv_btnmatrix_set_map( kb, (const char **)kb_map_cap_nz );
-            lv_btnmatrix_set_ctrl_map( kb, kb_ctrl_alpha );
+            lv_keyboard_set_map( kb, LV_KEYBOARD_MODE_TEXT_LOWER, (const char **)kb_map_cap_nz );
+            lv_keyboard_set_ctrl_map( kb, LV_KEYBOARD_MODE_TEXT_LOWER, kb_ctrl_alpha );
+            lv_keyboard_set_mode( kb, LV_KEYBOARD_MODE_TEXT_LOWER );
             break;
         case KB_PAGE_SYMBOL:
-            lv_btnmatrix_set_map( kb, (const char **)kb_map_symbol );
-            lv_btnmatrix_set_ctrl_map( kb, kb_ctrl_symbol );
+            lv_keyboard_set_map( kb, LV_KEYBOARD_MODE_TEXT_LOWER, (const char **)kb_map_symbol );
+            lv_keyboard_set_ctrl_map( kb, LV_KEYBOARD_MODE_TEXT_LOWER, kb_ctrl_symbol );
+            lv_keyboard_set_mode( kb, LV_KEYBOARD_MODE_TEXT_LOWER );
             break;
     }
+    lv_obj_invalidate( kb );
 }
 
 static bool keyboard_handle_text_key( lv_obj_t * keyboard, const char * txt ) {
