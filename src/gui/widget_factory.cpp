@@ -172,6 +172,96 @@ static bool wf_anim_enabled = true;
 
 static void exit_jump_back_event_cb( lv_obj_t * obj, lv_event_t event );
 
+#if defined( LILYGO_WATCH_ULTRA )
+typedef struct wf_fast_image_button_ctx_t {
+    lv_obj_t *obj;
+    lv_event_cb_t event_cb;
+    uint32_t last_press_ms;
+    struct wf_fast_image_button_ctx_t *next;
+} wf_fast_image_button_ctx_t;
+
+static wf_fast_image_button_ctx_t *wf_fast_image_button_ctx_head = NULL;
+
+static wf_fast_image_button_ctx_t *wf_find_fast_image_button_ctx( lv_obj_t *obj ) {
+    for ( wf_fast_image_button_ctx_t *ctx = wf_fast_image_button_ctx_head; ctx != NULL; ctx = ctx->next ) {
+        if ( ctx->obj == obj )
+            return ctx;
+    }
+    return NULL;
+}
+
+static wf_fast_image_button_ctx_t *wf_get_fast_image_button_ctx( lv_obj_t *obj ) {
+    wf_fast_image_button_ctx_t *ctx = wf_find_fast_image_button_ctx( obj );
+    if ( ctx )
+        return ctx;
+
+    ctx = (wf_fast_image_button_ctx_t*)CALLOC_ASSERT( 1, sizeof( wf_fast_image_button_ctx_t ), "wf image button ctx allocation failed" );
+    ctx->obj = obj;
+    ctx->next = wf_fast_image_button_ctx_head;
+    wf_fast_image_button_ctx_head = ctx;
+    return ctx;
+}
+
+static void wf_delete_fast_image_button_ctx( lv_obj_t *obj ) {
+    wf_fast_image_button_ctx_t **ctx = &wf_fast_image_button_ctx_head;
+    while ( *ctx != NULL ) {
+        if ( ( *ctx )->obj == obj ) {
+            wf_fast_image_button_ctx_t *deleted = *ctx;
+            *ctx = deleted->next;
+            free( deleted );
+            return;
+        }
+        ctx = &( *ctx )->next;
+    }
+}
+
+static void wf_fast_image_button_event_cb( lv_obj_t *obj, lv_event_t event ) {
+    wf_fast_image_button_ctx_t *ctx = wf_find_fast_image_button_ctx( obj );
+    if ( !ctx || !ctx->event_cb )
+        return;
+
+    switch ( event ) {
+        case LV_EVENT_PRESSED: {
+            uint32_t now = lv_tick_get();
+            if ( ctx->last_press_ms != 0 && now - ctx->last_press_ms < 220 )
+                return;
+
+            ctx->last_press_ms = now;
+            lv_event_cb_t event_cb = ctx->event_cb;
+            event_cb( obj, LV_EVENT_PRESSED );
+            if ( wf_find_fast_image_button_ctx( obj ) == ctx )
+                event_cb( obj, LV_EVENT_CLICKED );
+            break;
+        }
+        case LV_EVENT_CLICKED:
+        case LV_EVENT_SHORT_CLICKED:
+            break;
+        case LV_EVENT_DELETE:
+            ctx->event_cb( obj, event );
+            wf_delete_fast_image_button_ctx( obj );
+            break;
+        default:
+            ctx->event_cb( obj, event );
+            break;
+    }
+}
+
+static void wf_set_fast_image_button_event_cb( lv_obj_t *button, lv_event_cb_t event_cb ) {
+    if ( !button || !event_cb )
+        return;
+
+    wf_fast_image_button_ctx_t *ctx = wf_get_fast_image_button_ctx( button );
+    ctx->event_cb = event_cb;
+    ctx->last_press_ms = 0;
+    lv_obj_set_event_cb( button, wf_fast_image_button_event_cb );
+}
+
+static void wf_configure_fast_image_button( lv_obj_t *button ) {
+    if ( button )
+        lv_obj_set_ext_click_area( button, 12, 12, 12, 12 );
+}
+#endif
+
 lv_obj_t * wf_add_container(lv_obj_t *parent_tile, lv_layout_t layout, lv_fit_t hor_fit, lv_fit_t ver_fit, bool add_padding, lv_style_t *style ){
     lv_obj_t *container = lv_cont_create( parent_tile, NULL );
     lv_obj_add_style( container, LV_OBJ_PART_MAIN, style?style:APP_STYLE );
@@ -546,8 +636,16 @@ lv_obj_t * wf_add_image_button(lv_obj_t *parent, lv_img_dsc_t const &image, lv_e
 
     lv_obj_add_style( button_img, LV_OBJ_PART_MAIN, style );
 
+#if defined( LILYGO_WATCH_ULTRA )
+    wf_configure_fast_image_button( button );
+#endif
+
     if (event_cb != NULL) {
+#if defined( LILYGO_WATCH_ULTRA )
+        wf_set_fast_image_button_event_cb( button, event_cb );
+#else
         lv_obj_set_event_cb( button, event_cb );
+#endif
     }
     return button;
 }
@@ -728,7 +826,11 @@ lv_obj_t * wf_add_settings_header(lv_obj_t *parent, char const * title, lv_obj_t
 lv_obj_t * wf_add_settings_header(lv_obj_t *parent, char const * title, lv_event_cb_t event_cb){
     lv_obj_t *exit_btn;
     lv_obj_t *cont = wf_add_settings_header( parent, title, &exit_btn );
+#if defined( LILYGO_WATCH_ULTRA )
+    wf_set_fast_image_button_event_cb( exit_btn, event_cb );
+#else
     lv_obj_set_event_cb( exit_btn, event_cb );
+#endif
     return cont;
 }
 

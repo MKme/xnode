@@ -10,6 +10,7 @@
 
 #ifdef NATIVE_64BIT
     #include "utils/logging.h"
+    #include "utils/millis.h"
 #else
     #include <Arduino.h>
 #endif
@@ -19,8 +20,77 @@ LV_IMG_DECLARE( location_64px );
 namespace {
     icon_t *xnode_checkin_app = NULL;
     lv_obj_t *xnode_checkin_tile = NULL;
+    lv_obj_t *xnode_checkin_exit_btn = NULL;
+    lv_obj_t *xnode_checkin_send_btn = NULL;
     lv_obj_t *xnode_checkin_status_label = NULL;
     uint32_t xnode_checkin_tile_num = 0;
+
+    bool xnode_checkin_accept_button_event( lv_event_t event, uint32_t &last_event_ms, uint32_t debounce_ms ) {
+        #if defined( LILYGO_WATCH_ULTRA )
+            if ( event != LV_EVENT_PRESSED ) {
+                return( false );
+            }
+            const uint32_t now = millis();
+            if ( last_event_ms != 0 && now - last_event_ms < debounce_ms ) {
+                return( false );
+            }
+            last_event_ms = now;
+            return( true );
+        #else
+            return( event == LV_EVENT_CLICKED );
+        #endif
+    }
+
+    void xnode_checkin_configure_image_button( lv_obj_t *button ) {
+        #if defined( LILYGO_WATCH_ULTRA )
+            if ( !button ) {
+                return;
+            }
+
+            const lv_coord_t target_size = 78;
+            if ( lv_obj_get_width( button ) < target_size ) {
+                lv_obj_set_width( button, target_size );
+            }
+            if ( lv_obj_get_height( button ) < target_size ) {
+                lv_obj_set_height( button, target_size );
+            }
+
+            lv_obj_t *icon = lv_obj_get_child( button, NULL );
+            if ( icon ) {
+                lv_obj_align( icon, button, LV_ALIGN_CENTER, 0, 0 );
+            }
+            lv_obj_set_ext_click_area( button, 18, 18, 18, 18 );
+            lv_obj_move_foreground( button );
+        #endif
+    }
+
+    void xnode_checkin_configure_action_button( lv_obj_t *button ) {
+        #if defined( LILYGO_WATCH_ULTRA )
+            if ( !button ) {
+                return;
+            }
+
+            const lv_coord_t target_height = 72;
+            if ( lv_obj_get_height( button ) < target_height ) {
+                lv_obj_set_height( button, target_height );
+            }
+            lv_obj_set_ext_click_area( button, 18, 18, 18, 18 );
+        #endif
+    }
+
+    void xnode_checkin_configure_controls( void ) {
+        xnode_checkin_configure_action_button( xnode_checkin_send_btn );
+        xnode_checkin_configure_image_button( xnode_checkin_exit_btn );
+        #if defined( LILYGO_WATCH_ULTRA )
+            if ( xnode_checkin_exit_btn ) {
+                lv_obj_align( xnode_checkin_exit_btn, xnode_checkin_tile, LV_ALIGN_IN_BOTTOM_LEFT, THEME_PADDING * 3, -( THEME_PADDING * 3 ) );
+            }
+        #endif
+    }
+
+    void xnode_checkin_exit_to_previous( void ) {
+        mainbar_jump_back();
+    }
 
     void xnode_checkin_set_status( const char *text ) {
         if ( xnode_checkin_status_label ) {
@@ -40,29 +110,23 @@ namespace {
     }
 
     void xnode_checkin_exit_event_cb( lv_obj_t *obj, lv_event_t event ) {
-        switch( event ) {
-            case LV_EVENT_CLICKED:
-                mainbar_jump_back();
-                break;
-            default:
-                break;
+        static uint32_t last_event_ms = 0;
+        if ( xnode_checkin_accept_button_event( event, last_event_ms, 250 ) ) {
+            xnode_checkin_exit_to_previous();
         }
     }
 
     void xnode_checkin_send_event_cb( lv_obj_t *obj, lv_event_t event ) {
-        switch( event ) {
-            case LV_EVENT_CLICKED:
-                xnode_checkin_set_status( xnode_send_manual_checkin() ? "Check-in sent over mesh" : "Check-in not sent" );
-                break;
-            default:
-                break;
+        static uint32_t last_event_ms = 0;
+        if ( xnode_checkin_accept_button_event( event, last_event_ms, 1000 ) ) {
+            xnode_checkin_set_status( xnode_send_manual_checkin() ? "Check-in sent over mesh" : "Check-in not sent" );
         }
     }
 
     bool xnode_checkin_button_event_cb( EventBits_t event, void *arg ) {
         switch( event ) {
             case BUTTON_EXIT:
-                mainbar_jump_back();
+                xnode_checkin_exit_to_previous();
                 break;
             default:
                 break;
@@ -73,17 +137,22 @@ namespace {
 
 void xnode_checkin_tile_setup( void ) {
     const lv_coord_t content_width = lv_disp_get_hor_res( NULL ) - ( THEME_PADDING * 2 );
+    #if defined( LILYGO_WATCH_ULTRA )
+        const lv_coord_t send_height = 72;
+    #else
+        const lv_coord_t send_height = 56;
+    #endif
 
     xnode_checkin_tile_num = mainbar_add_app_tile( 1, 1, "CheckIn" );
     xnode_checkin_tile = mainbar_get_tile_obj( xnode_checkin_tile_num );
     lv_obj_add_style( xnode_checkin_tile, LV_OBJ_PART_MAIN, ws_get_app_opa_style() );
 
     #if defined( LILYGO_WATCH_ULTRA )
-        lv_obj_t *exit_btn = wf_add_exit_button( xnode_checkin_tile, xnode_checkin_exit_event_cb );
-        lv_obj_align( exit_btn, xnode_checkin_tile, LV_ALIGN_IN_BOTTOM_LEFT, THEME_PADDING, -THEME_PADDING );
+        xnode_checkin_exit_btn = wf_add_exit_button( xnode_checkin_tile, xnode_checkin_exit_event_cb );
+        lv_obj_align( xnode_checkin_exit_btn, xnode_checkin_tile, LV_ALIGN_IN_BOTTOM_LEFT, THEME_PADDING * 3, -( THEME_PADDING * 3 ) );
     #else
-        lv_obj_t *exit_btn = wf_add_close_button( xnode_checkin_tile, xnode_checkin_exit_event_cb );
-        lv_obj_align( exit_btn, xnode_checkin_tile, LV_ALIGN_IN_TOP_RIGHT, -THEME_PADDING, THEME_PADDING );
+        xnode_checkin_exit_btn = wf_add_close_button( xnode_checkin_tile, xnode_checkin_exit_event_cb );
+        lv_obj_align( xnode_checkin_exit_btn, xnode_checkin_tile, LV_ALIGN_IN_TOP_RIGHT, -THEME_PADDING, THEME_PADDING );
     #endif
 
     lv_obj_t *title = lv_label_create( xnode_checkin_tile, NULL );
@@ -99,15 +168,15 @@ void xnode_checkin_tile_setup( void ) {
     lv_obj_set_width( summary, content_width );
     lv_obj_align( summary, title, LV_ALIGN_OUT_BOTTOM_LEFT, 0, THEME_PADDING );
 
-    lv_obj_t *send_btn = lv_btn_create( xnode_checkin_tile, NULL );
-    lv_obj_add_style( send_btn, LV_BTN_PART_MAIN, ws_get_button_style() );
-    lv_obj_set_size( send_btn, content_width, 56 );
-    lv_obj_align( send_btn, summary, LV_ALIGN_OUT_BOTTOM_LEFT, 0, THEME_PADDING * 2 );
-    lv_obj_set_event_cb( send_btn, xnode_checkin_send_event_cb );
+    xnode_checkin_send_btn = lv_btn_create( xnode_checkin_tile, NULL );
+    lv_obj_add_style( xnode_checkin_send_btn, LV_BTN_PART_MAIN, ws_get_button_style() );
+    lv_obj_set_size( xnode_checkin_send_btn, content_width, send_height );
+    lv_obj_align( xnode_checkin_send_btn, summary, LV_ALIGN_OUT_BOTTOM_LEFT, 0, THEME_PADDING * 2 );
+    lv_obj_set_event_cb( xnode_checkin_send_btn, xnode_checkin_send_event_cb );
 
-    lv_obj_t *send_label = lv_label_create( send_btn, NULL );
+    lv_obj_t *send_label = lv_label_create( xnode_checkin_send_btn, NULL );
     lv_label_set_text( send_label, "CHECK IN" );
-    lv_obj_align( send_label, send_btn, LV_ALIGN_CENTER, 0, 0 );
+    lv_obj_align( send_label, xnode_checkin_send_btn, LV_ALIGN_CENTER, 0, 0 );
 
     xnode_checkin_status_label = lv_label_create( xnode_checkin_tile, NULL );
     lv_obj_add_style( xnode_checkin_status_label, LV_OBJ_PART_MAIN, APP_STYLE );
@@ -115,7 +184,9 @@ void xnode_checkin_tile_setup( void ) {
     lv_obj_set_width( xnode_checkin_status_label, content_width );
     lv_label_set_text( xnode_checkin_status_label, "Ready" );
     lv_obj_set_width( xnode_checkin_status_label, content_width );
-    lv_obj_align( xnode_checkin_status_label, send_btn, LV_ALIGN_OUT_BOTTOM_LEFT, 0, THEME_PADDING );
+    lv_obj_align( xnode_checkin_status_label, xnode_checkin_send_btn, LV_ALIGN_OUT_BOTTOM_LEFT, 0, THEME_PADDING );
+
+    xnode_checkin_configure_controls();
 
     mainbar_add_tile_button_cb( xnode_checkin_tile_num, xnode_checkin_button_event_cb );
     xnode_checkin_app = app_register( "CheckIn", &location_64px, xnode_checkin_open_event_cb );

@@ -15,6 +15,7 @@
 
 #ifdef NATIVE_64BIT
     #include "utils/logging.h"
+    #include "utils/millis.h"
 #else
     #include <Arduino.h>
 #endif
@@ -29,10 +30,56 @@ namespace {
 
     icon_t *xnode_notifications_app = NULL;
     lv_obj_t *xnode_notifications_tile = NULL;
+    lv_obj_t *xnode_notifications_header = NULL;
+    lv_obj_t *xnode_notifications_exit_btn = NULL;
     lv_obj_t *xnode_notifications_enabled_switch = NULL;
     lv_obj_t *xnode_notifications_page = NULL;
     lv_obj_t *xnode_notifications_label = NULL;
     uint32_t xnode_notifications_tile_num = 0;
+
+    bool xnode_notifications_accept_button_event( lv_event_t event, uint32_t &last_event_ms, uint32_t debounce_ms ) {
+        #if defined( LILYGO_WATCH_ULTRA )
+            if ( event != LV_EVENT_PRESSED ) {
+                return( false );
+            }
+            const uint32_t now = millis();
+            if ( last_event_ms != 0 && now - last_event_ms < debounce_ms ) {
+                return( false );
+            }
+            last_event_ms = now;
+            return( true );
+        #else
+            return( event == LV_EVENT_CLICKED );
+        #endif
+    }
+
+    void xnode_notifications_configure_header_exit_button( lv_obj_t *button ) {
+        #if defined( LILYGO_WATCH_ULTRA )
+            if ( !button ) {
+                return;
+            }
+
+            lv_obj_t *icon = lv_obj_get_child( button, NULL );
+            if ( icon ) {
+                lv_obj_align( icon, button, LV_ALIGN_CENTER, 0, 0 );
+            }
+            lv_obj_set_ext_click_area( button, 10, 10, 10, 10 );
+            lv_obj_move_foreground( button );
+        #endif
+    }
+
+    void xnode_notifications_configure_controls( void ) {
+        #if defined( LILYGO_WATCH_ULTRA )
+            xnode_notifications_configure_header_exit_button( xnode_notifications_exit_btn );
+            if ( xnode_notifications_enabled_switch ) {
+                lv_obj_set_ext_click_area( xnode_notifications_enabled_switch, 18, 18, 18, 18 );
+            }
+        #endif
+    }
+
+    void xnode_notifications_exit_to_previous( void ) {
+        mainbar_jump_back();
+    }
 
     void xnode_notifications_load_history_from_config( void ) {
         if ( !xnode_notifications_config ) {
@@ -162,12 +209,9 @@ namespace {
     }
 
     void xnode_notifications_exit_event_cb( lv_obj_t *obj, lv_event_t event ) {
-        switch( event ) {
-            case LV_EVENT_CLICKED:
-                mainbar_jump_back();
-                break;
-            default:
-                break;
+        static uint32_t last_event_ms = 0;
+        if ( xnode_notifications_accept_button_event( event, last_event_ms, 250 ) ) {
+            xnode_notifications_exit_to_previous();
         }
     }
 
@@ -183,12 +227,13 @@ namespace {
 
     void xnode_notifications_activate_cb( void ) {
         xnode_notifications_render();
+        xnode_notifications_configure_controls();
     }
 
     bool xnode_notifications_button_event_cb( EventBits_t event, void *arg ) {
         switch( event ) {
             case BUTTON_EXIT:
-                mainbar_jump_back();
+                xnode_notifications_exit_to_previous();
                 break;
             default:
                 break;
@@ -204,8 +249,9 @@ void xnode_notifications_tile_setup( void ) {
     xnode_notifications_tile = mainbar_get_tile_obj( xnode_notifications_tile_num );
     lv_obj_add_style( xnode_notifications_tile, LV_OBJ_PART_MAIN, APP_STYLE );
 
-    lv_obj_t *header = wf_add_settings_header( xnode_notifications_tile, "XNODE alerts", xnode_notifications_exit_event_cb );
-    lv_obj_align( header, xnode_notifications_tile, LV_ALIGN_IN_TOP_LEFT, THEME_PADDING, THEME_PADDING );
+    xnode_notifications_header = wf_add_settings_header( xnode_notifications_tile, "XNODE alerts", &xnode_notifications_exit_btn );
+    lv_obj_set_event_cb( xnode_notifications_exit_btn, xnode_notifications_exit_event_cb );
+    lv_obj_align( xnode_notifications_header, xnode_notifications_tile, LV_ALIGN_IN_TOP_LEFT, THEME_PADDING, THEME_PADDING );
 
     lv_obj_t *enable_cont = wf_add_labeled_switch(
         xnode_notifications_tile,
@@ -215,7 +261,7 @@ void xnode_notifications_tile_setup( void ) {
         xnode_notifications_enable_event_cb,
         APP_STYLE
     );
-    lv_obj_align( enable_cont, header, LV_ALIGN_OUT_BOTTOM_MID, 0, THEME_PADDING );
+    lv_obj_align( enable_cont, xnode_notifications_header, LV_ALIGN_OUT_BOTTOM_MID, 0, THEME_PADDING );
 
     xnode_notifications_page = lv_page_create( xnode_notifications_tile, NULL );
     lv_obj_set_size( xnode_notifications_page, lv_disp_get_hor_res( NULL ) - ( THEME_PADDING * 2 ), lv_disp_get_ver_res( NULL ) - ( THEME_CONT_HEIGHT * 3 ) );
@@ -228,6 +274,8 @@ void xnode_notifications_tile_setup( void ) {
     lv_obj_set_width( xnode_notifications_label, lv_page_get_width_fit( xnode_notifications_page ) );
     lv_obj_add_style( xnode_notifications_label, LV_OBJ_PART_MAIN, APP_STYLE );
     lv_label_set_text( xnode_notifications_label, "No XNODE news alerts yet." );
+
+    xnode_notifications_configure_controls();
 
     mainbar_add_tile_button_cb( xnode_notifications_tile_num, xnode_notifications_button_event_cb );
     mainbar_add_tile_activate_cb( xnode_notifications_tile_num, xnode_notifications_activate_cb );
