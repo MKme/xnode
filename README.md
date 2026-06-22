@@ -189,6 +189,39 @@ After flashing, confirm the watch re-enumerates:
 pio device list
 ```
 
+## Automated CI and regression testing
+
+The repo now has a build/regression workflow at `.github/workflows/ci.yml`.
+It runs on push, pull request, and manual dispatch, then builds both active
+watch firmware targets:
+
+```powershell
+pio run -e t-watch-ultra
+pio run -e t-watch2020-v3-s3
+```
+
+The same regression checks run automatically before local PlatformIO builds for
+those two environments through `support/regression_checks.py`. Run them directly
+when changing UI, GPS, power, map, keyboard, or watchface code:
+
+```powershell
+python support/regression_checks.py
+```
+
+The regression gate protects the recent watch fixes:
+- Ultra shared image buttons respond on press and suppress duplicate clicks.
+- SOS, Check-In, Alert Summary, Bluetooth message, Meshtastic, and Tac Map controls keep large Ultra press targets.
+- Tac Map keeps the large GPS user marker, heading update path, topmost marker ordering, and active map performance mode.
+- Tac Map still auto-starts GPS for the user marker, while Ultra WiFi auto-start defaults off.
+- GPS, WiFi, BLE, display sleep/wake, and PMU idle-power defaults stay wired for the Ultra battery fixes.
+- Ultra pedometer step continuity survives raw sensor counter resets.
+- The multi-page watch keyboard keeps A-M, N-Z, caps, symbols, space, and backspace handling.
+- The Ultra main screen keeps the generated moon phase text and visual indicator.
+- The non-Ultra `t-watch2020-v3-s3` firmware still builds.
+
+If this gate fails, either restore the protected behavior or update the check in
+the same change with the intentional replacement behavior.
+
 ## Power management audit (2026-04-18)
 
 Scope:

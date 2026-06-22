@@ -1,0 +1,42 @@
+name: Build and Regression
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    name: ${{ matrix.environment }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment:
+          - t-watch-ultra
+          - t-watch2020-v3-s3
+
+    steps:
+      - name: Check out repository
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref }}
+        run: |
+          git init .
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+          git fetch --depth=1 origin "${REF}"
+          git checkout --detach FETCH_HEAD
+
+      - name: Install PlatformIO
+        run: python3 -m pip install --upgrade platformio
+
+      - name: Run regression checks
+        run: python3 support/regression_checks.py
+
+      - name: Build firmware
+        run: python3 -m platformio run -e "${{ matrix.environment }}"
