@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 
 #include "config.h"
 
@@ -64,6 +65,11 @@ static lv_obj_t *timelabel = NULL;
 static lv_obj_t *infolabel = NULL;
 static lv_obj_t *templabel = NULL;
 static lv_obj_t *datelabel = NULL;
+#if defined( LILYGO_WATCH_ULTRA )
+static lv_obj_t *moon_cont = NULL;
+static lv_obj_t *moon_canvas = NULL;
+static lv_obj_t *moonlabel = NULL;
+#endif
 
 uint32_t main_tile_num;
 
@@ -117,6 +123,7 @@ static bool main_tile_sensor_event_cb( EventBits_t event, void *arg );
 static bool main_tile_ultra_time_is_valid( const tm &info );
 static void main_tile_ultra_get_display_time( tm *info, time_t *epoch );
 static void main_tile_ultra_align_clock( void );
+static void main_tile_ultra_update_moon( const tm *info );
 #endif
 
 void main_tile_setup( void ) {
@@ -212,6 +219,25 @@ void main_tile_setup( void ) {
         lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 14 );
     #else
         lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_TOP_MID, 0, 0 );
+    #endif
+
+    #if defined( LILYGO_WATCH_ULTRA )
+        moon_cont = mainbar_obj_create( clock_cont );
+        lv_obj_set_size( moon_cont, lv_disp_get_hor_res( NULL ) - 24, 40 );
+        lv_obj_add_style( moon_cont, LV_OBJ_PART_MAIN, style );
+        lv_obj_align( moon_cont, infolabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 8 );
+
+        moon_canvas = lv_canvas_create( moon_cont, NULL );
+        lv_obj_align( moon_canvas, moon_cont, LV_ALIGN_IN_LEFT_MID, 8, 0 );
+
+        moonlabel = lv_label_create( moon_cont, NULL );
+        lv_label_set_text( moonlabel, "Moon: --" );
+        lv_label_set_long_mode( moonlabel, LV_LABEL_LONG_CROP );
+        lv_obj_set_width( moonlabel, lv_obj_get_width( moon_cont ) - 52 );
+        lv_label_set_align( moonlabel, LV_LABEL_ALIGN_LEFT );
+        lv_obj_reset_style_list( moonlabel, LV_OBJ_PART_MAIN );
+        lv_obj_add_style( moonlabel, LV_OBJ_PART_MAIN, &infostyle );
+        lv_obj_align( moonlabel, moon_canvas, LV_ALIGN_OUT_RIGHT_MID, 10, 0 );
     #endif
 
     templabel = lv_label_create( clock_cont , NULL);
@@ -396,6 +422,120 @@ static bool mainbar_wifictl_event_cb( EventBits_t event, void *arg ) {
 }
 
 #if defined( LILYGO_WATCH_ULTRA )
+static const uint8_t MAIN_TILE_MOON_CANVAS_SIZE = 34;
+static lv_color_t main_tile_moon_canvas_buf[ MAIN_TILE_MOON_CANVAS_SIZE * MAIN_TILE_MOON_CANVAS_SIZE ];
+
+static const char *main_tile_ultra_moon_phase_name( uint8_t phase_index ) {
+    switch ( phase_index & 0x07 ) {
+        case 0: return( "New Moon" );
+        case 1: return( "Waxing Crescent" );
+        case 2: return( "First Quarter" );
+        case 3: return( "Waxing Gibbous" );
+        case 4: return( "Full Moon" );
+        case 5: return( "Waning Gibbous" );
+        case 6: return( "Last Quarter" );
+        default: return( "Waning Crescent" );
+    }
+}
+
+static double main_tile_ultra_positive_mod( double value, double modulus ) {
+    double result = fmod( value, modulus );
+    if ( result < 0.0 ) {
+        result += modulus;
+    }
+    return( result );
+}
+
+static double main_tile_ultra_moon_fraction( const tm *info ) {
+    if ( !info ) {
+        return( 0.0 );
+    }
+
+    tm moon_date = *info;
+    moon_date.tm_hour = 12;
+    moon_date.tm_min = 0;
+    moon_date.tm_sec = 0;
+    time_t day_epoch = mktime( &moon_date );
+
+    const double known_new_moon_epoch = 947182440.0;       // 2000-01-06 18:14 UTC
+    const double synodic_month_seconds = 2551442.877;      // 29.530588853 days
+    return( main_tile_ultra_positive_mod( (double)day_epoch - known_new_moon_epoch, synodic_month_seconds ) / synodic_month_seconds );
+}
+
+static void main_tile_ultra_draw_moon( double phase_fraction ) {
+    if ( !moon_canvas ) {
+        return;
+    }
+
+    const double two_pi = 6.28318530717958647692;
+    const double phase_angle = phase_fraction * two_pi;
+    const double sun_x = sin( phase_angle );
+    const double sun_z = -cos( phase_angle );
+    const double center = ( (double)MAIN_TILE_MOON_CANVAS_SIZE - 1.0 ) * 0.5;
+    const double radius = center - 1.0;
+    const double radius_sq = radius * radius;
+    const lv_color_t lit = LV_COLOR_MAKE( 238, 242, 248 );
+    const lv_color_t shadow = LV_COLOR_MAKE( 24, 30, 38 );
+    const lv_color_t edge = LV_COLOR_MAKE( 110, 122, 140 );
+
+    lv_canvas_fill_bg( moon_canvas, LV_COLOR_TRANSP, LV_OPA_COVER );
+
+    for ( uint8_t y = 0; y < MAIN_TILE_MOON_CANVAS_SIZE; y++ ) {
+        for ( uint8_t x = 0; x < MAIN_TILE_MOON_CANVAS_SIZE; x++ ) {
+            const double dx = (double)x - center;
+            const double dy = (double)y - center;
+            const double dist_sq = dx * dx + dy * dy;
+            if ( dist_sq > radius_sq ) {
+                lv_canvas_set_px( moon_canvas, x, y, LV_COLOR_TRANSP );
+                continue;
+            }
+
+            if ( dist_sq > radius_sq - ( radius * 1.4 ) ) {
+                lv_canvas_set_px( moon_canvas, x, y, edge );
+                continue;
+            }
+
+            const double nx = dx / radius;
+            const double nz = sqrt( 1.0 - ( dist_sq / radius_sq ) );
+            lv_canvas_set_px( moon_canvas, x, y, ( nx * sun_x + nz * sun_z ) >= 0.0 ? lit : shadow );
+        }
+    }
+}
+
+static void main_tile_ultra_update_moon( const tm *info ) {
+    if ( !moon_canvas || !moonlabel ) {
+        return;
+    }
+
+    static bool canvas_ready = false;
+    if ( !canvas_ready ) {
+        lv_canvas_set_buffer(
+            moon_canvas,
+            main_tile_moon_canvas_buf,
+            MAIN_TILE_MOON_CANVAS_SIZE,
+            MAIN_TILE_MOON_CANVAS_SIZE,
+            LV_IMG_CF_TRUE_COLOR_CHROMA_KEYED
+        );
+        canvas_ready = true;
+    }
+
+    const double phase_fraction = main_tile_ultra_moon_fraction( info );
+    const double illumination = ( 1.0 - cos( phase_fraction * 6.28318530717958647692 ) ) * 0.5;
+    const uint8_t phase_index = (uint8_t)( (int)( phase_fraction * 8.0 + 0.5 ) & 0x07 );
+    char moon_text[48];
+
+    main_tile_ultra_draw_moon( phase_fraction );
+    snprintf(
+        moon_text,
+        sizeof( moon_text ),
+        "Moon: %s %d%%",
+        main_tile_ultra_moon_phase_name( phase_index ),
+        (int)( illumination * 100.0 + 0.5 )
+    );
+    lv_label_set_text( moonlabel, moon_text );
+    main_tile_ultra_align_clock();
+}
+
 static bool main_tile_ultra_time_is_valid( const tm &info ) {
     return( info.tm_year + 1900 >= 2024 );
 }
@@ -428,6 +568,16 @@ static void main_tile_ultra_align_clock( void ) {
     lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, -58 );
     lv_obj_align( datelabel, timelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, -4 );
     lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 14 );
+    if ( moon_cont != NULL ) {
+        lv_obj_align( moon_cont, infolabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 8 );
+    }
+    if ( moon_canvas != NULL ) {
+        lv_obj_align( moon_canvas, moon_cont, LV_ALIGN_IN_LEFT_MID, 8, 0 );
+    }
+    if ( moonlabel != NULL && moon_canvas != NULL ) {
+        lv_obj_set_width( moonlabel, lv_obj_get_width( moon_cont ) - 52 );
+        lv_obj_align( moonlabel, moon_canvas, LV_ALIGN_OUT_RIGHT_MID, 10, 0 );
+    }
 }
 #endif
 
@@ -698,6 +848,7 @@ void main_tile_update_time( bool force ) {
             log_d("renew date: %s", time_str );
             lv_label_set_text( datelabel, time_str );
             #if defined( LILYGO_WATCH_ULTRA )
+                main_tile_ultra_update_moon( &info );
                 main_tile_ultra_align_clock();
             #else
                 lv_obj_align( datelabel, clock_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
