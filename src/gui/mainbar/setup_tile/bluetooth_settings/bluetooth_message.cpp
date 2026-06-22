@@ -269,11 +269,20 @@ void bluetooth_message_tile_setup( void ) {
     lv_label_set_text( bluetooth_message_msg_label, "Test message from bar.");
 
 
-    bluetooth_message_exit_btn = wf_add_close_button( bluetooth_message_tile, exit_bluetooth_message_event_cb );
-    lv_obj_align( bluetooth_message_exit_btn, bluetooth_message_tile, LV_ALIGN_IN_TOP_RIGHT, -THEME_PADDING, THEME_PADDING );
+    #if defined( LILYGO_WATCH_ULTRA )
+        bluetooth_message_exit_btn = wf_add_exit_button( bluetooth_message_tile, exit_bluetooth_message_event_cb );
+        lv_obj_align( bluetooth_message_exit_btn, bluetooth_message_tile, LV_ALIGN_IN_BOTTOM_LEFT, THEME_PADDING, -THEME_PADDING );
+    #else
+        bluetooth_message_exit_btn = wf_add_close_button( bluetooth_message_tile, exit_bluetooth_message_event_cb );
+        lv_obj_align( bluetooth_message_exit_btn, bluetooth_message_tile, LV_ALIGN_IN_TOP_RIGHT, -THEME_PADDING, THEME_PADDING );
+    #endif
 
     bluetooth_message_prev_msg_btn = wf_add_left_button( bluetooth_message_tile, bluetooth_prev_message_event_cb );
-    lv_obj_align( bluetooth_message_prev_msg_btn, bluetooth_message_tile, LV_ALIGN_IN_BOTTOM_LEFT, THEME_PADDING, -THEME_PADDING );
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_obj_align( bluetooth_message_prev_msg_btn, bluetooth_message_exit_btn, LV_ALIGN_OUT_RIGHT_MID, 0, 0 );
+    #else
+        lv_obj_align( bluetooth_message_prev_msg_btn, bluetooth_message_tile, LV_ALIGN_IN_BOTTOM_LEFT, THEME_PADDING, -THEME_PADDING );
+    #endif
 
     bluetooth_message_next_msg_btn = wf_add_right_button( bluetooth_message_tile, bluetooth_next_message_event_cb );
     lv_obj_align( bluetooth_message_next_msg_btn, bluetooth_message_tile, LV_ALIGN_IN_BOTTOM_RIGHT, -THEME_PADDING, -THEME_PADDING );

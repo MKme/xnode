@@ -78,8 +78,13 @@ void xnode_sos_tile_setup( void ) {
     xnode_sos_tile = mainbar_get_tile_obj( xnode_sos_tile_num );
     lv_obj_add_style( xnode_sos_tile, LV_OBJ_PART_MAIN, ws_get_app_opa_style() );
 
-    lv_obj_t *exit_btn = wf_add_close_button( xnode_sos_tile, xnode_sos_exit_event_cb );
-    lv_obj_align( exit_btn, xnode_sos_tile, LV_ALIGN_IN_TOP_RIGHT, -THEME_PADDING, THEME_PADDING );
+    #if defined( LILYGO_WATCH_ULTRA )
+        lv_obj_t *exit_btn = wf_add_exit_button( xnode_sos_tile, xnode_sos_exit_event_cb );
+        lv_obj_align( exit_btn, xnode_sos_tile, LV_ALIGN_IN_BOTTOM_LEFT, THEME_PADDING, -THEME_PADDING );
+    #else
+        lv_obj_t *exit_btn = wf_add_close_button( xnode_sos_tile, xnode_sos_exit_event_cb );
+        lv_obj_align( exit_btn, xnode_sos_tile, LV_ALIGN_IN_TOP_RIGHT, -THEME_PADDING, THEME_PADDING );
+    #endif
 
     lv_obj_t *title = lv_label_create( xnode_sos_tile, NULL );
     lv_obj_add_style( title, LV_OBJ_PART_MAIN, APP_STYLE );

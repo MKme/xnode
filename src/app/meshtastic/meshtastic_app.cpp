@@ -9,6 +9,7 @@
 #include "gui/statusbar.h"
 #include "gui/widget_factory.h"
 #include "gui/widget_styles.h"
+#include "hardware/button.h"
 #include "hardware/powermgm.h"
 
 #include <inttypes.h>
@@ -35,12 +36,16 @@ static lv_obj_t *meshtastic_exit_btn = NULL;
 LV_IMG_DECLARE(message_64px);
 
 static void meshtastic_app_refresh( void );
+static void meshtastic_configure_exit_button( void );
+static bool meshtastic_accept_exit_event( lv_event_t event );
+static void meshtastic_exit_to_previous( void );
 static void enter_meshtastic_app_event_cb( lv_obj_t * obj, lv_event_t event );
 static void exit_meshtastic_app_event_cb( lv_obj_t * obj, lv_event_t event );
 static void meshtastic_channel_event_cb( lv_obj_t * obj, lv_event_t event );
 static void meshtastic_input_event_cb( lv_obj_t * obj, lv_event_t event );
 static void meshtastic_send_event_cb( lv_obj_t * obj, lv_event_t event );
 static void meshtastic_inbox_event_cb( lv_obj_t * obj, lv_event_t event );
+static bool meshtastic_button_event_cb( EventBits_t event, void *arg );
 static bool meshtastic_app_loop_cb( EventBits_t event, void *arg );
 
 void meshtastic_app_setup( void ) {
@@ -50,8 +55,13 @@ void meshtastic_app_setup( void ) {
 
     meshtastic_app = app_register( "mesh", &message_64px, enter_meshtastic_app_event_cb );
 
-    meshtastic_exit_btn = wf_add_close_button( meshtastic_app_tile, exit_meshtastic_app_event_cb );
-    lv_obj_align( meshtastic_exit_btn, meshtastic_app_tile, LV_ALIGN_IN_TOP_RIGHT, -THEME_PADDING, THEME_PADDING );
+    #if defined( LILYGO_WATCH_ULTRA )
+        meshtastic_exit_btn = wf_add_exit_button( meshtastic_app_tile, exit_meshtastic_app_event_cb );
+        lv_obj_align( meshtastic_exit_btn, meshtastic_app_tile, LV_ALIGN_IN_BOTTOM_LEFT, THEME_PADDING, -THEME_PADDING );
+    #else
+        meshtastic_exit_btn = wf_add_close_button( meshtastic_app_tile, exit_meshtastic_app_event_cb );
+        lv_obj_align( meshtastic_exit_btn, meshtastic_app_tile, LV_ALIGN_IN_TOP_RIGHT, -THEME_PADDING, THEME_PADDING );
+    #endif
 
     meshtastic_node_label = lv_label_create( meshtastic_app_tile, NULL );
     lv_obj_add_style( meshtastic_node_label, LV_OBJ_PART_MAIN, APP_STYLE );
@@ -112,7 +122,9 @@ void meshtastic_app_setup( void ) {
 
     meshtastic_service_setup();
     meshtastic_app_refresh();
+    meshtastic_configure_exit_button();
 
+    mainbar_add_tile_button_cb( meshtastic_app_tile_num, meshtastic_button_event_cb );
     powermgm_register_loop_cb( POWERMGM_WAKEUP | POWERMGM_SILENCE_WAKEUP, meshtastic_app_loop_cb, "meshtastic app loop" );
 }
 
@@ -186,10 +198,59 @@ static void meshtastic_app_refresh( void ) {
     lv_obj_set_width( meshtastic_last_label, link_width );
 }
 
+static void meshtastic_configure_exit_button( void ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    if ( !meshtastic_exit_btn ) {
+        return;
+    }
+
+    const lv_coord_t target_size = 78;
+    if ( lv_obj_get_width( meshtastic_exit_btn ) < target_size ) {
+        lv_obj_set_width( meshtastic_exit_btn, target_size );
+    }
+    if ( lv_obj_get_height( meshtastic_exit_btn ) < target_size ) {
+        lv_obj_set_height( meshtastic_exit_btn, target_size );
+    }
+
+    lv_obj_t *icon = lv_obj_get_child( meshtastic_exit_btn, NULL );
+    if ( icon ) {
+        lv_obj_align( icon, meshtastic_exit_btn, LV_ALIGN_CENTER, 0, 0 );
+    }
+
+    lv_obj_set_ext_click_area( meshtastic_exit_btn, 18, 18, 18, 18 );
+    lv_obj_align( meshtastic_exit_btn, meshtastic_app_tile, LV_ALIGN_IN_BOTTOM_LEFT, THEME_PADDING, -THEME_PADDING );
+    lv_obj_move_foreground( meshtastic_exit_btn );
+#endif
+}
+
+static bool meshtastic_accept_exit_event( lv_event_t event ) {
+#if defined( LILYGO_WATCH_ULTRA )
+    static uint32_t last_event_ms = 0;
+    if ( event != LV_EVENT_PRESSED ) {
+        return( false );
+    }
+
+    const uint32_t now = millis();
+    if ( last_event_ms != 0 && now - last_event_ms < 250 ) {
+        return( false );
+    }
+    last_event_ms = now;
+    return( true );
+#else
+    return( event == LV_EVENT_CLICKED );
+#endif
+}
+
+static void meshtastic_exit_to_previous( void ) {
+    keyboard_hide();
+    mainbar_jump_back();
+}
+
 static void enter_meshtastic_app_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
         case LV_EVENT_CLICKED:
             meshtastic_app_refresh();
+            meshtastic_configure_exit_button();
             mainbar_jump_to_tilenumber( meshtastic_app_tile_num, LV_ANIM_OFF, true );
             app_hide_indicator( meshtastic_app );
             break;
@@ -197,10 +258,8 @@ static void enter_meshtastic_app_event_cb( lv_obj_t * obj, lv_event_t event ) {
 }
 
 static void exit_meshtastic_app_event_cb( lv_obj_t * obj, lv_event_t event ) {
-    switch( event ) {
-        case LV_EVENT_CLICKED:
-            mainbar_jump_back();
-            break;
+    if ( meshtastic_accept_exit_event( event ) ) {
+        meshtastic_exit_to_previous();
     }
 }
 
@@ -226,6 +285,7 @@ static void meshtastic_send_event_cb( lv_obj_t * obj, lv_event_t event ) {
         case LV_EVENT_CLICKED:
             if ( meshtastic_service_send_text( lv_textarea_get_text( meshtastic_input ) ) ) {
                 lv_textarea_set_text( meshtastic_input, "" );
+                keyboard_hide();
             }
             meshtastic_app_refresh();
             break;
@@ -235,9 +295,21 @@ static void meshtastic_send_event_cb( lv_obj_t * obj, lv_event_t event ) {
 static void meshtastic_inbox_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
         case LV_EVENT_CLICKED:
+            keyboard_hide();
             bluetooth_message_open();
             break;
     }
+}
+
+static bool meshtastic_button_event_cb( EventBits_t event, void *arg ) {
+    switch( event ) {
+        case BUTTON_EXIT:
+            meshtastic_exit_to_previous();
+            break;
+        default:
+            break;
+    }
+    return( true );
 }
 
 static bool meshtastic_app_loop_cb( EventBits_t event, void *arg ) {
