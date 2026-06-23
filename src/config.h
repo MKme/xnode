@@ -43,6 +43,14 @@
             #define RES_X_MAX       240
             #define RES_Y_MAX       240
             #define USE_PSRAM_ALLOC_LVGL
+        #elif defined( LILYGO_T_DECK_PLUS )
+            #undef LILYGO_WATCH_LVGL
+            #define HARDWARE_NAME   "T-DeckPlus"
+            #define RES_X_MAX       320
+            #define RES_Y_MAX       240
+            #define USE_PSRAM_ALLOC_LVGL
+            #define ENABLE_WEBSERVER
+            #define ENABLE_FTPSERVER
         #elif defined( LILYGO_WATCH_2020_V1 )
             #undef LILYGO_WATCH_LVGL
             #define HARDWARE_NAME   "T-Watch2020V1"
@@ -115,6 +123,7 @@
         #else
             #ifdef M5PAPER
             #elif defined( LILYGO_WATCH_S3 )
+            #elif defined( LILYGO_T_DECK_PLUS )
             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                 #include <LilyGoWatch.h>
             #endif

@@ -42,6 +42,10 @@
         #include "hardware/twatch_ultra_hal.h"
 
         SPIClass *sdhander = &SPI;
+    #elif defined( LILYGO_T_DECK_PLUS )
+        #include "hardware/tdeck_plus_hal.h"
+
+        SPIClass *sdhander = &SPI;
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #include <TTGO.h>
         
@@ -110,6 +114,25 @@ void sdcard_setup( void ) {
             if ( !sdhander ) {
                 sdhander = &SPI;
             }
+            heap_caps_malloc_extmem_enable( 1 );
+            if ( !SD.begin( SD_CS, *sdhander, 4000000, "/sd" ) ) {
+                log_e("SD Card Mount Failed");
+                sdcard_mount_failed = true;
+                sdcard_mounted = false;
+            }
+            else {
+                log_i("SD Card mounted at /sd");
+                sdcard_mounted = true;
+            }
+            heap_caps_malloc_extmem_enable( 16 * 1024 );
+        #endif
+    #elif defined( LILYGO_T_DECK_PLUS )
+        #if defined( LILYGO_WATCH_HAS_SDCARD )
+            if ( !sdhander ) {
+                sdhander = &SPI;
+            }
+            digitalWrite( BOARD_TFT_CS, HIGH );
+            digitalWrite( RADIO_CS_PIN, HIGH );
             heap_caps_malloc_extmem_enable( 1 );
             if ( !SD.begin( SD_CS, *sdhander, 4000000, "/sd" ) ) {
                 log_e("SD Card Mount Failed");
@@ -240,6 +263,44 @@ bool sdcard_powermgm_event_cb( EventBits_t event, void *arg ) {
                     break;
                 case POWERMGM_WAKEUP:
                     if( !sdcard_mounted ) {
+                        heap_caps_malloc_extmem_enable( 1 );
+                        sdcard_mounted = SD.begin( SD_CS, *sdhander, 4000000, "/sd" );
+                        heap_caps_malloc_extmem_enable( 16 * 1024 );
+                        if ( !sdcard_mounted ) {
+                            log_e("SD Card Mount Failed");
+                        }
+                    }
+                    retval = true;
+                    break;
+            }
+        #endif
+    #elif defined( LILYGO_T_DECK_PLUS )
+        #if defined( LILYGO_WATCH_HAS_SDCARD )
+            switch( event ) {
+                case POWERMGM_SILENCE_WAKEUP:
+                    if( !sdcard_mounted ) {
+                        digitalWrite( BOARD_TFT_CS, HIGH );
+                        digitalWrite( RADIO_CS_PIN, HIGH );
+                        heap_caps_malloc_extmem_enable( 1 );
+                        sdcard_mounted = SD.begin( SD_CS, *sdhander, 4000000, "/sd" );
+                        heap_caps_malloc_extmem_enable( 16 * 1024 );
+                        if ( !sdcard_mounted ) {
+                            log_e("SD Card Mount Failed");
+                        }
+                    }
+                    retval = true;
+                    break;
+                case POWERMGM_STANDBY:
+                    if( sdcard_mounted && !sdcard_block_unmount ) {
+                        SD.end();
+                        sdcard_mounted = false;
+                    }
+                    retval = true;
+                    break;
+                case POWERMGM_WAKEUP:
+                    if( !sdcard_mounted ) {
+                        digitalWrite( BOARD_TFT_CS, HIGH );
+                        digitalWrite( RADIO_CS_PIN, HIGH );
                         heap_caps_malloc_extmem_enable( 1 );
                         sdcard_mounted = SD.begin( SD_CS, *sdhander, 4000000, "/sd" );
                         heap_caps_malloc_extmem_enable( 16 * 1024 );

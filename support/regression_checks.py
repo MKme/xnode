@@ -44,6 +44,58 @@ def require_any(relative_path, description, token_groups):
     raise RegressionFailure(f"{description} regressed in {relative_path}")
 
 
+def require_slice_tokens(relative_path, description, start_token, end_token, tokens):
+    text = read_file(relative_path)
+    start = text.find(start_token)
+    if start == -1:
+        raise RegressionFailure(
+            f"{description} regressed in {relative_path}; missing start token: {start_token}"
+        )
+    end = text.find(end_token, start + len(start_token))
+    if end == -1:
+        raise RegressionFailure(
+            f"{description} regressed in {relative_path}; missing end token: {end_token}"
+        )
+    slice_text = text[start:end]
+    missing = [token for token in tokens if token not in slice_text]
+    if missing:
+        raise RegressionFailure(
+            f"{description} regressed in {relative_path}; missing: {', '.join(missing)}"
+        )
+    print(f"[regression] ok: {description}")
+
+
+def forbid_tokens(relative_path, description, tokens):
+    text = read_file(relative_path)
+    present = [token for token in tokens if token in text]
+    if present:
+        raise RegressionFailure(
+            f"{description} regressed in {relative_path}; forbidden: {', '.join(present)}"
+        )
+    print(f"[regression] ok: {description}")
+
+
+def forbid_slice_tokens(relative_path, description, start_token, end_token, tokens):
+    text = read_file(relative_path)
+    start = text.find(start_token)
+    if start == -1:
+        raise RegressionFailure(
+            f"{description} regressed in {relative_path}; missing start token: {start_token}"
+        )
+    end = text.find(end_token, start + len(start_token))
+    if end == -1:
+        raise RegressionFailure(
+            f"{description} regressed in {relative_path}; missing end token: {end_token}"
+        )
+    slice_text = text[start:end]
+    present = [token for token in tokens if token in slice_text]
+    if present:
+        raise RegressionFailure(
+            f"{description} regressed in {relative_path}; forbidden: {', '.join(present)}"
+        )
+    print(f"[regression] ok: {description}")
+
+
 def run_checks():
     require_tokens(
         "src/gui/widget_factory.cpp",
@@ -89,6 +141,20 @@ def run_checks():
             "xnode_notifications_accept_button_event",
             "LV_EVENT_PRESSED",
             "xnode_notifications_configure_controls",
+        ],
+    )
+    require_tokens(
+        "src/gui/mainbar/setup_tile/bluetooth_settings/bluetooth_message.cpp",
+        "message main-tile shortcut disappears after messages are viewed",
+        [
+            "bluetooth_message_dismiss_main_widget",
+            "messages_widget = widget_remove( messages_widget );",
+            "bluetooth_message_open_latest",
+            "bluetooth_message_show_msg( msg_chain_get_entrys( bluetooth_msg_chain ) - 1 );",
+            "const bool opened_message_tile = blectl_get_show_notification();",
+            "if ( opened_message_tile )",
+            "else if ( messages_widget == NULL )",
+            "bluetooth_message_set_indicator();",
         ],
     )
 
@@ -218,6 +284,8 @@ def run_checks():
         "src/gui/mainbar/main_tile/main_tile.cpp",
         "Ultra main screen moon phase indicator",
         [
+            "MAIN_TILE_HAS_MOON",
+            "LILYGO_T_DECK_PLUS",
             "MAIN_TILE_MOON_CANVAS_SIZE",
             "moon_canvas",
             "main_tile_ultra_moon_fraction",
@@ -231,13 +299,249 @@ def run_checks():
     )
 
     require_tokens(
+        "src/hardware/motion.cpp",
+        "T-Deck Plus does not leak bogus pedometer values",
+        [
+            "LILYGO_T_DECK_PLUS",
+            "return 0;",
+            "stepcounter = 0;",
+            "stepcounter_before_reset = 0;",
+        ],
+    )
+    require_tokens(
+        "src/hardware/config/bmaconfig.cpp",
+        "T-Deck Plus motion defaults stay disabled",
+        [
+            "LILYGO_T_DECK_PLUS",
+            "const bool default_motion_enabled = false;",
+            "enable[ BMA_STEPCOUNTER ] = false;",
+            "enable[ BMA_DOUBLECLICK ] = false;",
+        ],
+    )
+    require_tokens(
+        "src/gui/statusbar.cpp",
+        "T-Deck Plus hides the unsupported step counter",
+        [
+            "LILYGO_T_DECK_PLUS",
+            "lv_obj_set_hidden( statusbar_stepcounterlabel, true );",
+            "#if !defined( LILYGO_T_DECK_PLUS )",
+            "bma_register_cb( BMACTL_STEPCOUNTER, statusbar_bmactl_event_cb, \"statusbar stepcounter\" );",
+        ],
+    )
+
+    require_slice_tokens(
+        "src/gui/widget_styles.cpp",
+        "light theme keeps black text on light shared surfaces",
+        "case( 2 ):",
+        "case( 3 ):",
+        [
+            "lv_style_set_bg_color( &background_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );",
+            "lv_style_set_text_color( &mainbar_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );",
+            "lv_style_set_text_color( &app_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );",
+            "lv_style_set_text_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );",
+            "lv_style_set_text_color( &setup_tile_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );",
+            "lv_style_set_text_color( &setup_header_tile_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );",
+            "lv_style_set_text_color( &label_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );",
+            "lv_style_set_text_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_BLACK );",
+            "styles_send_event_cb( STYLE_LIGHTMODE, (void*)NULL );",
+        ],
+    )
+    require_slice_tokens(
+        "src/gui/widget_styles.cpp",
+        "dark theme keeps white text on dark shared surfaces",
+        "case( 3 ):",
+        "default:",
+        [
+            "lv_style_set_bg_color( &background_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );",
+            "lv_style_set_text_color( &mainbar_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );",
+            "lv_style_set_text_color( &app_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );",
+            "lv_style_set_text_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );",
+            "lv_style_set_text_color( &setup_tile_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );",
+            "lv_style_set_text_color( &setup_header_tile_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );",
+            "lv_style_set_text_color( &label_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );",
+            "lv_style_set_text_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_WHITE );",
+            "styles_send_event_cb( STYLE_DARKMODE, (void*)NULL );",
+        ],
+    )
+    require_tokens(
+        "src/gui/mainbar/setup_tile/style_settings/config/styleconfig.cpp",
+        "saved dark theme migrates to readable light theme on watch builds",
+        [
+            'theme = doc["theme"] | 2;',
+            'bool theme_migrated = doc["theme_migrated"] | false;',
+            "needs_save = !theme_migrated;",
+            "if ( theme == 3 || theme < 0 || theme > 3 )",
+            "theme = 2;",
+            "needs_save = true;",
+        ],
+    )
+    require_tokens(
+        "src/gui/mainbar/setup_tile/style_settings/config/styleconfig.cpp",
+        "T-Deck Plus theme defaults and recovers to dark high contrast",
+        [
+            "#elif defined( LILYGO_T_DECK_PLUS )",
+            'theme = doc["theme"] | 1;',
+            "if ( theme < 0 || theme > 1 )",
+            "theme = 1;",
+        ],
+    )
+    require_tokens(
+        "src/gui/mainbar/setup_tile/style_settings/style_settings.cpp",
+        "dark theme is not exposed on watch light-theme settings until visually verified",
+        [
+            '"E-Ink\\nE-Ink neg\\nlight"',
+            "if ( style_config.theme < 0 || style_config.theme > 2 )",
+            "uint16_t selected_theme = lv_dropdown_get_selected( obj );",
+            "if ( selected_theme > 2 )",
+            "style_config.theme = selected_theme;",
+        ],
+    )
+    require_tokens(
+        "src/gui/mainbar/setup_tile/style_settings/style_settings.cpp",
+        "T-Deck Plus theme settings expose only high-contrast watch-style choices",
+        [
+            "#if defined( LILYGO_T_DECK_PLUS )",
+            '"E-Ink\\nE-Ink neg"',
+            "if ( style_config.theme < 0 || style_config.theme > 1 )",
+            "if ( selected_theme > 1 )",
+        ],
+    )
+    require_tokens(
+        "src/gui/widget_styles.cpp",
+        "runtime theme clamp keeps unreadable dark selection from applying",
+        [
+            "if ( theme == 3 || theme < 0 || theme > 3 )",
+            "theme = 2;",
+        ],
+    )
+    require_tokens(
+        "src/gui/widget_styles.cpp",
+        "T-Deck Plus runtime theme clamp keeps light/invalid themes out of the main UI",
+        [
+            "#if defined( LILYGO_T_DECK_PLUS )",
+            "if ( theme < 0 || theme > 1 )",
+            "theme = 1;",
+        ],
+    )
+
+    require_tokens(
+        "src/app/gps_status/gps_status_main.cpp",
+        "T-Deck Plus GPS status uses readable full-width diagnostics",
+        [
+            "GPS_STATUS_FULL_DEBUG_LAYOUT",
+            "LILYGO_T_DECK_PLUS",
+            "gps_status_debug_text",
+            "LV_LABEL_LONG_BREAK",
+            "RES_X_MAX - ( GPS_STATUS_DEBUG_X * 2 )",
+            "char debug_text[640]",
+            "lv_label_set_text(gps_status_debug_text, debug_text);",
+            "Position:%s\\n",
+            "Raw RX:%lu  last:%s\\n",
+        ],
+    )
+    require_tokens(
+        "src/app/gps_status/gps_status_main.cpp",
+        "Ultra GPS status keeps row layout",
+        [
+            "#define GPS_STATUS_DEBUG_ROW_COUNT 10",
+            "#define GPS_STATUS_DEBUG_STEP 18",
+            "lv_obj_set_width(gps_status_debug_rows[i], lv_disp_get_hor_res(NULL) - ( GPS_STATUS_DEBUG_X * 2 ) );",
+            "\"Fix: %s\"",
+            "\"Position: %s\"",
+            "\"Raw RX: %lu  last %s\"",
+        ],
+    )
+    require_tokens(
+        "src/hardware/gpsctl.cpp",
+        "T-Deck Plus GPS supports L76K and u-blox/M10 receiver init",
+        [
+            "LILYGO_T_DECK_PLUS",
+            "gps_serial = &Serial1;",
+            "gpsctl_probe_tdeck_l76k",
+            "gpsctl_probe_tdeck_ublox_baud",
+            "gpsctl_wait_for_tdeck_ubx",
+            "const uint32_t probe_bauds[] = { 38400, BOARD_GPS_BAUDRATE };",
+            "gpsctl_set_probe_model( \"M10\" );",
+            "$PCAS06,0*1B",
+            "$PCAS04,5*1C",
+            "$PCAS11,3*1E",
+            "gpsctl_config.autoon = true;",
+            "watch.powerIoctl( WATCH_POWER_GPS, true );",
+        ],
+    )
+    require_tokens(
+        "src/hardware/display.cpp",
+        "T-Deck Plus uses direct backlight updates instead of pulse-count fading",
+        [
+            "display_update_timeout_dimmer();",
+            "brightness = dest_brightness;",
+            "dest_brightness = inactive_ms >= timeout_ms ? 0 : configured_brightness;",
+        ],
+    )
+    require_slice_tokens(
+        "src/gui/gui.cpp",
+        "T-Deck Plus display timeout keeps LVGL active instead of entering standby",
+        "bool gui_powermgm_loop_event_cb",
+        "lv_task_handler();",
+        [
+            "#if !defined( LILYGO_T_DECK_PLUS )",
+            "display_get_inactive_time_ms()",
+            "POWERMGM_STANDBY_REQUEST",
+        ],
+    )
+    forbid_slice_tokens(
+        "src/hardware/display.cpp",
+        "T-Deck Plus standby does not send LCD sleep command",
+        "#elif defined( LILYGO_T_DECK_PLUS )\n            watch.setBrightness( 0 );\n            brightness = 0;\n            dest_brightness = 0;",
+        "#elif defined( LILYGO_WATCH_2020_V1 )",
+        ["watch.displaySleep();"],
+    )
+    forbid_slice_tokens(
+        "src/hardware/display.cpp",
+        "T-Deck Plus wakeup does not depend on LCD wake command",
+        "#elif defined( LILYGO_T_DECK_PLUS )\n                brightness = 0;\n                dest_brightness = display_get_brightness();",
+        "#elif defined( LILYGO_WATCH_2020_V1 )",
+        ["watch.displayWakeup();"],
+    )
+    require_tokens(
+        "src/hardware/touch.cpp",
+        "T-Deck Plus standby can wake from touch and hardware keyboard without ESP light sleep",
+        [
+            "BOARD_KEYBOARD_INT",
+            "attachInterrupt( BOARD_KEYBOARD_INT, &touch_irq, FALLING );",
+            "gpio_wakeup_enable( (gpio_num_t)BOARD_KEYBOARD_INT, GPIO_INTR_LOW_LEVEL );",
+            "digitalRead( BOARD_KEYBOARD_INT ) == LOW",
+            "retval = false;",
+        ],
+    )
+    forbid_slice_tokens(
+        "src/hardware/pmu.cpp",
+        "T-Deck Plus standby keeps GPS powered for receiver continuity",
+        "#elif defined( LILYGO_T_DECK_PLUS )",
+        "#elif defined( LILYGO_WATCH_S3 )",
+        ["watch.powerIoctl( WATCH_POWER_GPS, false );"],
+    )
+    forbid_tokens(
+        "src/hardware/tdeck_plus_hal.cpp",
+        "T-Deck Plus HAL display sleep avoids ST7789 sleep/wake commands",
+        [
+            "display.writecommand(0x10);",
+            "display.writecommand(0x11);",
+        ],
+    )
+
+    require_tokens(
         "platformio.ini",
-        "regression checks run before both active watch builds",
+        "regression checks and post-upload resets run on active watch builds",
         [
             "[env:t-watch2020-v3-s3]",
             "[env:t-watch-ultra]",
+            "[env:tdeck-plus]",
             "pre:support/regression_checks.py",
             "pre:support/twatch_ultra_asyncwebserver.py",
+            "post:support/twatch_ultra_post_upload_reset.py",
+            "post:support/tdeck_plus_post_upload_reset.py",
+            "board_upload.after_reset = no_reset_stub",
         ],
     )
 

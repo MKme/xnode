@@ -50,6 +50,8 @@
         static bool bma_ultra_stepcounter_event = false;
         static bool bma_ultra_motion_event = false;
 
+    #elif defined( LILYGO_T_DECK_PLUS )
+
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -247,6 +249,10 @@ void bma_setup( void ) {
                 bma_send_event_cb( BMACTL_STEPCOUNTER_RESET, NULL );
                 log_w("stepcounter not valid. reset");
             }
+        #elif defined( LILYGO_T_DECK_PLUS )
+            stepcounter = 0;
+            stepcounter_before_reset = 0;
+            stepcounter_valid = 0xa5a5a5a5;
         #elif defined( LILYGO_WATCH_S3 )
             if ( stepcounter_valid != 0xa5a5a5a5 ) {
                 stepcounter = 0;
@@ -290,6 +296,7 @@ void bma_setup( void ) {
         #ifdef M5PAPER
         #elif defined( LILYGO_WATCH_ULTRA )
             bma_ultra_ready = bma_ultra_setup_sensor();
+        #elif defined( LILYGO_T_DECK_PLUS )
         #elif defined( LILYGO_WATCH_S3 )
             pinMode( BOARD_BMA423_INT1, INPUT );
             attachInterrupt( BOARD_BMA423_INT1, bma_irq, GPIO_INTR_POSEDGE );
@@ -555,10 +562,13 @@ void bma_notify_stepcounter( void ) {
     #ifdef NATIVE_64BIT
     #else
         #ifdef M5PAPER
-        #elif defined( LILYGO_WATCH_ULTRA )
-            bma_ultra_update_stepcounter();
-        #elif defined( LILYGO_WATCH_S3 )
-            stepcounter_before_reset = watch.getPedometerCounter();
+            #elif defined( LILYGO_WATCH_ULTRA )
+                bma_ultra_update_stepcounter();
+            #elif defined( LILYGO_T_DECK_PLUS )
+                stepcounter = 0;
+                stepcounter_before_reset = 0;
+            #elif defined( LILYGO_WATCH_S3 )
+                stepcounter_before_reset = watch.getPedometerCounter();
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
             stepcounter_before_reset = ttgo->bma->getCounter();
@@ -584,6 +594,7 @@ void bma_standby( void ) {
             #ifdef M5PAPER
             #elif defined( LILYGO_WATCH_S3 )
                 watch.configreFeatureInterrupt( SensorBMA423::INT_STEP_CNTR, false );
+            #elif defined( LILYGO_T_DECK_PLUS )
             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                 TTGOClass *ttgo = TTGOClass::getWatch();
                 ttgo->bma->enableStepCountInterrupt( false );
@@ -608,6 +619,7 @@ void bma_standby( void ) {
                     gpio_wakeup_enable( (gpio_num_t)BOARD_BHI260_INT, GPIO_INTR_HIGH_LEVEL );
                     esp_sleep_enable_gpio_wakeup();
                 }
+            #elif defined( LILYGO_T_DECK_PLUS )
             #elif defined( LILYGO_WATCH_S3 )
                 gpio_wakeup_enable ( (gpio_num_t)BOARD_BMA423_INT1, GPIO_INTR_HIGH_LEVEL);
                 esp_sleep_enable_gpio_wakeup ();
@@ -638,6 +650,7 @@ void bma_wakeup( void ) {
             #elif defined( LILYGO_WATCH_ULTRA )
                 bma_ultra_configure_stepcounter();
                 bma_ultra_update_sensor();
+            #elif defined( LILYGO_T_DECK_PLUS )
             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                 TTGOClass *ttgo = TTGOClass::getWatch();
                 ttgo->bma->enableStepCountInterrupt( true );
@@ -683,6 +696,7 @@ void bma_wakeup( void ) {
                         bma_ultra_update_sensor();
                         bma_ultra_counter_base = bma_ultra_last_counter != 0xffffffff ? bma_ultra_last_counter : 0;
                     }
+                #elif defined( LILYGO_T_DECK_PLUS )
                 #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                     TTGOClass *ttgo = TTGOClass::getWatch();
                     ttgo->bma->resetStepCounter();
@@ -713,6 +727,7 @@ void bma_reload_settings( void ) {
         #elif defined( LILYGO_WATCH_ULTRA )
             bma_ultra_configure_stepcounter();
             bma_ultra_configure_motion_wake();
+        #elif defined( LILYGO_T_DECK_PLUS )
         #elif defined( LILYGO_WATCH_S3 )
             watch.configreFeatureInterrupt( SensorBMA423::INT_STEP_CNTR, bma_config.enable[ BMA_STEPCOUNTER ] );
             watch.configreFeatureInterrupt( SensorBMA423::INT_WAKEUP, bma_config.enable[ BMA_DOUBLECLICK ] );
@@ -862,6 +877,8 @@ void bma_set_rotate_tilt( uint32_t rotation ) {
 uint32_t bma_get_stepcounter( void ) {
     #if !defined( NATIVE_64BIT ) && defined( LILYGO_WATCH_ULTRA )
         bma_ultra_update_stepcounter();
+    #elif !defined( NATIVE_64BIT ) && defined( LILYGO_T_DECK_PLUS )
+        return 0;
     #endif
     return stepcounter + stepcounter_before_reset;
 }
@@ -876,6 +893,7 @@ void bma_reset_stepcounter( void ) {
                 bma_ultra_update_sensor();
                 bma_ultra_counter_base = bma_ultra_last_counter != 0xffffffff ? bma_ultra_last_counter : 0;
             }
+        #elif defined( LILYGO_T_DECK_PLUS )
         #elif defined( LILYGO_WATCH_S3 )
             watch.resetPedometer();
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )

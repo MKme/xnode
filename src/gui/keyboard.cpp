@@ -23,6 +23,11 @@
 #include "keyboard.h"
 #include "statusbar.h"
 #include "widget_factory.h"
+#include "hardware/display.h"
+
+#if defined( LILYGO_T_DECK_PLUS )
+    #include "hardware/tdeck_plus_hal.h"
+#endif
 
 #include <string.h>
 
@@ -108,6 +113,7 @@ static void kb_event_cb(lv_obj_t * ta, lv_event_t event);
 static void keyboard_set_page( keyboard_page_t page );
 static bool keyboard_handle_text_key( lv_obj_t * keyboard, const char * txt );
 static void keyboard_layout_text( void );
+static void keyboard_focus_textarea( lv_obj_t *textarea );
 
 void keyboard_prelim( void ) {
     if( !kb_style_initialized ) {
@@ -144,6 +150,10 @@ void keyboard_prelim( void ) {
 
 
 void keyboard_setup( void ) {
+#if defined( LILYGO_T_DECK_PLUS )
+    keyboard_hide();
+    return;
+#endif
     /*
      * check if keyboard already initialized
      */
@@ -165,6 +175,10 @@ void keyboard_setup( void ) {
 }
 
 void num_keyboard_setup( void ) {
+#if defined( LILYGO_T_DECK_PLUS )
+    keyboard_hide();
+    return;
+#endif
     /*
      * check if keyboard already initialized
      */
@@ -210,6 +224,10 @@ static void kb_event_cb( lv_obj_t * ta, lv_event_t event ) {
 }
 
 void keyboard_set_textarea( lv_obj_t *textarea ){
+#if defined( LILYGO_T_DECK_PLUS )
+    keyboard_focus_textarea( textarea );
+    return;
+#endif
     /*
      * check if keyboard already initialized
      */
@@ -224,6 +242,10 @@ void keyboard_set_textarea( lv_obj_t *textarea ){
 }
 
 void num_keyboard_set_textarea( lv_obj_t *textarea ){
+#if defined( LILYGO_T_DECK_PLUS )
+    keyboard_focus_textarea( textarea );
+    return;
+#endif
     /*
      * check if keyboard already initialized
      */
@@ -237,6 +259,13 @@ void num_keyboard_set_textarea( lv_obj_t *textarea ){
 }
 
 void keyboard_hide( void ) {
+#if defined( LILYGO_T_DECK_PLUS )
+    if ( kb_user_textarea != NULL ) {
+        lv_textarea_set_cursor_hidden( kb_user_textarea, true );
+    }
+    kb_user_textarea = NULL;
+    return;
+#endif
     if ( kb_screen != NULL ) {
     	lv_obj_set_hidden( kb_screen, true );
     }
@@ -255,6 +284,9 @@ void keyboard_hide( void ) {
 }
 
 void keyboard_show( void ) {
+#if defined( LILYGO_T_DECK_PLUS )
+    return;
+#endif
     /*
      * check if keyboard already initialized
      */
@@ -273,6 +305,9 @@ void keyboard_show( void ) {
 }
 
 void num_keyboard_show( void ) {
+#if defined( LILYGO_T_DECK_PLUS )
+    return;
+#endif
     /*
      * check if keyboard already initialized
      */
@@ -402,4 +437,53 @@ static bool keyboard_handle_text_key( lv_obj_t * keyboard, const char * txt ) {
 
     lv_textarea_add_text( target, txt );
     return( true );
+}
+
+static void keyboard_focus_textarea( lv_obj_t *textarea ) {
+    if ( textarea == NULL ) {
+        return;
+    }
+    if ( kb_user_textarea != NULL && kb_user_textarea != textarea ) {
+        lv_textarea_set_cursor_hidden( kb_user_textarea, true );
+    }
+    kb_user_textarea = textarea;
+    lv_textarea_set_cursor_hidden( kb_user_textarea, false );
+    display_trigger_activity();
+}
+
+void keyboard_poll_hardware( void ) {
+#if defined( LILYGO_T_DECK_PLUS )
+    if ( kb_user_textarea == NULL ) {
+        return;
+    }
+
+    for ( uint8_t i = 0 ; i < 8 ; ++i ) {
+        const char key = watch.readKeyboardChar();
+        if ( key == '\0' || key == (char)0xff ) {
+            break;
+        }
+
+        display_trigger_activity();
+
+        if ( key == LV_KEY_ESC ) {
+            keyboard_hide();
+            break;
+        }
+        if ( key == LV_KEY_BACKSPACE || key == LV_KEY_DEL ) {
+            lv_textarea_del_char( kb_user_textarea );
+            continue;
+        }
+        if ( key == '\r' || key == '\n' ) {
+            if ( lv_textarea_get_one_line( kb_user_textarea ) ) {
+                keyboard_hide();
+                break;
+            }
+            lv_textarea_add_char( kb_user_textarea, '\n' );
+            continue;
+        }
+        if ( key >= 32 && key <= 126 ) {
+            lv_textarea_add_char( kb_user_textarea, key );
+        }
+    }
+#endif
 }

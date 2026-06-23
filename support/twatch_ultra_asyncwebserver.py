@@ -3,8 +3,9 @@ from pathlib import Path
 Import("env")
 
 project_dir = Path(env.subst("$PROJECT_DIR"))
-async_webserver_src = project_dir / ".pio" / "libdeps" / "t-watch-ultra" / "ESP Async WebServer" / "src"
-asynctcp_src = project_dir / ".pio" / "libdeps" / "t-watch-ultra" / "AsyncTCP" / "src"
+pio_env = env.subst("$PIOENV")
+async_webserver_src = project_dir / ".pio" / "libdeps" / pio_env / "ESP Async WebServer" / "src"
+asynctcp_src = project_dir / ".pio" / "libdeps" / pio_env / "AsyncTCP" / "src"
 framework_dir = Path(env.PioPlatform().get_package_dir("framework-arduinoespressif32"))
 framework_libraries = framework_dir / "libraries"
 
@@ -23,4 +24,4 @@ if async_webserver_src.is_dir():
         src_filter=["+<*.cpp>"],
     )
 else:
-    print("warning: ESP Async WebServer source directory was not found for t-watch-ultra")
+    print(f"warning: ESP Async WebServer source directory was not found for {pio_env}")

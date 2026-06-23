@@ -264,6 +264,9 @@ void statusbar_setup( void )
     lv_obj_add_style( statusbar_stepcounterlabel, LV_OBJ_PART_MAIN, &statusbarstyle[ STATUSBAR_STYLE_WHITE ] );
     lv_label_set_text( statusbar_stepcounterlabel, "0");
     lv_obj_align( statusbar_stepcounterlabel, statusbar, LV_ALIGN_IN_LEFT_MID, 5, 0 );
+    #if defined( LILYGO_T_DECK_PLUS )
+        lv_obj_set_hidden( statusbar_stepcounterlabel, true );
+    #endif
 
     lv_obj_t *statusbar_volume_cont = lv_obj_create( statusbar, NULL );
     lv_obj_add_style( statusbar_volume_cont, LV_OBJ_PART_MAIN, &style );
@@ -328,7 +331,9 @@ void statusbar_setup( void )
     blectl_register_cb( BLECTL_CONNECT | BLECTL_DISCONNECT | BLECTL_ON | BLECTL_OFF, statusbar_blectl_event_cb, "statusbar bluetooth" );
     wifictl_register_cb( WIFICTL_CONNECT | WIFICTL_DISCONNECT | WIFICTL_OFF | WIFICTL_ON | WIFICTL_MSG | WIFICTL_WPS_SUCCESS | WIFICTL_WPS_FAILED | WIFICTL_CONNECT_IP, statusbar_wifictl_event_cb, "statusbar wifi" );
     rtcctl_register_cb( RTCCTL_ALARM_ENABLED | RTCCTL_ALARM_DISABLED, statusbar_rtcctl_event_cb, "statusbar rtc" );
-    bma_register_cb( BMACTL_STEPCOUNTER, statusbar_bmactl_event_cb, "statusbar stepcounter" );
+    #if !defined( LILYGO_T_DECK_PLUS )
+        bma_register_cb( BMACTL_STEPCOUNTER, statusbar_bmactl_event_cb, "statusbar stepcounter" );
+    #endif
     pmu_register_cb( PMUCTL_STATUS, statusbar_pmuctl_event_cb, "statusbar pmu");
     display_register_cb( DISPLAYCTL_BRIGHTNESS, statusbar_displayctl_event_cb, "statusbar display" );
     gpsctl_register_cb( GPSCTL_ENABLE | GPSCTL_DISABLE | GPSCTL_FIX | GPSCTL_NOFIX, statusbar_gpsctl_event_cb, "statusbar gps" );

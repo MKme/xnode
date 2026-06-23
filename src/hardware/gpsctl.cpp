@@ -47,6 +47,8 @@
         #include <M5Core2.h>
     #elif defined( LILYGO_WATCH_ULTRA )
         #include "hardware/twatch_ultra_hal.h"
+    #elif defined( LILYGO_T_DECK_PLUS )
+        #include "hardware/tdeck_plus_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -113,6 +115,8 @@ static uint32_t gpsctl_get_configured_baud( void ) {
 #ifdef NATIVE_64BIT
     return( 0 );
 #elif defined( LILYGO_WATCH_ULTRA )
+    return( BOARD_GPS_BAUDRATE );
+#elif defined( LILYGO_T_DECK_PLUS )
     return( BOARD_GPS_BAUDRATE );
 #elif defined( LILYGO_WATCH_S3 )
     return( 38400 );
@@ -202,7 +206,7 @@ static int gpsctl_read_serial_byte( void ) {
     return( c );
 }
 
-#if defined( LILYGO_WATCH_ULTRA ) && !defined( USE_SOFTWARE_SERIAL )
+#if ( defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) ) && !defined( USE_SOFTWARE_SERIAL )
 static void gpsctl_set_probe_model( const char *model ) {
     if ( !model ) {
         model = "unknown";
@@ -210,6 +214,7 @@ static void gpsctl_set_probe_model( const char *model ) {
     snprintf( gpsctl_probe_model, sizeof( gpsctl_probe_model ), "%s", model );
 }
 
+#if defined( LILYGO_WATCH_ULTRA )
 static bool gpsctl_wait_for_ubx( uint8_t requested_class, uint8_t requested_id, uint32_t timeout_ms ) {
     uint8_t state = 0;
     uint16_t payload_len = 0;
@@ -304,6 +309,7 @@ static bool gpsctl_wait_for_ls550g_version( uint32_t timeout_ms ) {
     line[line_len] = '\0';
     return( strstr( line, "$PQTMQVER,OK,1,MODULE,LS550G" ) != NULL );
 }
+#endif
 
 static void gpsctl_drain_serial_for( uint32_t duration_ms ) {
     uint32_t start = millis();
@@ -319,6 +325,161 @@ static void gpsctl_drain_serial_for( uint32_t duration_ms ) {
     }
 }
 
+#if defined( LILYGO_T_DECK_PLUS )
+static bool gpsctl_wait_for_tdeck_ubx( uint8_t requested_class, uint8_t requested_id, uint32_t timeout_ms ) {
+    uint8_t state = 0;
+    uint16_t payload_len = 0;
+    uint16_t bytes_to_skip = 0;
+    uint32_t start = millis();
+
+    while ( (uint32_t)( millis() - start ) < timeout_ms ) {
+        while ( gps_serial && gps_serial->available() > 0 ) {
+            int c = gpsctl_read_serial_byte();
+            if ( c < 0 ) {
+                continue;
+            }
+
+            switch ( state ) {
+                case 0:
+                    state = ( c == 0xB5 ) ? 1 : 0;
+                    break;
+                case 1:
+                    state = ( c == 0x62 ) ? 2 : 0;
+                    break;
+                case 2:
+                    state = ( c == requested_class ) ? 3 : 0;
+                    break;
+                case 3:
+                    state = ( c == requested_id ) ? 4 : 0;
+                    break;
+                case 4:
+                    payload_len = (uint8_t)c;
+                    state = 5;
+                    break;
+                case 5:
+                    payload_len |= ( (uint16_t)(uint8_t)c << 8 );
+                    if ( payload_len > 512 ) {
+                        state = 0;
+                    }
+                    else {
+                        bytes_to_skip = payload_len + 2;
+                        state = ( bytes_to_skip == 0 ) ? 0 : 6;
+                    }
+                    break;
+                case 6:
+                    if ( bytes_to_skip > 0 ) {
+                        bytes_to_skip--;
+                    }
+                    if ( bytes_to_skip == 0 ) {
+                        return( true );
+                    }
+                    break;
+                default:
+                    state = 0;
+                    break;
+            }
+        }
+        delay( 2 );
+    }
+
+    return( false );
+}
+
+static bool gpsctl_wait_for_l76k_version( uint32_t timeout_ms ) {
+    char line[128] = "";
+    size_t line_len = 0;
+    uint32_t start = millis();
+
+    while ( (uint32_t)( millis() - start ) < timeout_ms ) {
+        while ( gps_serial && gps_serial->available() > 0 ) {
+            int c = gpsctl_read_serial_byte();
+            if ( c < 0 ) {
+                continue;
+            }
+
+            if ( c == '\r' ) {
+                continue;
+            }
+            if ( c == '\n' ) {
+                line[line_len] = '\0';
+                if ( strstr( line, "$GPTXT,01,01,02" ) != NULL || strstr( line, "L76K" ) != NULL ) {
+                    return( true );
+                }
+                line_len = 0;
+                continue;
+            }
+            if ( line_len < sizeof( line ) - 1 ) {
+                line[line_len++] = (char)c;
+            }
+            else {
+                line_len = 0;
+            }
+        }
+        delay( 2 );
+    }
+
+    line[line_len] = '\0';
+    return( strstr( line, "$GPTXT,01,01,02" ) != NULL || strstr( line, "L76K" ) != NULL );
+}
+
+static bool gpsctl_probe_tdeck_l76k( void ) {
+    const uint32_t start_rx_bytes = gpsctl_rx_bytes;
+    gpsctl_begin_serial( BOARD_GPS_BAUDRATE );
+    delay( 100 );
+
+    gps_serial->write( "$PCAS03,0,0,0,0,0,0,0,0,0,0,,,0,0*02\r\n" );
+    gps_serial->flush();
+    delay( 100 );
+    gpsctl_drain_serial_for( 100 );
+
+    gps_serial->write( "$PCAS06,0*1B\r\n" );
+    gps_serial->flush();
+    const bool saw_l76k_version = gpsctl_wait_for_l76k_version( 900 );
+
+    gps_serial->write( "$PCAS04,5*1C\r\n" );
+    delay( 20 );
+    gps_serial->write( "$PCAS03,1,1,1,1,1,1,1,1,1,1,,,0,0*02\r\n" );
+    delay( 20 );
+    gps_serial->write( "$PCAS11,3*1E\r\n" );
+    gps_serial->flush();
+
+    if ( saw_l76k_version ) {
+        gpsctl_set_probe_model( "L76K" );
+        return( true );
+    }
+
+    if ( gpsctl_rx_bytes > start_rx_bytes ) {
+        gpsctl_set_probe_model( "nmea" );
+        return( true );
+    }
+
+    gpsctl_set_probe_model( "silent" );
+    return( false );
+}
+
+static bool gpsctl_probe_tdeck_ublox_baud( uint32_t baud, bool *saw_rx ) {
+    static const uint8_t cfg_rate_poll[] = { 0xB5, 0x62, 0x06, 0x08, 0x00, 0x00, 0x0E, 0x30 };
+    const uint32_t start_rx_bytes = gpsctl_rx_bytes;
+
+    if ( saw_rx ) {
+        *saw_rx = false;
+    }
+
+    gpsctl_begin_serial( baud );
+    delay( 120 );
+    gpsctl_drain_serial_for( 150 );
+
+    gps_serial->write( cfg_rate_poll, sizeof( cfg_rate_poll ) );
+    gps_serial->flush();
+    const bool ok = gpsctl_wait_for_tdeck_ubx( 0x06, 0x08, 900 );
+    if ( saw_rx ) {
+        *saw_rx = gpsctl_rx_bytes > start_rx_bytes;
+    }
+    return( ok );
+}
+#endif
+
+#if defined( LILYGO_WATCH_ULTRA )
 static bool gpsctl_probe_ultra_baud( uint32_t baud, bool *saw_rx ) {
     static const uint8_t cfg_get_hw[] = { 0xB5, 0x62, 0x0A, 0x04, 0x00, 0x00, 0x0E, 0x34 };
     const uint32_t start_rx_bytes = gpsctl_rx_bytes;
@@ -367,6 +528,7 @@ static bool gpsctl_probe_ls550g( void ) {
     return( true );
 }
 #endif
+#endif
 
 static void gpsctl_prepare_receiver_after_power_on( void ) {
     if ( !gps_serial ) {
@@ -411,6 +573,42 @@ static void gpsctl_prepare_receiver_after_power_on( void ) {
 
     gpsctl_begin_serial( BOARD_GPS_BAUDRATE );
     GPSCTL_ERROR_LOG( "T-Watch Ultra GPS probe failed" );
+#elif defined( LILYGO_T_DECK_PLUS ) && !defined( USE_SOFTWARE_SERIAL )
+    gpsctl_probe_done = true;
+    gpsctl_probe_ok = false;
+    gpsctl_set_probe_model( "unknown" );
+
+    if ( gpsctl_probe_tdeck_l76k() ) {
+        gpsctl_probe_ok = true;
+        GPSCTL_INFO_LOG( "T-Deck Plus GPS probe ok as %s at %lu baud", gpsctl_probe_model, (unsigned long)gpsctl_active_baud );
+        return;
+    }
+
+    const uint32_t probe_bauds[] = { 38400, BOARD_GPS_BAUDRATE };
+    uint32_t nmea_baud = 0;
+
+    for ( size_t i = 0; i < sizeof( probe_bauds ) / sizeof( probe_bauds[0] ); i++ ) {
+        bool saw_rx = false;
+        if ( gpsctl_probe_tdeck_ublox_baud( probe_bauds[i], &saw_rx ) ) {
+            gpsctl_probe_ok = true;
+            gpsctl_set_probe_model( "M10" );
+            GPSCTL_INFO_LOG( "T-Deck Plus GPS probe ok as u-blox/M10 at %lu baud", (unsigned long)probe_bauds[i] );
+            return;
+        }
+        if ( saw_rx && nmea_baud == 0 ) {
+            nmea_baud = probe_bauds[i];
+        }
+    }
+
+    if ( nmea_baud != 0 ) {
+        gpsctl_begin_serial( nmea_baud );
+        gpsctl_probe_ok = true;
+        gpsctl_set_probe_model( "nmea" );
+        GPSCTL_INFO_LOG( "T-Deck Plus GPS raw NMEA detected at %lu baud", (unsigned long)nmea_baud );
+        return;
+    }
+
+    GPSCTL_ERROR_LOG( "T-Deck Plus GPS probe failed at %lu baud", (unsigned long)gpsctl_active_baud );
 #else
     gpsctl_begin_serial( gpsctl_get_configured_baud() );
 #endif
@@ -428,10 +626,15 @@ void gpsctl_setup( void ) {
      * load config from json
      */
     gpsctl_config.load();
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
         bool config_changed = false;
         if ( gpsctl_config.config_version < GPSCTL_CONFIG_VERSION ) {
-            gpsctl_config.autoon = false;
+            #if defined( LILYGO_T_DECK_PLUS )
+                gpsctl_config.autoon = true;
+                gpsctl_config.app_use_gps = true;
+            #else
+                gpsctl_config.autoon = false;
+            #endif
             gpsctl_config.enable_on_standby = false;
             gpsctl_config.config_version = GPSCTL_CONFIG_VERSION;
             config_changed = true;
@@ -441,6 +644,16 @@ void gpsctl_setup( void ) {
             gpsctl_config.TXPin = SHIELD_GPS_TX;
             config_changed = true;
         }
+        #if defined( LILYGO_T_DECK_PLUS )
+            if ( !gpsctl_config.autoon ) {
+                gpsctl_config.autoon = true;
+                config_changed = true;
+            }
+            if ( !gpsctl_config.app_use_gps ) {
+                gpsctl_config.app_use_gps = true;
+                config_changed = true;
+            }
+        #endif
         if ( config_changed ) {
             gpsctl_config.save();
         }
@@ -465,6 +678,9 @@ void gpsctl_setup( void ) {
             #elif defined( LILYGO_WATCH_ULTRA )
                 gpsctl_config.RXPin = SHIELD_GPS_RX;
                 gpsctl_config.TXPin = SHIELD_GPS_TX;
+            #elif defined( LILYGO_T_DECK_PLUS )
+                gpsctl_config.RXPin = SHIELD_GPS_RX;
+                gpsctl_config.TXPin = SHIELD_GPS_TX;
             #elif defined( LILYGO_WATCH_S3 )
                 gpsctl_config.RXPin = SHIELD_GPS_RX;
                 gpsctl_config.TXPin = SHIELD_GPS_TX;
@@ -487,7 +703,7 @@ void gpsctl_setup( void ) {
                 gps_serial = new SoftwareSerial( gpsctl_config.RXPin, gpsctl_config.TXPin );
                 gpsctl_begin_serial( GPSBaud );
             #else
-                #if defined( LILYGO_WATCH_ULTRA )
+                #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
                     gps_serial = &Serial1;
                 #else
                     gps_serial = &Serial2;
@@ -903,6 +1119,8 @@ void gpsctl_on( void ) {
 
             #elif defined( LILYGO_WATCH_ULTRA )
                 watch.powerIoctl( WATCH_POWER_GPS, true );
+            #elif defined( LILYGO_T_DECK_PLUS )
+                watch.powerIoctl( WATCH_POWER_GPS, true );
             #elif defined( LILYGO_WATCH_S3 )
                 watch.powerIoctl( WATCH_POWER_GPS, true );
                 watch.powerIoctl( WATCH_POWER_GPS_DC_CHANNEL, true );
@@ -957,6 +1175,8 @@ void gpsctl_off( void ) {
 
             #elif defined( LILYGO_WATCH_ULTRA )
                 watch.powerIoctl( WATCH_POWER_GPS, false );
+            #elif defined( LILYGO_T_DECK_PLUS )
+                watch.powerIoctl( WATCH_POWER_GPS, false );
             #elif defined( LILYGO_WATCH_S3 )
                 watch.powerIoctl( WATCH_POWER_GPS, false );
                 watch.powerIoctl( WATCH_POWER_GPS_DC_CHANNEL, false );
@@ -1008,6 +1228,8 @@ void gpsctl_autoon_on( void ) {
 
                 #elif defined( LILYGO_WATCH_ULTRA )
                     watch.powerIoctl( WATCH_POWER_GPS, true );
+                #elif defined( LILYGO_T_DECK_PLUS )
+                    watch.powerIoctl( WATCH_POWER_GPS, true );
                 #elif defined( LILYGO_WATCH_S3 )
                     watch.powerIoctl( WATCH_POWER_GPS, true );
                     watch.powerIoctl( WATCH_POWER_GPS_DC_CHANNEL, true );
@@ -1030,7 +1252,7 @@ void gpsctl_autoon_on( void ) {
     else {
         #ifdef NATIVE_64BIT
         #else
-            #if defined( LILYGO_WATCH_ULTRA )
+            #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
                 watch.powerIoctl( WATCH_POWER_GPS, false );
             #endif
         #endif
@@ -1049,6 +1271,8 @@ void gpsctl_autoon_off( void ) {
         #elif defined( M5CORE2 )
 
         #elif defined( LILYGO_WATCH_ULTRA )
+            watch.powerIoctl( WATCH_POWER_GPS, false );
+        #elif defined( LILYGO_T_DECK_PLUS )
             watch.powerIoctl( WATCH_POWER_GPS, false );
         #elif defined( LILYGO_WATCH_S3 )
             watch.powerIoctl( WATCH_POWER_GPS, false );
@@ -1099,7 +1323,7 @@ bool gpsctl_get_gps_over_ip( void ) {
 }
 
 void gpsctl_set_gps_rx_tx_pin( int8_t rx, int8_t tx ) {
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
         rx = SHIELD_GPS_RX;
         tx = SHIELD_GPS_TX;
     #endif

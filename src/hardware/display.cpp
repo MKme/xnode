@@ -38,6 +38,8 @@
         #include "hardware/twatch_ultra_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
+    #elif defined( LILYGO_T_DECK_PLUS )
+        #include "hardware/tdeck_plus_hal.h"
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #include <TTGO.h>
     #elif defined( LILYGO_WATCH_2021 )
@@ -100,6 +102,9 @@ void display_setup( void ) {
             watch.setRotation( display_config.rotation / 90 );
             watch.setBrightness( 0 );
             bma_set_rotate_tilt( display_config.rotation );
+        #elif defined( LILYGO_T_DECK_PLUS )
+            watch.setRotation( display_config.rotation / 90 );
+            watch.setBrightness( 0 );
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
             ttgo->tft->init();
@@ -190,6 +195,14 @@ static bool display_powermgm_loop_cb( EventBits_t event, void *arg ) {
                 watch.setBrightness( brightness );
             }
             display_update_timeout_dimmer();
+
+            retval = true;
+        #elif defined( LILYGO_T_DECK_PLUS )
+            display_update_timeout_dimmer();
+            if ( dest_brightness != brightness ) {
+                brightness = dest_brightness;
+                watch.setBrightness( brightness );
+            }
 
             retval = true;
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -291,6 +304,12 @@ static void display_update_timeout_dimmer( void ) {
 
     const uint32_t timeout_ms = timeout * 1000;
     const uint32_t inactive_ms = display_get_inactive_time_ms();
+
+    #if defined( LILYGO_T_DECK_PLUS )
+        dest_brightness = inactive_ms >= timeout_ms ? 0 : configured_brightness;
+        return;
+    #endif
+
     const uint32_t fade_window_ms = configured_brightness * 8;
     const uint32_t fade_start_ms = timeout_ms > fade_window_ms ? timeout_ms - fade_window_ms : 0;
 
@@ -318,6 +337,10 @@ static void display_standby( void ) {
             brightness = 0;
             dest_brightness = 0;
         #elif defined( LILYGO_WATCH_S3 )
+            watch.setBrightness( 0 );
+            brightness = 0;
+            dest_brightness = 0;
+        #elif defined( LILYGO_T_DECK_PLUS )
             watch.setBrightness( 0 );
             brightness = 0;
             dest_brightness = 0;
@@ -368,6 +391,10 @@ static void display_wakeup( bool silence ) {
                 watch.setBrightness( 0 );
                 brightness = 0;
                 dest_brightness = 0;
+            #elif defined( LILYGO_T_DECK_PLUS )
+                watch.setBrightness( 0 );
+                brightness = 0;
+                dest_brightness = 0;
             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
                 TTGOClass *ttgo = TTGOClass::getWatch();
                 #if defined( LILYGO_WATCH_2020_V2 )
@@ -410,6 +437,9 @@ static void display_wakeup( bool silence ) {
                 brightness = 0;
                 dest_brightness = display_get_brightness();
             #elif defined( LILYGO_WATCH_S3 )
+                brightness = 0;
+                dest_brightness = display_get_brightness();
+            #elif defined( LILYGO_T_DECK_PLUS )
                 brightness = 0;
                 dest_brightness = display_get_brightness();
             #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -495,6 +525,9 @@ void display_set_brightness( uint32_t brightness_level ) {
         #elif defined( LILYGO_WATCH_S3 )
         brightness = brightness_level;
         watch.setBrightness( brightness_level );
+        #elif defined( LILYGO_T_DECK_PLUS )
+        brightness = brightness_level;
+        watch.setBrightness( brightness_level );
         #endif
     #endif
     display_send_event_cb( DISPLAYCTL_BRIGHTNESS, (void *)&display_config.brightness );
@@ -537,6 +570,9 @@ void display_set_rotation( uint32_t rotation ) {
             display_config.rotation = rotation;
             watch.setRotation( rotation / 90 );
         #elif defined( LILYGO_WATCH_S3 )
+            display_config.rotation = rotation;
+            watch.setRotation( rotation / 90 );
+        #elif defined( LILYGO_T_DECK_PLUS )
             display_config.rotation = rotation;
             watch.setRotation( rotation / 90 );
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )

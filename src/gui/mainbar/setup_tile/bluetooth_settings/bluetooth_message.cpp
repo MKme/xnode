@@ -194,6 +194,8 @@ LV_IMG_DECLARE(message_96px);
 #endif
 
 static void bluetooth_message_set_indicator( void );
+static void bluetooth_message_dismiss_main_widget( void );
+static bool bluetooth_message_open_latest( void );
 static bool bluetooth_message_button_event_cb( EventBits_t event, void *arg );
 static void bluetooth_message_activate_cb( void );
 static void bluetooth_message_hibernate_cb( void );
@@ -355,10 +357,7 @@ static bool bluetooth_message_style_change_event_cb( EventBits_t event, void *ar
 static void enter_bluetooth_messages_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
         case( LV_EVENT_CLICKED ):       
-            if ( msg_chain_get_entrys( bluetooth_msg_chain ) > 0 ) {
-                bluetooth_message_show_msg( msg_chain_get_entrys( bluetooth_msg_chain ) - 1 );
-                mainbar_jump_to_tilenumber( bluetooth_message_tile_num, LV_ANIM_OFF, true );
-            }
+            bluetooth_message_open_latest();
             break;
         case ( LV_EVENT_LONG_PRESSED ):             
             break;
@@ -366,10 +365,17 @@ static void enter_bluetooth_messages_cb( lv_obj_t * obj, lv_event_t event ) {
 }
 
 void bluetooth_message_open( void ) {
+    bluetooth_message_open_latest();
+}
+
+static bool bluetooth_message_open_latest( void ) {
     if ( msg_chain_get_entrys( bluetooth_msg_chain ) > 0 ) {
         bluetooth_message_show_msg( msg_chain_get_entrys( bluetooth_msg_chain ) - 1 );
+        bluetooth_message_dismiss_main_widget();
         mainbar_jump_to_tilenumber( bluetooth_message_tile_num, LV_ANIM_OFF, true );
+        return( true );
     }
+    return( false );
 }
 
 static void bluetooth_prev_message_event_cb( lv_obj_t * obj, lv_event_t event ) {
@@ -448,7 +454,7 @@ static void bluetooth_message_set_indicator( void ) {
     switch ( msg_chain_get_entrys( bluetooth_msg_chain ) ) {
         case 0:
             app_hide_indicator( messages_app );
-            messages_widget = widget_remove( messages_widget );
+            bluetooth_message_dismiss_main_widget();
             break;
         case 1:
             widget_set_indicator( messages_widget, ICON_INDICATOR_1 );
@@ -466,6 +472,12 @@ static void bluetooth_message_set_indicator( void ) {
             widget_set_indicator( messages_widget, ICON_INDICATOR_N );
             app_set_indicator( messages_app, ICON_INDICATOR_N );
     } 
+}
+
+static void bluetooth_message_dismiss_main_widget( void ) {
+    if ( messages_widget != NULL ) {
+        messages_widget = widget_remove( messages_widget );
+    }
 }
 
 const char* bluetooth_get_msg_entry( int32_t entry ) {
@@ -657,7 +669,8 @@ bool bluetooth_message_queue_msg( const char *msg ) {
     /**
      * show on notification if enabled
      */
-    if ( blectl_get_show_notification() ) {
+    const bool opened_message_tile = blectl_get_show_notification();
+    if ( opened_message_tile ) {
         mainbar_jump_to_tilenumber( bluetooth_message_tile_num, LV_ANIM_OFF, true );
     }
     /**
@@ -682,7 +695,10 @@ bool bluetooth_message_queue_msg( const char *msg ) {
     /*
      * allocate an widget if nor allocated
      */
-    if ( messages_widget == NULL ) {
+    if ( opened_message_tile ) {
+        bluetooth_message_dismiss_main_widget();
+    }
+    else if ( messages_widget == NULL ) {
         messages_widget = widget_register( "message", &message_64px, enter_bluetooth_messages_cb );
     }
     /*

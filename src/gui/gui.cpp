@@ -74,7 +74,7 @@
     SemaphoreHandle_t xGUI_SemaphoreMutex;
 #endif
 
-#if defined( M5CORE2 )
+#if defined( M5CORE2 ) || defined( LILYGO_T_DECK_PLUS )
     LV_IMG_DECLARE( bg_320px );
     LV_IMG_DECLARE( bg1_320px );
     LV_IMG_DECLARE( bg2_320px );
@@ -370,18 +370,21 @@ bool gui_powermgm_loop_event_cb( EventBits_t event, void *arg ) {
     #ifdef NATIVE_64BIT
 
     #else
-        const uint32_t timeout = display_get_timeout();
+        #if !defined( LILYGO_T_DECK_PLUS )
+            const uint32_t timeout = display_get_timeout();
 
-        switch ( event ) {
-            case POWERMGM_WAKEUP:
-            case POWERMGM_SILENCE_WAKEUP:   if ( timeout != DISPLAY_NO_TIMEOUT && display_get_inactive_time_ms() >= timeout * 1000 ) {
-                                                powermgm_set_event( POWERMGM_STANDBY_REQUEST );
-                                            }
-                                            break;
-        }
+            switch ( event ) {
+                case POWERMGM_WAKEUP:
+                case POWERMGM_SILENCE_WAKEUP:   if ( timeout != DISPLAY_NO_TIMEOUT && display_get_inactive_time_ms() >= timeout * 1000 ) {
+                                                    powermgm_set_event( POWERMGM_STANDBY_REQUEST );
+                                                }
+                                                break;
+            }
+        #endif
     #endif
 
     lv_task_handler();
+    keyboard_poll_hardware();
 
     if ( force_redraw ) {
         force_redraw = !force_redraw;
