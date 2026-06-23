@@ -44,6 +44,8 @@ touch_config_t touch_config;
         #include <M5Core2.h>
     #elif defined( LILYGO_WATCH_ULTRA )
         #include "hardware/twatch_ultra_hal.h"
+    #elif defined( LILYGO_T_DECK_PLUS )
+        #include "hardware/tdeck_plus_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -121,6 +123,11 @@ void touch_setup( void ) {
         watch.interruptTrigger();
         watch.setMonitorTime(0x01);
         attachInterrupt( BOARD_TOUCH_INT, &touch_irq, FALLING );
+    #elif defined( LILYGO_T_DECK_PLUS )
+        watch.interruptTrigger();
+        watch.setMonitorTime(0x01);
+        attachInterrupt( BOARD_TOUCH_INT, &touch_irq, FALLING );
+        attachInterrupt( BOARD_KEYBOARD_INT, &touch_irq, FALLING );
     #elif defined( LILYGO_WATCH_S3 )
         watch.interruptTrigger();
         watch.setMonitorTime(0x01);
@@ -237,10 +244,14 @@ bool touch_powermgm_loop_event_cb( EventBits_t event, void *arg ) {
                     retval = true;        
                     break;
             }
-        #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_WATCH_S3 )
             switch( event ) {
                 case POWERMGM_STANDBY:
+                    #if defined( LILYGO_T_DECK_PLUS )
+                    if ( temp_pmu_irq_flag || watch.getTouched() || digitalRead( BOARD_KEYBOARD_INT ) == LOW ) {
+                    #else
                     if ( temp_pmu_irq_flag || watch.getTouched() ) {
+                    #endif
                         powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
                     }
                     retval = true;
@@ -249,7 +260,11 @@ bool touch_powermgm_loop_event_cb( EventBits_t event, void *arg ) {
                     retval = true;
                     break;
                 case POWERMGM_SILENCE_WAKEUP:
+                    #if defined( LILYGO_T_DECK_PLUS )
+                    if ( temp_pmu_irq_flag || watch.getTouched() || digitalRead( BOARD_KEYBOARD_INT ) == LOW ) {
+                    #else
                     if ( temp_pmu_irq_flag || watch.getTouched() ) {
+                    #endif
                         powermgm_set_event( POWERMGM_WAKEUP_REQUEST );
                     }
                     retval = true;
@@ -343,7 +358,7 @@ bool touch_powermgm_event_cb( EventBits_t event, void *arg ) {
                                                 retval = true;
                                                 break;
             }
-        #elif defined( LILYGO_WATCH_ULTRA )
+        #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
             switch( event ) {
                 case POWERMGM_STANDBY:          log_d("go standby");
                                                 if ( touch_lock_take() ) {
@@ -354,8 +369,13 @@ bool touch_powermgm_event_cb( EventBits_t event, void *arg ) {
                                                 touch_irq_flag = false;
                                                 portEXIT_CRITICAL(&Touch_IRQ_Mux);
                                                 gpio_wakeup_enable( (gpio_num_t)BOARD_TOUCH_INT, GPIO_INTR_LOW_LEVEL );
+                                                #if defined( LILYGO_T_DECK_PLUS )
+                                                    gpio_wakeup_enable( (gpio_num_t)BOARD_KEYBOARD_INT, GPIO_INTR_LOW_LEVEL );
+                                                    retval = false;
+                                                #else
+                                                    retval = true;
+                                                #endif
                                                 esp_sleep_enable_gpio_wakeup ();
-                                                retval = true;
                                                 break;
                 case POWERMGM_WAKEUP:           log_d("go wakeup");
                                                 if ( touch_lock_take() ) {
@@ -372,10 +392,16 @@ bool touch_powermgm_event_cb( EventBits_t event, void *arg ) {
                                                 break;
                 case POWERMGM_ENABLE_INTERRUPTS:
                                                 attachInterrupt( BOARD_TOUCH_INT, &touch_irq, FALLING );
+                                                #if defined( LILYGO_T_DECK_PLUS )
+                                                    attachInterrupt( BOARD_KEYBOARD_INT, &touch_irq, FALLING );
+                                                #endif
                                                 retval = true;
                                                 break;
                 case POWERMGM_DISABLE_INTERRUPTS:
                                                 detachInterrupt( BOARD_TOUCH_INT );
+                                                #if defined( LILYGO_T_DECK_PLUS )
+                                                    detachInterrupt( BOARD_KEYBOARD_INT );
+                                                #endif
                                                 retval = true;
                                                 break;
             }
@@ -547,6 +573,17 @@ bool touch_getXY( int16_t &x, int16_t &y ) {
             x -= T_WATCH_ULTRA_SAFE_LEFT;
             y -= T_WATCH_ULTRA_SAFE_TOP;
             touched = true;
+        #elif defined( LILYGO_T_DECK_PLUS )
+            bool getTouchResult = false;
+            if ( touch_lock_take() ) {
+                getTouchResult = watch.getPoint( &x, &y ) > 0;
+                touch_lock_give();
+            }
+            if ( !getTouchResult ) {
+                touched = false;
+                return( false );
+            }
+            touched = true;
         #elif defined( LILYGO_WATCH_S3 )
             int16_t raw_x = 0;
             int16_t raw_y = 0;
@@ -687,7 +724,7 @@ static bool touch_read(lv_indev_drv_t * drv, lv_indev_data_t*data) {
                 data->state = LV_INDEV_STATE_REL;
             }
 
-        #elif defined( LILYGO_WATCH_ULTRA )
+        #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
             data->state = touch_getXY( data->point.x, data->point.y ) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
         #elif defined( LILYGO_WATCH_S3 )
             data->state = touch_getXY( data->point.x, data->point.y ) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;

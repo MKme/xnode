@@ -20,6 +20,7 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 #include "bmaconfig.h"
+#include "config.h"
 
 bma_config_t::bma_config_t() : BaseJsonConfig(BMA_JSON_COFIG_FILE) {
     for (int i = 0 ; i < BMA_CONFIG_NUM ; i++)
@@ -36,8 +37,14 @@ bool bma_config_t::onSave(JsonDocument& doc) {
 }
 
 bool bma_config_t::onLoad(JsonDocument& doc) {
-    enable[ BMA_STEPCOUNTER ] = doc["stepcounter"] | true;
-    enable[ BMA_DOUBLECLICK ] = doc["doubleclick"] | true;
+    #if defined( LILYGO_T_DECK_PLUS )
+        const bool default_motion_enabled = false;
+    #else
+        const bool default_motion_enabled = true;
+    #endif
+
+    enable[ BMA_STEPCOUNTER ] = doc["stepcounter"] | default_motion_enabled;
+    enable[ BMA_DOUBLECLICK ] = doc["doubleclick"] | default_motion_enabled;
     enable[ BMA_TILT ] = doc["tilt"] | false;
     enable[ BMA_DAILY_STEPCOUNTER ] = doc["daily_stepcounter"] | false;
   
@@ -45,5 +52,12 @@ bool bma_config_t::onLoad(JsonDocument& doc) {
 }
 
 bool bma_config_t::onDefault( void ) {
+    #if defined( LILYGO_T_DECK_PLUS )
+        enable[ BMA_STEPCOUNTER ] = false;
+        enable[ BMA_DOUBLECLICK ] = false;
+        enable[ BMA_TILT ] = false;
+        enable[ BMA_DAILY_STEPCOUNTER ] = false;
+    #endif
+
     return true;
 }

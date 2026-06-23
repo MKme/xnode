@@ -61,12 +61,29 @@ lv_obj_t *altitude_value = NULL;
 lv_obj_t *speed_value = NULL;
 lv_obj_t *source_value = NULL;
 lv_obj_t *gps_status_debug_rows[12] = { NULL };
+lv_obj_t *gps_status_debug_text = NULL;
 lv_task_t *gps_status_debug_task = NULL;
 static bool gps_status_block_return_maintile = false;
 static bool gps_status_prev_autoon = false;
 static bool gps_status_prev_enable_on_standby = false;
 static bool gps_status_forced_gps = false;
 static bool gps_status_active = false;
+
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
+    #define GPS_STATUS_FULL_DEBUG_LAYOUT 1
+#endif
+
+#if defined( LILYGO_T_DECK_PLUS )
+    #define GPS_STATUS_DEBUG_ROW_COUNT 10
+    #define GPS_STATUS_DEBUG_X 6
+    #define GPS_STATUS_DEBUG_Y ( STATUSBAR_HEIGHT + 4 )
+    #define GPS_STATUS_DEBUG_STEP 18
+#else
+    #define GPS_STATUS_DEBUG_ROW_COUNT 12
+    #define GPS_STATUS_DEBUG_X 10
+    #define GPS_STATUS_DEBUG_Y ( STATUSBAR_HEIGHT + 8 )
+    #define GPS_STATUS_DEBUG_STEP 29
+#endif
 /*
  * images
  */
@@ -114,13 +131,26 @@ void gps_status_main_setup(uint32_t tile_num) {
     lv_style_set_shadow_color(&style_led_red, LV_STATE_DEFAULT, lv_color_hex(0x900000));
     lv_style_set_shadow_spread(&style_led_red, LV_STATE_DEFAULT, 4);
 
-#if defined( LILYGO_WATCH_ULTRA )
-    for ( uint8_t i = 0; i < 12; i++ ) {
+#if defined( GPS_STATUS_FULL_DEBUG_LAYOUT )
+    #if defined( LILYGO_T_DECK_PLUS )
+    gps_status_debug_text = lv_label_create(gps_status_main_tile, NULL);
+    lv_obj_add_style(gps_status_debug_text, LV_OBJ_PART_MAIN, &gps_status_value_style);
+    lv_label_set_long_mode(gps_status_debug_text, LV_LABEL_LONG_BREAK);
+    lv_label_set_align(gps_status_debug_text, LV_LABEL_ALIGN_LEFT);
+    lv_obj_set_size(gps_status_debug_text, RES_X_MAX - ( GPS_STATUS_DEBUG_X * 2 ), RES_Y_MAX - GPS_STATUS_DEBUG_Y - 42);
+    lv_obj_align(gps_status_debug_text, gps_status_main_tile, LV_ALIGN_IN_TOP_LEFT, GPS_STATUS_DEBUG_X, GPS_STATUS_DEBUG_Y);
+    lv_label_set_text(gps_status_debug_text, "");
+    #else
+    for ( uint8_t i = 0; i < GPS_STATUS_DEBUG_ROW_COUNT; i++ ) {
         gps_status_debug_rows[i] = lv_label_create(gps_status_main_tile, NULL);
         lv_obj_add_style(gps_status_debug_rows[i], LV_OBJ_PART_MAIN, &gps_status_value_style);
+        lv_obj_set_width(gps_status_debug_rows[i], lv_disp_get_hor_res(NULL) - ( GPS_STATUS_DEBUG_X * 2 ) );
+        lv_label_set_long_mode(gps_status_debug_rows[i], LV_LABEL_LONG_CROP);
+        lv_label_set_align(gps_status_debug_rows[i], LV_LABEL_ALIGN_LEFT);
         lv_label_set_text(gps_status_debug_rows[i], "");
-        lv_obj_align(gps_status_debug_rows[i], gps_status_main_tile, LV_ALIGN_IN_TOP_LEFT, 10, STATUSBAR_HEIGHT + 8 + ( i * 29 ) );
+        lv_obj_align(gps_status_debug_rows[i], gps_status_main_tile, LV_ALIGN_IN_TOP_LEFT, GPS_STATUS_DEBUG_X, GPS_STATUS_DEBUG_Y + ( i * GPS_STATUS_DEBUG_STEP ) );
     }
+    #endif
 
     gpsctl_register_cb(     GPSCTL_FIX
                           | GPSCTL_NOFIX
@@ -311,6 +341,9 @@ bool style_change_event_cb( EventBits_t event, void *arg ) {
                                     lv_obj_add_style(gps_status_debug_rows[i], LV_OBJ_PART_MAIN, &gps_status_value_style);
                                 }
                             }
+                            if ( gps_status_debug_text ) {
+                                lv_obj_add_style(gps_status_debug_text, LV_OBJ_PART_MAIN, &gps_status_value_style);
+                            }
                             gps_status_update_debug_label();
                             break;
     }
@@ -392,8 +425,54 @@ static void gps_status_update_debug_label( void ) {
         snprintf( sync_buf, sizeof( sync_buf ), "none" );
     }
 
-    #if defined( LILYGO_WATCH_ULTRA )
-    if ( gps_status_debug_rows[11] ) {
+    #if defined( GPS_STATUS_FULL_DEBUG_LAYOUT )
+    #if defined( LILYGO_T_DECK_PLUS )
+    if ( gps_status_debug_text ) {
+        char debug_text[640] = "";
+        snprintf(
+            debug_text,
+            sizeof( debug_text ),
+            "Fix:%s  Power:%s  UART:%s\n"
+            "Probe:%s %s  Baud:%lu\n"
+            "Raw RX:%lu  last:%s\n"
+            "NMEA ok:%lu bad:%lu  Ch:%lu\n"
+            "Position:%s\n"
+            "GPS UTC:%s\n"
+            "Time sync:%s\n"
+            "Pins: RX%ld TX%ld\n"
+            "Last:%s age:%s\n"
+            "Sats:%lu GP%lu GL%lu BD%lu",
+            debug.valid_location ? "yes" : "no",
+            debug.enabled ? "on" : "off",
+            debug.serial_available ? "ok" : "none",
+            probe,
+            debug.probe_model,
+            (unsigned long)active_baud,
+            (unsigned long)debug.rx_bytes,
+            rx_age,
+            (unsigned long)debug.passed_checksum,
+            (unsigned long)debug.failed_checksum,
+            (unsigned long)debug.chars_processed,
+            pos_buf,
+            utc_buf,
+            sync_buf,
+            (long)debug.rx_pin,
+            (long)debug.tx_pin,
+            last_sentence,
+            sentence_age,
+            (unsigned long)debug.satellites,
+            (unsigned long)debug.gps_satellites,
+            (unsigned long)debug.glonass_satellites,
+            (unsigned long)debug.baidou_satellites
+        );
+        lv_label_set_text(gps_status_debug_text, debug_text);
+        lv_label_set_long_mode(gps_status_debug_text, LV_LABEL_LONG_BREAK);
+        lv_obj_set_size(gps_status_debug_text, RES_X_MAX - ( GPS_STATUS_DEBUG_X * 2 ), RES_Y_MAX - GPS_STATUS_DEBUG_Y - 42);
+        lv_obj_align(gps_status_debug_text, gps_status_main_tile, LV_ALIGN_IN_TOP_LEFT, GPS_STATUS_DEBUG_X, GPS_STATUS_DEBUG_Y);
+        return;
+    }
+    #else
+    if ( gps_status_debug_rows[GPS_STATUS_DEBUG_ROW_COUNT - 1] ) {
         lv_label_set_text_fmt( gps_status_debug_rows[0], "Fix: %s", debug.valid_location ? "yes" : "no" );
         lv_label_set_text_fmt( gps_status_debug_rows[1], "Power: %s  UART: %s", debug.enabled ? "on" : "off", debug.serial_available ? "ok" : "none" );
         lv_label_set_text_fmt( gps_status_debug_rows[2], "Probe: %s %s", probe, debug.probe_model );
@@ -411,11 +490,12 @@ static void gps_status_update_debug_label( void ) {
             (unsigned long)debug.glonass_satellites,
             (unsigned long)debug.baidou_satellites
         );
-        for ( uint8_t i = 0; i < 12; i++ ) {
-            lv_obj_align(gps_status_debug_rows[i], gps_status_main_tile, LV_ALIGN_IN_TOP_LEFT, 10, STATUSBAR_HEIGHT + 8 + ( i * 29 ) );
+        for ( uint8_t i = 0; i < GPS_STATUS_DEBUG_ROW_COUNT; i++ ) {
+            lv_obj_align(gps_status_debug_rows[i], gps_status_main_tile, LV_ALIGN_IN_TOP_LEFT, GPS_STATUS_DEBUG_X, GPS_STATUS_DEBUG_Y + ( i * GPS_STATUS_DEBUG_STEP ) );
         }
         return;
     }
+    #endif
     #endif
 
     if ( !gps_status_debug_rows[0] ) {
@@ -486,8 +566,8 @@ bool gpsctl_gps_status_event_cb( EventBits_t event, void *arg ) {
         return( true );
     }
 
-    #if defined( LILYGO_WATCH_ULTRA )
-    if ( gps_status_debug_rows[11] ) {
+    #if defined( GPS_STATUS_FULL_DEBUG_LAYOUT )
+    if ( gps_status_debug_rows[GPS_STATUS_DEBUG_ROW_COUNT - 1] ) {
         gps_status_update_debug_label();
         return( true );
     }

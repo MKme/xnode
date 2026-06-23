@@ -54,6 +54,10 @@
 
 static bool maintile_init = false;
 
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
+    #define MAIN_TILE_HAS_MOON 1
+#endif
+
 static lv_obj_t *main_cont = NULL;
 static lv_obj_t *clock_cont = NULL;
 static lv_obj_t *info_cont = NULL;
@@ -65,7 +69,7 @@ static lv_obj_t *timelabel = NULL;
 static lv_obj_t *infolabel = NULL;
 static lv_obj_t *templabel = NULL;
 static lv_obj_t *datelabel = NULL;
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( MAIN_TILE_HAS_MOON )
 static lv_obj_t *moon_cont = NULL;
 static lv_obj_t *moon_canvas = NULL;
 static lv_obj_t *moonlabel = NULL;
@@ -119,7 +123,7 @@ static bool main_tile_time_update_ebent_cb( EventBits_t event, void *arg );
 static bool main_tile_style_event_cb( EventBits_t event, void *arg );
 static bool main_tile_button_event_cb( EventBits_t event, void *arg );
 static bool main_tile_sensor_event_cb( EventBits_t event, void *arg );
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( MAIN_TILE_HAS_MOON )
 static bool main_tile_ultra_time_is_valid( const tm &info );
 static void main_tile_ultra_get_display_time( tm *info, time_t *epoch );
 static void main_tile_ultra_align_clock( void );
@@ -154,7 +158,7 @@ void main_tile_setup( void ) {
     lv_style_copy( &iconstyle, style);
     lv_style_set_text_font( &iconstyle, LV_STATE_DEFAULT, icon_font );
 
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( MAIN_TILE_HAS_MOON )
         lv_style_set_text_color( &timestyle, LV_STATE_DEFAULT, LV_COLOR_WHITE );
         lv_style_set_text_color( &datestyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 220, 226, 235 ) );
         lv_style_set_text_color( &infostyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 150, 166, 184 ) );
@@ -162,7 +166,7 @@ void main_tile_setup( void ) {
     #endif
 
     clock_cont = mainbar_obj_create( main_cont );
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( MAIN_TILE_HAS_MOON )
         lv_obj_set_size( clock_cont, lv_disp_get_hor_res( NULL ), lv_disp_get_ver_res( NULL ) );
     #else
         lv_obj_set_size( clock_cont, lv_disp_get_hor_res( NULL ) , lv_disp_get_ver_res( NULL ) / 2 );
@@ -171,14 +175,14 @@ void main_tile_setup( void ) {
     lv_obj_align( clock_cont, main_cont, LV_ALIGN_CENTER, 0, 0 );
 
     timelabel = lv_label_create( clock_cont , NULL);
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( MAIN_TILE_HAS_MOON )
         lv_label_set_text(timelabel, "00:00");
     #else
         lv_label_set_text(timelabel, "00:00");
     #endif
     lv_obj_reset_style_list( timelabel, LV_OBJ_PART_MAIN );
     lv_obj_add_style( timelabel, LV_OBJ_PART_MAIN, &timestyle );
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( MAIN_TILE_HAS_MOON )
         lv_label_set_long_mode( timelabel, LV_LABEL_LONG_CROP );
         lv_obj_set_width( timelabel, lv_disp_get_hor_res( NULL ) );
         lv_label_set_align( timelabel, LV_LABEL_ALIGN_CENTER );
@@ -188,7 +192,7 @@ void main_tile_setup( void ) {
     #endif
 
     datelabel = lv_label_create( clock_cont , NULL);
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( MAIN_TILE_HAS_MOON )
         lv_label_set_text(datelabel, "");
         lv_label_set_long_mode( datelabel, LV_LABEL_LONG_CROP );
         lv_obj_set_width( datelabel, lv_disp_get_hor_res( NULL ) - 24 );
@@ -198,14 +202,14 @@ void main_tile_setup( void ) {
     #endif
     lv_obj_reset_style_list( datelabel, LV_OBJ_PART_MAIN );
     lv_obj_add_style( datelabel, LV_OBJ_PART_MAIN, &datestyle );
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( MAIN_TILE_HAS_MOON )
         lv_obj_align( datelabel, timelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, -4 );
     #else
         lv_obj_align( datelabel, clock_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
     #endif
 
     infolabel = lv_label_create( clock_cont , NULL);
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( MAIN_TILE_HAS_MOON )
         lv_label_set_text(infolabel, "BAT --%");
         lv_label_set_long_mode( infolabel, LV_LABEL_LONG_CROP );
         lv_obj_set_width( infolabel, lv_disp_get_hor_res( NULL ) - 24 );
@@ -215,13 +219,13 @@ void main_tile_setup( void ) {
     #endif
     lv_obj_reset_style_list( infolabel, LV_OBJ_PART_MAIN );
     lv_obj_add_style( infolabel, LV_OBJ_PART_MAIN, &infostyle );
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( MAIN_TILE_HAS_MOON )
         lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_BOTTOM_MID, 0, 14 );
     #else
         lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_TOP_MID, 0, 0 );
     #endif
 
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( MAIN_TILE_HAS_MOON )
         moon_cont = mainbar_obj_create( clock_cont );
         lv_obj_set_size( moon_cont, lv_disp_get_hor_res( NULL ) - 24, 40 );
         lv_obj_add_style( moon_cont, LV_OBJ_PART_MAIN, style );
@@ -326,7 +330,7 @@ void main_tile_setup( void ) {
     #ifndef ROUND_DISPLAY
         lv_obj_set_hidden( info_cont, true );
     #endif
-    #if !defined( M5PAPER ) && !defined( LILYGO_WATCH_ULTRA )
+    #if !defined( M5PAPER ) && !defined( MAIN_TILE_HAS_MOON )
         lv_obj_set_hidden( infolabel, true );
     #endif
 
@@ -421,7 +425,7 @@ static bool mainbar_wifictl_event_cb( EventBits_t event, void *arg ) {
     return( true );    
 }
 
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( MAIN_TILE_HAS_MOON )
 static const uint8_t MAIN_TILE_MOON_CANVAS_SIZE = 34;
 static lv_color_t main_tile_moon_canvas_buf[ MAIN_TILE_MOON_CANVAS_SIZE * MAIN_TILE_MOON_CANVAS_SIZE ];
 
@@ -599,7 +603,7 @@ static bool main_tile_style_event_cb( EventBits_t event, void *arg ){
 
                                 lv_style_copy( &iconstyle, style);
                                 lv_style_set_text_font( &iconstyle, LV_STATE_DEFAULT, icon_font );
-                                #if defined( LILYGO_WATCH_ULTRA )
+                                #if defined( MAIN_TILE_HAS_MOON )
                                     lv_style_set_text_color( &timestyle, LV_STATE_DEFAULT, LV_COLOR_WHITE );
                                     lv_style_set_text_color( &datestyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 220, 226, 235 ) );
                                     lv_style_set_text_color( &infostyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 150, 166, 184 ) );
@@ -731,7 +735,7 @@ void main_tile_align_widgets( void ) {
     lv_obj_align( wifiicon, batteryicon, LV_ALIGN_OUT_LEFT_MID, -THEME_PADDING, 0 );
     lv_obj_align( bluetoothicon, wifiicon, LV_ALIGN_OUT_LEFT_MID, -THEME_PADDING, 0 );
     lv_obj_align( batterylabel, batteryicon, LV_ALIGN_OUT_RIGHT_MID, THEME_PADDING, 0 );
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( MAIN_TILE_HAS_MOON )
         lv_obj_align( clock_cont, main_cont, LV_ALIGN_CENTER, 0, 0 );
         main_tile_ultra_align_clock();
     #endif
@@ -740,7 +744,7 @@ void main_tile_align_widgets( void ) {
      */
     if ( active_widgets == 0 ) {
         lv_obj_align( clock_cont, main_cont, LV_ALIGN_CENTER, 0, 0 );
-        #if defined( LILYGO_WATCH_ULTRA )
+        #if defined( MAIN_TILE_HAS_MOON )
             main_tile_ultra_align_clock();
         #endif
         return;
@@ -748,7 +752,7 @@ void main_tile_align_widgets( void ) {
     /**
      * set clock container to the top
      */
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( MAIN_TILE_HAS_MOON )
         lv_obj_align( clock_cont, main_cont, LV_ALIGN_CENTER, 0, 0 );
     #else
         lv_obj_align( clock_cont, main_cont, LV_ALIGN_IN_TOP_MID, 0, 0 );
@@ -795,7 +799,7 @@ void main_tile_update_time( bool force ) {
     /*
      * copy current time into now and convert it local time info
      */
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( MAIN_TILE_HAS_MOON )
         main_tile_ultra_get_display_time( &info, &now );
     #else
         time( &now );
@@ -815,7 +819,7 @@ void main_tile_update_time( bool force ) {
      * Display has a minute resolution
      */
     if ( last == 0 || info.tm_min != last_info.tm_min || info.tm_hour != last_info.tm_hour || force ) {
-        #if defined( LILYGO_WATCH_ULTRA )
+        #if defined( MAIN_TILE_HAS_MOON )
             if ( timesync_get_24hr() ) {
                 snprintf( time_str, sizeof( time_str ), "%02d:%02d", info.tm_hour, info.tm_min );
             }
@@ -834,7 +838,7 @@ void main_tile_update_time( bool force ) {
         #endif
         log_d("renew time: %s", time_str );
         lv_label_set_text( timelabel, time_str );
-        #if defined( LILYGO_WATCH_ULTRA )
+        #if defined( MAIN_TILE_HAS_MOON )
             main_tile_ultra_align_clock();
         #else
             lv_obj_align( timelabel, clock_cont, LV_ALIGN_CENTER, 0, 0 );
@@ -847,7 +851,7 @@ void main_tile_update_time( bool force ) {
             strftime( time_str, sizeof(time_str), "%a %d.%b %Y", &info );
             log_d("renew date: %s", time_str );
             lv_label_set_text( datelabel, time_str );
-            #if defined( LILYGO_WATCH_ULTRA )
+            #if defined( MAIN_TILE_HAS_MOON )
                 main_tile_ultra_update_moon( &info );
                 main_tile_ultra_align_clock();
             #else
@@ -855,13 +859,13 @@ void main_tile_update_time( bool force ) {
             #endif
         }
 
-        #if defined( LILYGO_WATCH_ULTRA )
+        #if defined( MAIN_TILE_HAS_MOON )
             snprintf( info_str, sizeof( info_str ), "BAT %d%%", pmu_get_battery_percent() );
         #else
             snprintf( info_str, sizeof( info_str ),"battery: %d%%", pmu_get_battery_percent() );
         #endif
         lv_label_set_text( infolabel, info_str );
-        #if defined( LILYGO_WATCH_ULTRA )
+        #if defined( MAIN_TILE_HAS_MOON )
             main_tile_ultra_align_clock();
         #else
             lv_obj_align( infolabel, datelabel, LV_ALIGN_OUT_TOP_MID, 0, 0 );

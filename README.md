@@ -1,6 +1,6 @@
 # XNODE
 
-Git-tracked home for the active LilyGO Watch Gen3 / T-Watch S3 XNODE firmware.
+Git-tracked home for the active LilyGO Watch Gen3 / T-Watch S3, T-Watch Ultra, and T-Deck Plus XNODE firmware.
 
 Workspace paths:
 - Active project: `C:\GitHub\XNODE`
@@ -16,6 +16,15 @@ These XNODE screens show the LilyGO T-Watch S3 firmware and the current T-Watch 
 | --- | --- | --- | --- |
 | <img src="site/images/IMG_6786.jpg" alt="T-Watch Ultra running the current XNODE clock screen with message shortcut" width="200"> | <img src="site/images/IMG_6765.jpg" alt="T-Watch Ultra GPS diagnostics screen showing fix, UART, baud, NMEA, and satellite status" width="200"> | <img src="site/images/IMG_6772.jpg" alt="T-Watch Ultra tactical map showing GPS position and synced overlay markers" width="200"> | <img src="site/images/IMG_6740.jpg" alt="T-Watch Ultra tactical map close-up showing GPS no-fix banner and synced overlay markers" width="200"> |
 | Current watchface/clock view on the Ultra hardware. | GPS status page for hardware bring-up and live receiver checks. | Tactical map with current position and XTOC/XCOM overlay markers. | Close-up map/GPS state with synced overlay symbols on the installed basemap. |
+
+### Current T-Deck Plus build
+
+The T-Deck Plus target carries the XNODE workflow onto a larger 320x240 screen with a built-in hardware keyboard. It keeps the watch launcher, message, mesh, GPS, tactical map, SOS, and CheckIn flows, but makes message entry and map/diagnostic viewing less cramped than a watch-only display.
+
+| Clock + moon | Launcher | Utilities | Mesh compose | CheckIn |
+| --- | --- | --- | --- | --- |
+| <img src="site/images/T-dec/IMG_6809.jpg" alt="T-Deck Plus running the XNODE clock screen with moon phase" width="180"> | <img src="site/images/T-dec/IMG_6810.jpg" alt="T-Deck Plus XNODE launcher showing messages, mesh, Tac Map, CheckIn, Alert Summary, and SOS" width="180"> | <img src="site/images/T-dec/IMG_6811.jpg" alt="T-Deck Plus XNODE utilities launcher showing GPS status and other tools" width="180"> | <img src="site/images/T-dec/IMG_6812.jpg" alt="T-Deck Plus XNODE mesh compose screen using the hardware keyboard" width="180"> | <img src="site/images/T-dec/IMG_6813.jpg" alt="T-Deck Plus XNODE CheckIn screen" width="180"> |
+| Larger clock face with the moon phase indicator. | Main XNODE actions on the larger T-Deck display. | GPS/status utilities available from the launcher. | Physical keyboard entry for mesh messages. | Fast CheckIn packet flow with current position. |
 
 ### T-Watch S3 reference screens
 
@@ -43,8 +52,9 @@ XNODE is built to work with the MKME X software stack. Add the companion softwar
 ## Current status
 
 Working now:
-- Builds for `t-watch2020-v3-s3`.
+- Builds for `t-watch-ultra`, `t-watch2020-v3-s3`, and `tdeck-plus`.
 - Flashes to the LilyGO Watch Gen3 / ESP32-S3 target.
+- Builds and flashes the LilyGO T-Deck Plus target from this repo with the in-repo HAL, board file, post-upload watchdog reset, and reliable `460800` baud upload setting.
 - Exposes the XNODE BLE bridge to XTOC and XCOM with `sync`, `location`, `meshtastic`, `basemap`, `mapOverlay`, `newsNotifications`, and `ble` capabilities.
 - Adds a Manual SOS launcher tile that sends a clear XTOC `SITREP` packet over the watch's Meshtastic radio, with the roster Unit ID, destination Unit ID, `P1`, `HELP`, current lat/lon, and note `Manual SOS`.
 - Adds a CheckIn launcher tile that sends a clear XTOC `CHECKIN/LOC` packet over the watch's Meshtastic radio, with the roster Unit ID, `OK` status, current lat/lon, and timestamp.
@@ -58,6 +68,8 @@ Working now:
 - Persists synced overlay markers in `/spiffs/osmmap/overlays.jsonl` and reloads them when the map opens or the watch reboots.
 - Applies replacement overlay syncs transactionally: existing markers stay visible until the expected replacement batch arrives; an intentional zero-count replacement clears the cache.
 - Stores XTOC/XCOM pushed news and alert items in the XNODE alerts app, with the watch-side `show pushed news` toggle.
+- Removes the main clock-screen message shortcut after the user opens the message view, while keeping the stored messages and the messages launcher entry intact.
+- Supports T-Deck Plus as a larger-screen XNODE device with a physical keyboard, readable GPS diagnostics, Launcher-usable firmware output, and the same core mesh/map/alert workflows.
 - Keeps the launcher functions active for messages, mesh, Tac Map, media player, Alert Summary, and watchface manager.
 - Inactivity timeout returns the T-Watch S3 build to standby instead of leaving it awake indefinitely.
 - T-Watch S3 standby uses the LilyGo `ext1` touch wake path on `BOARD_TOUCH_INT`.
@@ -73,27 +85,112 @@ Known limits:
 - Manual SOS requires a configured watch Unit ID, a valid watch location, and a ready Meshtastic radio/channel before it can transmit.
 - CheckIn requires the same watch Unit ID, valid watch location, and ready Meshtastic radio/channel.
 
+## T-Deck Plus support
+
+This branch adds a LilyGO T-Deck Plus target while preserving the active Ultra and S3 watch targets. The T-Deck build is intended to run from this repo and to produce a binary that can be loaded manually or by the bmorcelli Launcher.
+
+Build from this repo:
+
+```powershell
+pio run -e tdeck-plus
+```
+
+Flash the attached T-Deck Plus:
+
+```powershell
+pio run -e tdeck-plus -t upload --upload-port COM20
+```
+
+Firmware output for Launcher or manual install:
+
+```text
+.pio/build/tdeck-plus/firmware.bin
+```
+
+Board and upload support:
+- Uses dedicated `boards/tdeck_plus.json` and `[env:tdeck-plus]` entries.
+- Uses only code and support libraries in this repo plus the already-declared PlatformIO dependencies.
+- Uses DIO flash mode for the T-Deck Plus boot header; QIO produced reset loops on the attached unit.
+- Upload speed is set to `460800` because `921600` was unreliable on the attached unit and could drop mid-flash.
+- `support/tdeck_plus_post_upload_reset.py` runs after upload and issues a watchdog reset so the device does not stay trapped in the flasher stub.
+- GitHub Actions runs `npm run build`, which executes the regression checks and builds `t-watch-ultra`, `t-watch2020-v3-s3`, and `tdeck-plus`.
+
+Hardware mapped in the in-repo HAL:
+- ESP32-S3 with 16 MB flash and 8 MB PSRAM.
+- 320x240 ST7789 display with TFT CS/DC/backlight on GPIO `12/11/42`.
+- GT911 touch on I2C GPIO `18/8` with touch interrupt GPIO `16`.
+- Hardware keyboard on the T-Deck I2C keyboard controller at address `0x55`, with keyboard interrupt GPIO `46`.
+- SX1262 LoRa on shared SPI GPIO `41/38/40`, CS `9`, BUSY `13`, RST `17`, DIO1 `45`.
+- GPS on `Serial1`, RX `44`, TX `43`.
+- SD card CS `39` on the same SPI bus.
+- Battery voltage from ADC GPIO `4`.
+
+Runtime behavior now wired:
+- Initializes display, backlight, touch, shared SPI, SD, GPS UART, battery ADC, and SX1262 module pins from `src/hardware/tdeck_plus_hal.*`.
+- Uses the larger 320x240 rectangular UI path with the same app launcher, messages, mesh, Tac Map, Alert Summary, SOS, CheckIn, and watchface flows used by the watch builds.
+- Uses the watch-style high-contrast T-Deck theme and clamps invalid or unreadable saved themes so dark text on dark backgrounds cannot persist after changing display settings.
+- Shows the generated moon phase text and visual on the main screen.
+- Applies the same safe build-time clock fallback used by Ultra, then lets GPS UTC replace it once the receiver has valid date/time.
+- Removes the clock-screen message shortcut after messages are viewed, without deleting stored messages or hiding the messages launcher entry.
+- Keeps the on-screen LVGL keyboard disabled on T-Deck Plus. Text entry uses the physical keyboard and injects printable keys, backspace/delete, enter, and escape into the focused LVGL textarea.
+- Treats T-Deck Plus as a Meshtastic `T_DECK` hardware model for onboard radio and BLE user config paths.
+- Disables and hides motion/pedometer UI for T-Deck Plus because this target does not currently have an implemented BMA/BHI motion sensor path.
+
+GPS status:
+- GPS defaults on for T-Deck Plus so map position and GPS time sync can work without a user manually enabling GPS first.
+- GPS power setup forces the receiver pins to `RX44/TX43` mode and enables the board power path before probing.
+- Receiver init supports the LilyGO GPS Shield/L76K PCAS sequence and a u-blox/M10 fallback probe at `38400` and `9600`.
+- The GPS status page uses a full-width readable diagnostics layout for fix, power, UART, probe result, baud, raw RX count, NMEA checksum counts, position, GPS UTC, time sync, pins, last sentence, and satellites.
+- GPS stays powered through T-Deck display timeout/standby handoff so receiver state is not lost while debugging or waiting for lock.
+
+Display timeout and wake behavior:
+- T-Deck Plus display timeout blanks the backlight but does not enter the full watch standby path.
+- LVGL task handling, touch, and keyboard polling stay active while the display is blanked. This avoids the slow-motion/stutter state seen when the T-Deck UI stack was partially suspended.
+- Touch and hardware keyboard interrupts are wired as wake/activity sources.
+- The T-Deck display sleep path avoids ST7789 sleep/wake commands that caused flashing and failed wake on the attached hardware.
+
+Launcher compatibility:
+- The bmorcelli Launcher can install/run ESP32 binaries from SD/WebUI/GitHub links. Use `.pio/build/tdeck-plus/firmware.bin` as the app binary for this branch.
+- This repo does not yet include a Launcher package manifest, icon bundle, or release-hosted binary URL. It currently produces the binary that Launcher can load.
+
+Pre-merge verification commands:
+
+```powershell
+npm run build
+```
+
+Known T-Deck Plus limits:
+- Support has been build-verified and flashed on the attached T-Deck Plus, but it still needs more field validation.
+- Trackball handling is not wired yet.
+- Speaker, microphone, vibration/motor, IMU/compass, pedometer, and RTC alarm integration are not implemented for T-Deck Plus yet.
+- Battery reporting is an ADC estimate, not a PMU fuel-gauge reading.
+- GPS still requires real satellite lock. On the GPS status page, `Raw RX:0` means the receiver is silent or not wired/powered; rising `Raw RX` with `NMEA` counts means the receiver is talking; a valid map/time fix still requires satellites.
+- T-Deck Plus display timeout currently favors UI responsiveness over deepest idle power because the full watch standby path left the T-Deck UI sluggish after wake.
+- OTA URL is intentionally blank for this new target until a release path exists.
+- T-Deck Pro/Max are not targeted here; this branch is specifically for T-Deck Plus.
+
 ## Power management status (2026-06-21)
 
 Current verified firmware baseline:
 - `t-watch-ultra`: built, flashed, and post-upload watchdog reset verified on the T-Watch Ultra.
 - `t-watch2020-v3-s3`: built successfully after the shared power/config changes to protect the other watch variant.
+- `tdeck-plus`: built, flashed on `COM20`, and post-upload watchdog reset verified on the attached T-Deck Plus.
 - Latest power audit commit: `5ae38af Improve T-Watch Ultra battery life`.
 
 ### Variant status
 
-| Area | T-Watch Ultra | T-Watch S3 / Gen3 |
-| --- | --- | --- |
-| Idle timeout | Uses the shared display activity timer and standby request path. | Uses the shared display activity timer and restored timeout-to-standby path. |
-| Display standby | AMOLED brightness is set to zero and the panel is put into `display.sleep()`. | Backlight/display is turned off through the S3/LilyGo path. |
-| Touch wake | Touch/display rail stays powered because it is shared; touch interrupt can wake the watch. | Uses LilyGo-style `ext1` wake on `BOARD_TOUCH_INT`. |
-| GPS at boot | Off by default after one-time config migration. | Existing behavior preserved. |
-| GPS while using map | Tac map can still auto-start GPS for the user-location marker. | Existing behavior preserved. |
-| GPS in standby | Off unless an app explicitly blocks standby. GPS status no longer enables standby GPS. | Existing tracker/status behavior preserved. |
-| WiFi at boot | Off by default after one-time config migration; dummy setup scan disabled. | Existing behavior preserved. |
-| BLE at boot | Off by default after one-time config migration; BLE stack is lazy-initialized. | Existing auto-on behavior preserved unless config says otherwise. |
-| LoRa / Meshtastic | Radio chip is put into sleep on standby; regulator rail is not cut yet to avoid a risky radio re-init path. | Existing behavior preserved. |
-| CPU performance mode | Active tac map and normal awake watchface use performance mode; standby handoff, hibernate, and the GPS loop do not globally pin performance. | Shared change applies; S3 build verified. |
+| Area | T-Watch Ultra | T-Watch S3 / Gen3 | T-Deck Plus |
+| --- | --- | --- | --- |
+| Idle timeout | Uses the shared display activity timer and standby request path. | Uses the shared display activity timer and restored timeout-to-standby path. | Blanks the backlight but keeps LVGL/touch/keyboard active to avoid post-wake UI stutter. |
+| Display standby | AMOLED brightness is set to zero and the panel is put into `display.sleep()`. | Backlight/display is turned off through the S3/LilyGo path. | Avoids ST7789 sleep/wake commands; backlight is driven directly. |
+| Touch wake | Touch/display rail stays powered because it is shared; touch interrupt can wake the watch. | Uses LilyGo-style `ext1` wake on `BOARD_TOUCH_INT`. | Touch and hardware keyboard interrupts are activity/wake sources. |
+| GPS at boot | Off by default after one-time config migration. | Existing behavior preserved. | On by default so GPS time/map location can work without manual enable. |
+| GPS while using map | Tac map can still auto-start GPS for the user-location marker. | Existing behavior preserved. | Uses the same map GPS path and the T-Deck Serial1 GPS receiver. |
+| GPS in standby | Off unless an app explicitly blocks standby. GPS status no longer enables standby GPS. | Existing tracker/status behavior preserved. | Kept powered across the T-Deck display timeout path so receiver lock/debug state is not lost. |
+| WiFi at boot | Off by default after one-time config migration; dummy setup scan disabled. | Existing behavior preserved. | Existing config path preserved; not auto-enabled by the T-Deck bring-up. |
+| BLE at boot | Off by default after one-time config migration; BLE stack is lazy-initialized. | Existing auto-on behavior preserved unless config says otherwise. | Uses the XNODE/Meshtastic BLE paths when enabled or when host sync needs them. |
+| LoRa / Meshtastic | Radio chip is put into sleep on standby; regulator rail is not cut yet to avoid a risky radio re-init path. | Existing behavior preserved. | SX1262 pins and `T_DECK` Meshtastic model are wired; radio power-cut policy is not finalized. |
+| CPU performance mode | Active tac map and normal awake watchface use performance mode; standby handoff, hibernate, and the GPS loop do not globally pin performance. | Shared change applies; S3 build verified. | Display timeout stays in active UI mode; active apps keep normal responsiveness instead of waking into a suspended UI. |
 
 ### What changed in the Ultra audit
 
@@ -177,6 +274,12 @@ Build S3 / Gen3 regression target:
 pio run -e t-watch2020-v3-s3
 ```
 
+Build T-Deck Plus:
+
+```powershell
+pio run -e tdeck-plus
+```
+
 Flash Ultra from this repo:
 
 ```powershell
@@ -191,33 +294,37 @@ pio device list
 
 ## Automated CI and regression testing
 
-The repo now has a build/regression workflow at `.github/workflows/ci.yml`.
-It runs on push, pull request, and manual dispatch, then builds both active
-watch firmware targets:
+The repo has a regression and firmware-build workflow at `.github/workflows/ci.yml`.
+It runs on push, pull request, and manual dispatch. The workflow installs PlatformIO `6.1.19` and runs:
 
 ```powershell
-pio run -e t-watch-ultra
-pio run -e t-watch2020-v3-s3
+npm run build
 ```
 
-The same regression checks run automatically before local PlatformIO builds for
-those two environments through `support/regression_checks.py`. Run them directly
-when changing UI, GPS, power, map, keyboard, or watchface code:
+The current `npm test` command runs the watch overlay persistence check and the structural regression checks:
 
 ```powershell
-python support/regression_checks.py
+npm test
+```
+
+The current `npm run build` command runs `npm test` and then compiles:
+
+```powershell
+pio run -e t-watch-ultra -e t-watch2020-v3-s3 -e tdeck-plus
 ```
 
 The regression gate protects the recent watch fixes:
 - Ultra shared image buttons respond on press and suppress duplicate clicks.
 - SOS, Check-In, Alert Summary, Bluetooth message, Meshtastic, and Tac Map controls keep large Ultra press targets.
+- The main clock-screen message shortcut disappears after messages are viewed, while stored messages remain available from the messages menu.
 - Tac Map keeps the large GPS user marker, heading update path, topmost marker ordering, and active map performance mode.
 - Tac Map still auto-starts GPS for the user marker, while Ultra WiFi auto-start defaults off.
 - GPS, WiFi, BLE, display sleep/wake, and PMU idle-power defaults stay wired for the Ultra battery fixes.
 - Ultra pedometer step continuity survives raw sensor counter resets.
 - The multi-page watch keyboard keeps A-M, N-Z, caps, symbols, space, and backspace handling.
 - The Ultra main screen keeps the generated moon phase text and visual indicator.
-- The non-Ultra `t-watch2020-v3-s3` firmware still builds.
+- T-Deck Plus keeps the moon phase indicator, hides unsupported pedometer state, uses readable GPS status diagnostics, keeps the Serial1/L76K/u-blox GPS init path, applies GPS UTC time sync to the main clock, uses DIO flash mode, and avoids full UI standby on display timeout.
+- CI now builds all three supported firmware targets so Ultra, S3/Gen3, and T-Deck Plus regressions fail before merge.
 
 If this gate fails, either restore the protected behavior or update the check in
 the same change with the intentional replacement behavior.
@@ -499,7 +606,9 @@ The receiving TOC should auto-decode mesh packets so the inbound `CHECKIN/LOC` u
 From `C:\GitHub\XNODE`:
 
 ```powershell
+pio run -e t-watch-ultra
 pio run -e t-watch2020-v3-s3
+pio run -e tdeck-plus
 ```
 
 ## Flash

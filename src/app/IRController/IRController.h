@@ -31,6 +31,8 @@
             void IRController_setup( void );
         #elif defined( LILYGO_WATCH_ULTRA )
             void IRController_setup( void );
+        #elif defined( LILYGO_T_DECK_PLUS )
+            void IRController_setup( void );
         #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             enum IRControlSettingsAction {
                 Ignore,

@@ -53,6 +53,8 @@
         #include "hardware/twatch_ultra_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
+    #elif defined( LILYGO_T_DECK_PLUS )
+        #include "hardware/tdeck_plus_hal.h"
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #include <TTGO.h>
     #elif defined( LILYGO_WATCH_2021 )
@@ -113,6 +115,10 @@ void framebuffer_setup( void ) {
             watch.setSwapBytes( true );
             watch.fillScreen( TFT_BLACK );
         #elif defined( LILYGO_WATCH_S3 )
+            framebuffer_use_dma = false;
+            watch.setSwapBytes( true );
+            watch.fillScreen( TFT_BLACK );
+        #elif defined( LILYGO_T_DECK_PLUS )
             framebuffer_use_dma = false;
             watch.setSwapBytes( true );
             watch.fillScreen( TFT_BLACK );
@@ -264,6 +270,7 @@ bool framebuffer_powermgm_loop_cb( EventBits_t event, void *arg ) {
         #elif defined( M5CORE2 )
         #elif defined( LILYGO_WATCH_ULTRA )
         #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_T_DECK_PLUS )
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #elif defined( LILYGO_WATCH_2021 )
         #elif defined( WT32_SC01 )
@@ -292,6 +299,7 @@ void framebuffer_refresh( void ) {
         #elif defined( M5CORE2 )
         #elif defined( LILYGO_WATCH_ULTRA )
         #elif defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_T_DECK_PLUS )
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #elif defined( LILYGO_WATCH_2021 )
         #elif defined( WT32_SC01 )
@@ -388,6 +396,12 @@ static void framebuffer_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area,
             watch.pushColors((uint16_t *)color_p, size, true);
             watch.endWrite();
         #elif defined( LILYGO_WATCH_S3 )
+            uint32_t size = (area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1);
+            watch.startWrite();
+            watch.setAddrWindow(area->x1, area->y1, (area->x2 - area->x1 + 1), (area->y2 - area->y1 + 1));
+            watch.pushColors((uint16_t *)color_p, size, true);
+            watch.endWrite();
+        #elif defined( LILYGO_T_DECK_PLUS )
             uint32_t size = (area->x2 - area->x1 + 1) * (area->y2 - area->y1 + 1);
             watch.startWrite();
             watch.setAddrWindow(area->x1, area->y1, (area->x2 - area->x1 + 1), (area->y2 - area->y1 + 1));

@@ -49,7 +49,7 @@ bool timesync_powermgm_event_cb( EventBits_t event, void *arg );
 bool timesync_wifictl_event_cb( EventBits_t event, void *arg );
 bool timesync_blectl_event_cb( EventBits_t event, void *arg );
 bool timesync_send_event_cb( EventBits_t event, void *arg );
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
 static bool timesync_apply_build_time_if_needed( void );
 #endif
 
@@ -74,7 +74,7 @@ void timesync_setup( void ) {
      * sync time from rtc to system
      */
     timesyncToSystem();
-    #if defined( LILYGO_WATCH_ULTRA )
+    #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
         timesync_apply_build_time_if_needed();
     #endif
 }
@@ -152,7 +152,7 @@ time_t timesync_get_build_epoch_utc( void ) {
     return( static_cast<time_t>( epoch_seconds ) );
 }
 
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
 static bool timesync_apply_build_time_if_needed( void ) {
     time_t now;
     struct tm current_info;
@@ -170,7 +170,7 @@ static bool timesync_apply_build_time_if_needed( void ) {
         return( false );
     }
 
-    log_i( "applied Ultra build-time UTC clock fallback: %s %s", __DATE__, __TIME__ );
+    log_i( "applied build-time UTC clock fallback: %s %s", __DATE__, __TIME__ );
     return( true );
 }
 #endif

@@ -39,6 +39,9 @@
         #elif defined( LILYGO_WATCH_ULTRA )
             #define TOUCH_X_SCALE       1.0
             #define TOUCH_Y_SCALE       1.0
+        #elif defined( LILYGO_T_DECK_PLUS )
+            #define TOUCH_X_SCALE       1.0
+            #define TOUCH_Y_SCALE       1.0
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             #define TOUCH_X_SCALE       1.15
             #define TOUCH_Y_SCALE       1.0

@@ -54,5 +54,9 @@
      * @brief   show numerical onscreen keyboard
      */
     void num_keyboard_show( void );
+    /**
+     * @brief poll board hardware keyboard input when present
+     */
+    void keyboard_poll_hardware( void );
 
 #endif // _KEYBOARD_H

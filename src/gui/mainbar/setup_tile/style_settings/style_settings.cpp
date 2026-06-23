@@ -63,9 +63,22 @@ void style_settings_tile_setup( void ) {
     lv_obj_t *header = wf_add_settings_header( style_settings_tile, "theme settings", exit_style_setup_event_cb );
     lv_obj_align( header, style_settings_tile, LV_ALIGN_IN_TOP_LEFT, 10, STATUSBAR_HEIGHT + 10 );
 
-    lv_obj_t *theme_cont = wf_add_labeled_list( style_settings_tile, "theme", &theme_list, "E-Ink\nE-Ink neg\nlight\ndark", select_style_event_cb, SETUP_STYLE );
+    #if defined( LILYGO_T_DECK_PLUS )
+    lv_obj_t *theme_cont = wf_add_labeled_list( style_settings_tile, "theme", &theme_list, "E-Ink\nE-Ink neg", select_style_event_cb, SETUP_STYLE );
+    #else
+    lv_obj_t *theme_cont = wf_add_labeled_list( style_settings_tile, "theme", &theme_list, "E-Ink\nE-Ink neg\nlight", select_style_event_cb, SETUP_STYLE );
+    #endif
     lv_obj_align( theme_cont, header, LV_ALIGN_OUT_BOTTOM_MID, 0, THEME_PADDING );
 
+    #if defined( LILYGO_T_DECK_PLUS )
+    if ( style_config.theme < 0 || style_config.theme > 1 ) {
+        style_config.theme = 1;
+    }
+    #else
+    if ( style_config.theme < 0 || style_config.theme > 2 ) {
+        style_config.theme = 2;
+    }
+    #endif
     lv_dropdown_set_selected( theme_list, style_config.theme );
     widget_style_theme_set( style_config.theme );
     wf_enable_anim( style_config.anim );
@@ -77,12 +90,24 @@ void style_settings_tile_setup( void ) {
 
 static void select_style_event_cb( lv_obj_t * obj, lv_event_t event ) {
     switch( event ) {
-        case( LV_EVENT_VALUE_CHANGED ):     widget_style_theme_set( lv_dropdown_get_selected( obj ) );
+        case( LV_EVENT_VALUE_CHANGED ): {
+                                            uint16_t selected_theme = lv_dropdown_get_selected( obj );
+                                            #if defined( LILYGO_T_DECK_PLUS )
+                                            if ( selected_theme > 1 ) {
+                                                selected_theme = 1;
+                                            }
+                                            #else
+                                            if ( selected_theme > 2 ) {
+                                                selected_theme = 2;
+                                            }
+                                            #endif
+                                            widget_style_theme_set( selected_theme );
                                             wf_enable_anim( style_config.anim );
                                             lv_obj_invalidate( lv_scr_act() );
                                             lv_refr_now( NULL );
-                                            style_config.theme = lv_dropdown_get_selected( obj );
+                                            style_config.theme = selected_theme;
                                             break;
+                                        }
     }
 }
 

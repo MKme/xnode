@@ -42,16 +42,26 @@ bool style_config_t::onLoad(JsonDocument& doc) {
     #if defined( M5PAPER )
         theme = doc["theme"] | 0;
         anim = doc["anim"] | false;
+    #elif defined( LILYGO_T_DECK_PLUS )
+        theme = doc["theme"] | 1;
+        anim = doc["anim"] | true;
     #else
         theme = doc["theme"] | 2;
         anim = doc["anim"] | true;
     #endif
     bool theme_migrated = doc["theme_migrated"] | false;
-    needs_save = false;
-    if ( !theme_migrated && theme == 3 ) {
+    needs_save = !theme_migrated;
+    #if defined( LILYGO_T_DECK_PLUS )
+    if ( theme < 0 || theme > 1 ) {
+        theme = 1;
+        needs_save = true;
+    }
+    #else
+    if ( theme == 3 || theme < 0 || theme > 3 ) {
         theme = 2;
         needs_save = true;
     }
+    #endif
     return true;
 }
 
@@ -59,6 +69,9 @@ bool style_config_t::onDefault( void ) {
     #if defined( M5PAPER )
         theme = 0;
         anim = false;
+    #elif defined( LILYGO_T_DECK_PLUS )
+        theme = 1;
+        anim = true;
     #else
         theme = 2;
         anim = true;

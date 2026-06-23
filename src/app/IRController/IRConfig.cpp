@@ -3,7 +3,7 @@
 
 #ifdef NATIVE_64BIT
 #else
-    #if defined( M5PAPER ) || defined( M5CORE2 ) || defined( LILYGO_WATCH_2021 ) 
+    #if defined( M5PAPER ) || defined( M5CORE2 ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_WATCH_2021 )
 
     #elif defined( LILYGO_WATCH_S3 ) || defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #include <IRremoteESP8266.h>

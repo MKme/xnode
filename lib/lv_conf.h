@@ -28,6 +28,9 @@
     #elif defined( LILYGO_WATCH_ULTRA )
         #define LV_HOR_RES_MAX          (362)
         #define LV_VER_RES_MAX          (440)
+    #elif defined( LILYGO_T_DECK_PLUS )
+        #define LV_HOR_RES_MAX          (320)
+        #define LV_VER_RES_MAX          (240)
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #define LV_HOR_RES_MAX          (240)
         #define LV_VER_RES_MAX          (240)
@@ -52,6 +55,8 @@
     #ifdef M5PAPER
         #define LV_COLOR_16_SWAP   0
     #elif defined( LILYGO_WATCH_ULTRA )
+        #define LV_COLOR_16_SWAP   0
+    #elif defined( LILYGO_T_DECK_PLUS )
         #define LV_COLOR_16_SWAP   0
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #define LV_COLOR_16_SWAP   0

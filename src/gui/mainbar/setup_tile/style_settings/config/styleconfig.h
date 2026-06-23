@@ -34,6 +34,9 @@
         #if defined( M5PAPER )
             int theme = 0;
             bool anim = false;
+        #elif defined( LILYGO_T_DECK_PLUS )
+            int theme = 1;
+            bool anim = true;
         #else
             int theme = 2;
             bool anim = true;

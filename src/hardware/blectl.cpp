@@ -43,6 +43,7 @@
     #if defined( M5PAPER )
     #elif defined( M5CORE2 )
     #elif defined( LILYGO_WATCH_ULTRA )
+    #elif defined( LILYGO_T_DECK_PLUS )
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
     #elif defined( LILYGO_WATCH_2021 )
     #elif defined( WT32_SC01 )

@@ -35,6 +35,26 @@ ASSETS = {
         "image/jpeg",
         ROOT / "images" / "IMG_6740.jpg",
     ),
+    "https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6809.jpg": (
+        "image/jpeg",
+        ROOT / "images" / "T-dec" / "IMG_6809.jpg",
+    ),
+    "https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6810.jpg": (
+        "image/jpeg",
+        ROOT / "images" / "T-dec" / "IMG_6810.jpg",
+    ),
+    "https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6811.jpg": (
+        "image/jpeg",
+        ROOT / "images" / "T-dec" / "IMG_6811.jpg",
+    ),
+    "https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6812.jpg": (
+        "image/jpeg",
+        ROOT / "images" / "T-dec" / "IMG_6812.jpg",
+    ),
+    "https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6813.jpg": (
+        "image/jpeg",
+        ROOT / "images" / "T-dec" / "IMG_6813.jpg",
+    ),
 }
 
 

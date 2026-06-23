@@ -38,10 +38,18 @@ bool gpsctl_config_t::onSave(JsonDocument& doc) {
 
 bool gpsctl_config_t::onLoad(JsonDocument& doc) {
     config_version = doc["config_version"] | 0;
-    autoon = doc["autoon"] | false;
+    #if defined( LILYGO_T_DECK_PLUS )
+        autoon = doc["autoon"] | true;
+    #else
+        autoon = doc["autoon"] | false;
+    #endif
     enable_on_standby = doc["enable_on_standby"] | false;
     gps_over_ip = doc["gps_over_ip"] | false;
-    app_use_gps = doc["app_use_gps"] | false;
+    #if defined( LILYGO_T_DECK_PLUS )
+        app_use_gps = doc["app_use_gps"] | true;
+    #else
+        app_use_gps = doc["app_use_gps"] | false;
+    #endif
     TXPin = doc["TXPin"] | -1;
     RXPin = doc["RXPin"] | -1;
     config_version = config_version == 0 ? 0 : GPSCTL_CONFIG_VERSION;
@@ -51,10 +59,18 @@ bool gpsctl_config_t::onLoad(JsonDocument& doc) {
 
 bool gpsctl_config_t::onDefault( void ) {
     config_version = GPSCTL_CONFIG_VERSION;
-    autoon = false;
+    #if defined( LILYGO_T_DECK_PLUS )
+        autoon = true;
+    #else
+        autoon = false;
+    #endif
     enable_on_standby = false;
     gps_over_ip = false;
-    app_use_gps = false;
+    #if defined( LILYGO_T_DECK_PLUS )
+        app_use_gps = true;
+    #else
+        app_use_gps = false;
+    #endif
     TXPin = -1;
     RXPin = -1;
 

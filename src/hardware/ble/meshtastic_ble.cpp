@@ -1,7 +1,7 @@
 #include "config.h"
 #include "meshtastic_ble.h"
 
-#if !defined( NATIVE_64BIT ) && ( defined( USING_TWATCH_S3 ) || defined( USING_TWATCH_ULTRA ) )
+#if !defined( NATIVE_64BIT ) && ( defined( USING_TWATCH_S3 ) || defined( USING_TWATCH_ULTRA ) || defined( USING_TDECK_PLUS ) )
 
     #include <Arduino.h>
     #include <ESP.h>
@@ -307,6 +307,8 @@
             snprintf( user.short_name, sizeof( user.short_name ), "%s", info.short_name[ 0 ] ? info.short_name : meshtastic_ble_owner_short_name );
             #if defined( USING_TWATCH_ULTRA )
                 user.hw_model = meshtastic_HardwareModel_T_WATCH_ULTRA;
+            #elif defined( USING_TDECK_PLUS )
+                user.hw_model = meshtastic_HardwareModel_T_DECK;
             #else
                 user.hw_model = meshtastic_HardwareModel_T_WATCH_S3;
             #endif
@@ -361,7 +363,13 @@
             metadata.hasEthernet = false;
             metadata.role = meshtastic_ble_config_store.device.role;
             metadata.position_flags = meshtastic_ble_config_store.position.position_flags;
-            metadata.hw_model = meshtastic_HardwareModel_T_WATCH_S3;
+            #if defined( USING_TWATCH_ULTRA )
+                metadata.hw_model = meshtastic_HardwareModel_T_WATCH_ULTRA;
+            #elif defined( USING_TDECK_PLUS )
+                metadata.hw_model = meshtastic_HardwareModel_T_DECK;
+            #else
+                metadata.hw_model = meshtastic_HardwareModel_T_WATCH_S3;
+            #endif
             metadata.hasRemoteHardware = false;
             metadata.hasPKC = false;
             metadata.excluded_modules = 0;

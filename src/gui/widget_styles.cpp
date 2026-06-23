@@ -98,6 +98,16 @@ bool styles_send_event_cb( EventBits_t event, void *arg ) {
 }
 
 void widget_style_theme_set( int theme ) {
+    #if defined( LILYGO_T_DECK_PLUS )
+    if ( theme < 0 || theme > 1 ) {
+        theme = 1;
+    }
+    #else
+    if ( theme == 3 || theme < 0 || theme > 3 ) {
+        theme = 2;
+    }
+    #endif
+
     switch( theme ) {
         case( 0 ):      /** background **/
                         lv_style_set_bg_color( &background_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
@@ -117,6 +127,7 @@ void widget_style_theme_set( int theme ) {
                         lv_style_set_text_font( &app_style, LV_OBJ_PART_MAIN, app_font );
                         /** app ops style color **/
                         lv_style_set_bg_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_text_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
                         lv_style_set_text_font( &app_opa_style, LV_OBJ_PART_MAIN, app_font );
                         /** app dropdown colors **/
                         lv_style_set_bg_color( &app_dropdown_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
@@ -146,14 +157,17 @@ void widget_style_theme_set( int theme ) {
                         lv_style_set_bg_opa( &app_icon_style, LV_OBJ_PART_MAIN, LV_OPA_20 );
                         lv_style_set_text_color( &app_icon_label_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
                         lv_style_set_text_font( &app_icon_label_style, LV_OBJ_PART_MAIN, app_icon_label_font );
+                        lv_style_set_text_color( &label_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
                         /** button/switch/slider  style **/
                         lv_style_set_radius( &button_style, LV_STATE_DEFAULT, 0 );
                         lv_style_set_border_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_BLACK );
+                        lv_style_set_bg_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_WHITE );
+                        lv_style_set_text_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_BLACK );
                         lv_style_set_bg_color( &switch_style, LV_STATE_CHECKED, LV_COLOR_BLACK );
                         lv_style_set_bg_color( &slider_style, LV_STATE_DEFAULT, LV_COLOR_BLACK );
                         /** trigger style change event **/
                         styles_send_event_cb( STYLE_CHANGE, (void*)NULL );
-                        styles_send_event_cb( STYLE_DARKMODE, (void*)NULL );
+                        styles_send_event_cb( STYLE_LIGHTMODE, (void*)NULL );
                         break;
         case( 1 ):      /** background **/
                         lv_style_set_bg_color( &background_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
@@ -172,7 +186,8 @@ void widget_style_theme_set( int theme ) {
                         lv_style_set_text_color( &app_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
                         lv_style_set_text_font( &app_style, LV_OBJ_PART_MAIN, app_font );
                         /** app ops style color **/
-                        lv_style_set_bg_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_bg_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+                        lv_style_set_text_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
                         lv_style_set_text_font( &app_opa_style, LV_OBJ_PART_MAIN, app_font );
                         /** app dropdown colors **/
                         lv_style_set_bg_color( &app_dropdown_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
@@ -202,16 +217,19 @@ void widget_style_theme_set( int theme ) {
                         lv_style_set_bg_opa( &app_icon_style, LV_OBJ_PART_MAIN, LV_OPA_20 );
                         lv_style_set_text_color( &app_icon_label_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
                         lv_style_set_text_font( &app_icon_label_style, LV_OBJ_PART_MAIN, app_icon_label_font );
+                        lv_style_set_text_color( &label_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
                         /** button/switch/slider  style **/
                         lv_style_set_radius( &button_style, LV_STATE_DEFAULT, 0 );
                         lv_style_set_border_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_GRAY );
+                        lv_style_set_bg_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_BLACK );
+                        lv_style_set_text_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_WHITE );
                         lv_style_set_bg_color( &switch_style, LV_STATE_CHECKED, LV_COLOR_GRAY );
                         lv_style_set_bg_color( &slider_style, LV_STATE_DEFAULT, LV_COLOR_GRAY );
                         /** trigger style change event **/
                         styles_send_event_cb( STYLE_CHANGE, (void*)NULL );
                         styles_send_event_cb( STYLE_DARKMODE, (void*)NULL );
                         break;
-        case( 3 ):      lv_style_set_bg_color( &background_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+        case( 2 ):      lv_style_set_bg_color( &background_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
                         /** maibbar colors **/
                         lv_style_set_bg_color( &mainbar_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
                         lv_style_set_text_color( &mainbar_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
@@ -228,6 +246,7 @@ void widget_style_theme_set( int theme ) {
                         lv_style_set_text_font( &app_style, LV_OBJ_PART_MAIN, app_font );
                         /** app ops style color **/
                         lv_style_set_bg_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_text_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
                         lv_style_set_text_font( &app_opa_style, LV_OBJ_PART_MAIN, app_font );
                         /** app dropdown colors **/
                         lv_style_set_bg_color( &app_dropdown_style, LV_OBJ_PART_MAIN, LV_COLOR_MAKE( 0xa0, 0xa0, 0xa0 ) );
@@ -257,16 +276,19 @@ void widget_style_theme_set( int theme ) {
                         lv_style_set_bg_opa( &app_icon_style, LV_OBJ_PART_MAIN, LV_OPA_40 );
                         lv_style_set_text_color( &app_icon_label_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
                         lv_style_set_text_font( &app_icon_label_style, LV_OBJ_PART_MAIN, app_icon_label_font );
+                        lv_style_set_text_color( &label_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
                         /** button/switch/slider  style **/
                         lv_style_set_radius( &button_style, LV_STATE_DEFAULT, 3 );
                         lv_style_set_border_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_BLACK );
+                        lv_style_set_bg_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_WHITE );
+                        lv_style_set_text_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_BLACK );
                         lv_style_set_bg_color( &switch_style, LV_STATE_CHECKED, LV_COLOR_GREEN );
                         lv_style_set_bg_color( &slider_style, LV_STATE_DEFAULT, LV_COLOR_GREEN );
 
                         styles_send_event_cb( STYLE_CHANGE, (void*)NULL );
-                        styles_send_event_cb( STYLE_DARKMODE, (void*)NULL );
+                        styles_send_event_cb( STYLE_LIGHTMODE, (void*)NULL );
                         break;
-        default:        lv_style_set_bg_color( &background_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+        case( 3 ):      lv_style_set_bg_color( &background_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
                         /** maibbar colors **/
                         lv_style_set_bg_color( &mainbar_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
                         lv_style_set_text_color( &mainbar_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
@@ -277,12 +299,13 @@ void widget_style_theme_set( int theme ) {
                         lv_style_set_border_width( &mainbar_dropdown_style, LV_OBJ_PART_MAIN, 0 );
                         lv_style_set_text_font( &mainbar_dropdown_style, LV_OBJ_PART_MAIN, mainbar_font );
                         lv_style_set_text_color( &mainbar_dropdown_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
-                        /** app colors **/                        
+                        /** app colors **/
                         lv_style_set_bg_color( &app_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
                         lv_style_set_text_color( &app_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
                         lv_style_set_text_font( &app_style, LV_OBJ_PART_MAIN, app_font );
                         /** app ops style color **/
                         lv_style_set_bg_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+                        lv_style_set_text_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
                         lv_style_set_text_font( &app_opa_style, LV_OBJ_PART_MAIN, app_font );
                         /** app dropdown colors **/
                         lv_style_set_bg_color( &app_dropdown_style, LV_OBJ_PART_MAIN, LV_COLOR_MAKE( 0xa0, 0xa0, 0xa0 ) );
@@ -312,14 +335,76 @@ void widget_style_theme_set( int theme ) {
                         lv_style_set_bg_opa( &app_icon_style, LV_OBJ_PART_MAIN, LV_OPA_40 );
                         lv_style_set_text_color( &app_icon_label_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
                         lv_style_set_text_font( &app_icon_label_style, LV_OBJ_PART_MAIN, app_icon_label_font );
+                        lv_style_set_text_color( &label_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
                         /** button/switch/slider  style **/
                         lv_style_set_radius( &button_style, LV_STATE_DEFAULT, 3 );
                         lv_style_set_border_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_WHITE );
+                        lv_style_set_bg_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_BLACK );
+                        lv_style_set_text_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_WHITE );
                         lv_style_set_bg_color( &switch_style, LV_STATE_CHECKED, LV_COLOR_GREEN );
                         lv_style_set_bg_color( &slider_style, LV_STATE_DEFAULT, LV_COLOR_GREEN );
 
                         styles_send_event_cb( STYLE_CHANGE, (void*)NULL );
-                        styles_send_event_cb( STYLE_LIGHTMODE, (void*)NULL );
+                        styles_send_event_cb( STYLE_DARKMODE, (void*)NULL );
+                        break;
+        default:        lv_style_set_bg_color( &background_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+                        /** maibbar colors **/
+                        lv_style_set_bg_color( &mainbar_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+                        lv_style_set_text_color( &mainbar_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_text_font( &mainbar_style, LV_OBJ_PART_MAIN, mainbar_font );
+                        /** mainbar dropdown colors **/
+                        lv_style_set_bg_color( &mainbar_dropdown_style, LV_OBJ_PART_MAIN, LV_COLOR_MAKE( 0xa0, 0xa0, 0xa0 ) );
+                        lv_style_set_bg_opa( &mainbar_dropdown_style, LV_OBJ_PART_MAIN, LV_OPA_100);
+                        lv_style_set_border_width( &mainbar_dropdown_style, LV_OBJ_PART_MAIN, 0 );
+                        lv_style_set_text_font( &mainbar_dropdown_style, LV_OBJ_PART_MAIN, mainbar_font );
+                        lv_style_set_text_color( &mainbar_dropdown_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        /** app colors **/                        
+                        lv_style_set_bg_color( &app_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+                        lv_style_set_text_color( &app_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_text_font( &app_style, LV_OBJ_PART_MAIN, app_font );
+                        /** app ops style color **/
+                        lv_style_set_bg_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+                        lv_style_set_text_color( &app_opa_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_text_font( &app_opa_style, LV_OBJ_PART_MAIN, app_font );
+                        /** app dropdown colors **/
+                        lv_style_set_bg_color( &app_dropdown_style, LV_OBJ_PART_MAIN, LV_COLOR_MAKE( 0xa0, 0xa0, 0xa0 ) );
+                        lv_style_set_bg_opa( &app_dropdown_style, LV_OBJ_PART_MAIN, LV_OPA_100);
+                        lv_style_set_border_width( &app_dropdown_style, LV_OBJ_PART_MAIN, 0 );
+                        lv_style_set_text_font( &app_dropdown_style, LV_OBJ_PART_MAIN, app_font );
+                        lv_style_set_text_color( &app_dropdown_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        /** setup colors **/
+                        lv_style_set_bg_color( &setup_tile_style, LV_OBJ_PART_MAIN, LV_COLOR_GRAY );
+                        lv_style_set_text_color( &setup_tile_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_image_recolor( &setup_tile_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_text_font( &setup_tile_style, LV_OBJ_PART_MAIN, setup_font );
+                        /** setup dropdown style **/
+                        lv_style_set_bg_color( &setup_dropdown_style, LV_OBJ_PART_MAIN, LV_COLOR_MAKE( 0xa0, 0xa0, 0xa0 ) );
+                        lv_style_set_bg_opa( &setup_dropdown_style, LV_OBJ_PART_MAIN, LV_OPA_100);
+                        lv_style_set_border_width( &setup_dropdown_style, LV_OBJ_PART_MAIN, 0 );
+                        lv_style_set_border_color( &setup_dropdown_style, LV_OBJ_PART_MAIN, LV_COLOR_MAKE( 0xa0, 0xa0, 0xa0 ) );
+                        lv_style_set_text_color( &setup_dropdown_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        /** setup header style **/
+                        lv_style_set_bg_color( &setup_header_tile_style, LV_OBJ_PART_MAIN, LV_COLOR_GRAY );
+                        lv_style_set_text_color( &setup_header_tile_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_text_font( &setup_header_tile_style, LV_OBJ_PART_MAIN, setup_header_font );
+                        /** system/app icon/label style **/
+                        lv_style_set_image_recolor( &system_icon_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_text_color( &system_icon_label_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_text_font( &system_icon_label_style, LV_OBJ_PART_MAIN, system_icon_label_font );
+                        lv_style_set_bg_opa( &app_icon_style, LV_OBJ_PART_MAIN, LV_OPA_40 );
+                        lv_style_set_text_color( &app_icon_label_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_text_font( &app_icon_label_style, LV_OBJ_PART_MAIN, app_icon_label_font );
+                        lv_style_set_text_color( &label_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        /** button/switch/slider  style **/
+                        lv_style_set_radius( &button_style, LV_STATE_DEFAULT, 3 );
+                        lv_style_set_border_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_WHITE );
+                        lv_style_set_bg_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_BLACK );
+                        lv_style_set_text_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_WHITE );
+                        lv_style_set_bg_color( &switch_style, LV_STATE_CHECKED, LV_COLOR_GREEN );
+                        lv_style_set_bg_color( &slider_style, LV_STATE_DEFAULT, LV_COLOR_GREEN );
+
+                        styles_send_event_cb( STYLE_CHANGE, (void*)NULL );
+                        styles_send_event_cb( STYLE_DARKMODE, (void*)NULL );
                         break;
     }
 }

@@ -59,7 +59,7 @@
     <div class="xnode-hero-content">
       <div class="xnode-kicker">X Suite wearable field node</div>
       <h1>XNODE puts the tactical picture on your wrist.</h1>
-      <p>XNODE turns the LilyGO T-Watch S3 into a field-ready companion for XTOC and XCOM: offline watch maps, synced tactical markers, pushed alerts, and one-tap Meshtastic SOS or CheckIn packets.</p>
+      <p>XNODE turns LilyGO field hardware into a companion for XTOC and XCOM: offline maps, synced tactical markers, pushed alerts, and one-tap Meshtastic SOS or CheckIn packets on the T-Watch family or the larger T-Deck Plus.</p>
       <div class="xnode-actions">
         <a class="xnode-button dark" href="https://github.com/MKme/xnode" target="_blank" rel="noreferrer">View XNODE on GitHub</a>
         <a class="xnode-button warn" href="https://amzn.to/4sHfvgK" target="_blank" rel="noreferrer">Buy the T-Watch S3 hardware</a>
@@ -80,11 +80,11 @@
       <div class="xnode-grid">
         <div class="xnode-card xnode-feature">
           <span class="xnode-dot"></span>
-          <div><h3>Watch-ready common operating picture</h3><p>XTOC and XCOM can install the active raster map onto the watch and sync overlay markers for team members, mesh nodes, CHECKINs, SITREPs, CONTACTs, TASKs, assets, routes, zones, and more.</p></div>
+          <div><h3>Device-ready common operating picture</h3><p>XTOC and XCOM can install the active raster map onto the device and sync overlay markers for team members, mesh nodes, CHECKINs, SITREPs, CONTACTs, TASKs, assets, routes, zones, and more.</p></div>
         </div>
         <div class="xnode-card xnode-feature">
           <span class="xnode-dot blue"></span>
-          <div><h3>Two-tap field reporting</h3><p>The watch can transmit clear XTOC packet text over its Meshtastic radio for Manual SOS and CheckIn flows, using the configured roster Unit ID and current watch location.</p></div>
+          <div><h3>Two-tap field reporting</h3><p>The firmware can transmit clear XTOC packet text over the Meshtastic radio for Manual SOS and CheckIn flows, using the configured roster Unit ID and current device location.</p></div>
         </div>
         <div class="xnode-card xnode-feature">
           <span class="xnode-dot amber"></span>
@@ -97,7 +97,7 @@
       <div class="xnode-split">
         <div>
           <h2>Real watch screens, not vaporware.</h2>
-          <p class="xnode-lead">The current firmware builds for the T-Watch S3, flashes to the ESP32-S3 target, exposes the XNODE BLE bridge, installs a compact basemap, displays operational overlays, and keeps alerts visible on the watch.</p>
+          <p class="xnode-lead">The current firmware builds for the T-Watch S3, T-Watch Ultra, and T-Deck Plus, exposes the XNODE BLE bridge, installs a compact basemap, displays operational overlays, and keeps alerts visible on the device.</p>
           <div class="xnode-actions">
             <a class="xnode-button dark" href="https://github.com/MKme/xnode/blob/main/README.md" target="_blank" rel="noreferrer">Read the project README</a>
             <a class="xnode-button" href="https://github.com/MKme/xnode/blob/main/platformio.ini" target="_blank" rel="noreferrer">PlatformIO build config</a>
@@ -131,6 +131,33 @@
     </section>
 
     <section class="xnode-section">
+      <h2>Now on T-Deck Plus</h2>
+      <p class="xnode-lead">The T-Deck Plus build moves XNODE onto a bigger 320x240 display with a physical keyboard. It keeps the core map, mesh, alert, GPS, SOS, and CheckIn workflows while making typed mesh messages and status screens much easier to use in the field.</p>
+      <div class="xnode-photo-grid">
+        <div class="xnode-photo-card">
+          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6809.jpg" alt="T-Deck Plus running the XNODE clock screen with moon phase" width="1062" height="1416" loading="lazy" decoding="async" />
+          <div><strong>Clock + moon</strong><p>Larger clock screen with the generated moon phase visual and text.</p></div>
+        </div>
+        <div class="xnode-photo-card">
+          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6810.jpg" alt="T-Deck Plus XNODE launcher showing messages, mesh, Tac Map, CheckIn, Alert Summary, and SOS" width="1062" height="1416" loading="lazy" decoding="async" />
+          <div><strong>Main launcher</strong><p>Messages, mesh, Tac Map, CheckIn, Alert Summary, and SOS on the larger display.</p></div>
+        </div>
+        <div class="xnode-photo-card">
+          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6811.jpg" alt="T-Deck Plus XNODE utilities launcher showing GPS status and other tools" width="1062" height="1416" loading="lazy" decoding="async" />
+          <div><strong>Status tools</strong><p>Readable GPS/status utilities and support screens from the launcher.</p></div>
+        </div>
+        <div class="xnode-photo-card">
+          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6812.jpg" alt="T-Deck Plus XNODE mesh compose screen using the hardware keyboard" width="1062" height="1416" loading="lazy" decoding="async" />
+          <div><strong>Hardware keyboard</strong><p>Physical keys make mesh compose usable without a cramped on-screen keyboard.</p></div>
+        </div>
+        <div class="xnode-photo-card">
+          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6813.jpg" alt="T-Deck Plus XNODE CheckIn screen" width="1062" height="1416" loading="lazy" decoding="async" />
+          <div><strong>CheckIn ready</strong><p>Fast CHECKIN/LOC packet flow with current position.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="xnode-section">
       <h2>Built for the X Suite workflow</h2>
       <p class="xnode-lead">XNODE is not another disconnected gadget. It is the wearable edge of the X Suite: XTOC drives the command picture, XCOM supports field communications, and XNODE carries the essentials on the operator's wrist.</p>
       <img class="xnode-image" src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/xnode-system-flow.svg" alt="XNODE operational flow between XTOC, XCOM, the watch, maps, and Meshtastic" width="1600" height="900" loading="lazy" decoding="async" />
@@ -146,7 +173,7 @@
       <h2>What XNODE does in the field</h2>
       <div class="xnode-grid two">
         <div class="xnode-card">
-          <h3>Tactical map on watch flash</h3>
+          <h3>Tactical map on device flash</h3>
           <ul>
             <li>Installs the active XTOC/XCOM raster basemap into SPIFFS.</li>
             <li>Persists center, zoom, and projection metadata.</li>
@@ -160,15 +187,15 @@
             <li>Stores synced markers in <code>/spiffs/osmmap/overlays.jsonl</code>.</li>
             <li>Reloads overlays when the map opens or the watch restarts.</li>
             <li>Uses transactional replacement so partial syncs do not wipe the live picture.</li>
-            <li>Keeps up to 96 overlay marker slots on the watch.</li>
+            <li>Keeps up to 96 overlay marker slots on the device.</li>
           </ul>
         </div>
         <div class="xnode-card">
           <h3>SOS over mesh</h3>
           <ul>
             <li>Creates a clear XTOC <code>SITREP</code> packet.</li>
-            <li>Uses the watch Unit ID, SOS destination, priority <code>P1</code>, status <code>HELP</code>, and current lat/lon.</li>
-            <li>Sends over the watch Meshtastic service on the active channel.</li>
+            <li>Uses the device Unit ID, SOS destination, priority <code>P1</code>, status <code>HELP</code>, and current lat/lon.</li>
+            <li>Sends over the onboard Meshtastic service on the active channel.</li>
           </ul>
         </div>
         <div class="xnode-card">
@@ -188,7 +215,7 @@
         <div class="xnode-card">
           <h3>GitHub source</h3>
           <p><a href="https://github.com/MKme/xnode" target="_blank" rel="noreferrer">github.com/MKme/xnode</a></p>
-          <p class="xnode-note">Firmware source, board config, PlatformIO environment, watch photos, and current implementation notes.</p>
+          <p class="xnode-note">Firmware source, board config, PlatformIO environments, hardware photos, and current implementation notes.</p>
         </div>
         <div class="xnode-card">
           <h3>Key code areas</h3>
@@ -196,9 +223,9 @@
           <p class="xnode-note">Useful for developers who want to audit how maps, overlays, and packet shortcuts are wired.</p>
         </div>
         <div class="xnode-card">
-          <h3>Hardware target</h3>
+          <h3>Hardware targets</h3>
           <p><a href="https://amzn.to/4sHfvgK" target="_blank" rel="noreferrer">LILYGO T-Watch S3 hardware listing</a></p>
-          <p class="xnode-note">ESP32-S3 watch target with 16 MB flash, PSRAM, touch display, and SX1262 LoRa hardware path.</p>
+          <p class="xnode-note">T-Watch S3/Ultra watch targets plus T-Deck Plus support for a larger screen, physical keyboard, GPS, SD, and SX1262 LoRa hardware path.</p>
         </div>
       </div>
     </section>
@@ -227,7 +254,7 @@
     <section class="xnode-section">
       <div class="xnode-callout">
         <h2>Operational note</h2>
-        <p>XNODE is a firmware project for a specific watch target and a companion workflow for the X Suite. The current watch-flash map mode is intentionally compact: one installed raster basemap with synced overlays, not a full multi-tile slippy map engine. That tradeoff is what makes the watch useful inside tight flash, RAM, battery, and screen constraints.</p>
+        <p>XNODE is a firmware project for compact LilyGO field hardware and a companion workflow for the X Suite. The current flash-map mode is intentionally compact: one installed raster basemap with synced overlays, not a full multi-tile slippy map engine. That tradeoff keeps the workflow useful inside tight flash, RAM, battery, and screen constraints.</p>
       </div>
     </section>
 
@@ -239,7 +266,7 @@
       </details>
       <details>
         <summary>Does XNODE work offline?</summary>
-        <p>The watch can display the installed basemap and persisted overlays from flash. Syncing new maps, markers, unit settings, and pushed alerts happens through the companion XTOC/XCOM bridge.</p>
+        <p>The device can display the installed basemap and persisted overlays from flash. Syncing new maps, markers, unit settings, and pushed alerts happens through the companion XTOC/XCOM bridge.</p>
       </details>
       <details>
         <summary>Does the SOS button send through the phone?</summary>
