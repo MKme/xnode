@@ -147,14 +147,27 @@ def run_checks():
         "src/gui/mainbar/setup_tile/bluetooth_settings/bluetooth_message.cpp",
         "message main-tile shortcut disappears after messages are viewed",
         [
+            "static bool bluetooth_message_new = false;",
             "bluetooth_message_dismiss_main_widget",
+            "bluetooth_message_mark_read",
             "messages_widget = widget_remove( messages_widget );",
             "bluetooth_message_open_latest",
+            "bluetooth_message_mark_read();",
             "bluetooth_message_show_msg( msg_chain_get_entrys( bluetooth_msg_chain ) - 1 );",
-            "const bool opened_message_tile = blectl_get_show_notification();",
-            "if ( opened_message_tile )",
-            "else if ( messages_widget == NULL )",
+            "if ( bluetooth_message_new )",
+            "messages_widget = widget_register( \"message\", &message_64px, enter_bluetooth_messages_cb );",
+            "bluetooth_message_new = true;",
             "bluetooth_message_set_indicator();",
+        ],
+    )
+    forbid_slice_tokens(
+        "src/gui/mainbar/setup_tile/bluetooth_settings/bluetooth_message.cpp",
+        "message receive does not force-open the message screen",
+        "bool bluetooth_message_queue_msg( const char *msg ) {",
+        "int32_t bluetooth_get_number_of_msg( void ) {",
+        [
+            "mainbar_jump_to_tilenumber( bluetooth_message_tile_num",
+            "blectl_get_show_notification()",
         ],
     )
 
@@ -470,6 +483,18 @@ def run_checks():
         ],
     )
     require_tokens(
+        "src/hardware/timesync.cpp",
+        "T-Deck Plus clock gets the same boot-time fallback and GPS update path as Ultra",
+        [
+            "#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )",
+            "timesync_apply_build_time_if_needed();",
+            "settimeofday( &build_now, NULL )",
+            "applied build-time UTC clock fallback",
+            "timesync_apply_external_time( time_t epoch_seconds )",
+            "timesync_send_event_cb( TIME_SYNC_UPDATE, (void *)NULL );",
+        ],
+    )
+    require_tokens(
         "src/hardware/display.cpp",
         "T-Deck Plus uses direct backlight updates instead of pulse-count fading",
         [
@@ -542,6 +567,57 @@ def run_checks():
             "post:support/twatch_ultra_post_upload_reset.py",
             "post:support/tdeck_plus_post_upload_reset.py",
             "board_upload.after_reset = no_reset_stub",
+        ],
+    )
+    require_tokens(
+        "platformio.ini",
+        "active S3 builds use portable Arduino framework include paths",
+        [
+            "[esp32s3_arduino_framework_includes]",
+            "-I$PROJECT_PACKAGES_DIR/framework-arduinoespressif32/libraries/Update/src",
+            "-I$PROJECT_PACKAGES_DIR/framework-arduinoespressif32@3.20009.0/libraries/Update/src",
+            "${esp32s3_arduino_framework_includes.build_flags}",
+        ],
+    )
+    forbid_tokens(
+        "platformio.ini",
+        "active build flags stay portable",
+        [
+            "C:/Users/Eric/.platformio",
+            "C:\\Users\\Eric\\.platformio",
+        ],
+    )
+    require_slice_tokens(
+        "platformio.ini",
+        "T-Deck Plus uses DIO flash mode to avoid QIO boot loops",
+        "[env:tdeck-plus]",
+        "build_flags =",
+        [
+            "board_build.flash_mode = dio",
+        ],
+    )
+    require_tokens(
+        "boards/tdeck_plus.json",
+        "T-Deck Plus board file defaults to DIO flash mode",
+        [
+            '"flash_mode": "dio"',
+        ],
+    )
+    require_tokens(
+        "package.json",
+        "npm build covers all supported firmware targets",
+        [
+            '"test": "python support/check_watch_overlay_persistence.py && python support/regression_checks.py"',
+            "pio run -e t-watch-ultra -e t-watch2020-v3-s3 -e tdeck-plus",
+        ],
+    )
+    require_tokens(
+        ".github/workflows/ci.yml",
+        "GitHub Actions runs regression tests and all firmware builds",
+        [
+            "Regression and firmware builds",
+            "platformio==6.1.19",
+            "npm run build",
         ],
     )
 
