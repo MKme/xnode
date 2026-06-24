@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">XNODE launcher icon</title>
+  <desc id="desc">A tactical map style icon with a navigation marker and linked field nodes.</desc>
+  <defs>
+    <linearGradient id="panel" x1="72" y1="58" x2="440" y2="454" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#17201d"/>
+      <stop offset="0.55" stop-color="#101716"/>
+      <stop offset="1" stop-color="#090d0c"/>
+    </linearGradient>
+    <radialGradient id="scan" cx="254" cy="242" r="230" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#63f6a0" stop-opacity="0.2"/>
+      <stop offset="0.55" stop-color="#2aa66a" stop-opacity="0.08"/>
+      <stop offset="1" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft-glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="5" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="108" fill="#07100e"/>
+  <rect x="22" y="22" width="468" height="468" rx="92" fill="url(#panel)" stroke="#263b35" stroke-width="6"/>
+  <rect x="46" y="46" width="420" height="420" rx="70" fill="url(#scan)"/>
+
+  <g stroke="#35574f" stroke-width="2" opacity="0.45">
+    <path d="M84 154h344M84 238h344M84 322h344M154 84v344M238 84v344M322 84v344"/>
+    <path d="M96 396c54-42 90-54 148-30 68 28 122 4 174-54" fill="none" stroke="#47746b"/>
+    <path d="M88 123c70 22 118 20 169-6 64-32 112-20 170 46" fill="none" stroke="#47746b"/>
+  </g>
+
+  <g fill="none" stroke="#71f0a2" stroke-linecap="round">
+    <circle cx="256" cy="256" r="108" stroke-width="4" opacity="0.34"/>
+    <circle cx="256" cy="256" r="158" stroke-width="3" opacity="0.22"/>
+    <path d="M256 256 160 172M256 256l118-80M256 256 362 344M256 256 148 352" stroke-width="6" opacity="0.72"/>
+  </g>
+
+  <g filter="url(#soft-glow)">
+    <circle cx="160" cy="172" r="20" fill="#75f0a6"/>
+    <circle cx="374" cy="176" r="20" fill="#75f0a6"/>
+    <circle cx="362" cy="344" r="20" fill="#75f0a6"/>
+    <circle cx="148" cy="352" r="20" fill="#75f0a6"/>
+    <circle cx="418" cy="276" r="15" fill="#f0b35a"/>
+  </g>
+
+  <g filter="url(#soft-glow)">
+    <path d="M256 120 186 364 256 318 326 364Z" fill="#f4f6f0"/>
+    <path d="M256 120 256 318 326 364Z" fill="#c9d4cc" opacity="0.9"/>
+    <path d="M256 120 186 364 256 318 326 364Z" fill="none" stroke="#ffffff" stroke-width="10" stroke-linejoin="round"/>
+  </g>
+
+  <g fill="none" stroke="#f0b35a" stroke-width="8" stroke-linecap="round" opacity="0.9">
+    <path d="M124 92h-32v32M388 92h32v32M124 420h-32v-32M388 420h32v-32"/>
+  </g>
+</svg>

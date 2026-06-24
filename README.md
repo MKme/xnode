@@ -156,6 +156,7 @@ Display timeout and wake behavior:
 
 Launcher compatibility:
 - The bmorcelli Launcher can install/run ESP32 binaries from SD/WebUI/GitHub links. The current launcher-ready binaries are published at `https://github.com/MKme/xnode/releases/tag/xnode-2026.06.24`.
+- The Launcher catalog icon/cover art lives in `launcher/`; use `launcher/xnode-launcher-icon-512.png` as the preferred card image.
 - Use the hardware-specific release asset names so catalog entries do not cross-flash the wrong board:
   - `xnode-t-watch-ultra-launcher-20260624-101247.bin` for LilyGO T-Watch Ultra / XNODE Ultra.
   - `xnode-t-watch-s3-gen3-launcher-20260624-101247.bin` for LilyGO T-Watch S3 / Gen3.
