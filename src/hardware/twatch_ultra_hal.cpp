@@ -12,6 +12,9 @@ namespace {
     constexpr uint8_t CST226_SYNC = 0xAB;
     constexpr uint8_t CST226_SINGLE_POINT_READ_LEN = 8;
     constexpr uint8_t CST226_MAX_POINTS = 5;
+    constexpr uint8_t DRV2605_ADDR = 0x5A;
+    constexpr uint16_t DRV2605_POWER_SETTLE_MS = 8;
+    constexpr uint16_t DRV2605_CLICK_PLAY_MS = 45;
 
     bool writeBytes(uint8_t addr, const uint8_t *data, size_t len) {
         Wire.beginTransmission(addr);
@@ -214,6 +217,33 @@ bool TWatchUltraHal::beginExpander() {
     return true;
 }
 
+bool TWatchUltraHal::beginHaptic() {
+    powerIoctl(WATCH_POWER_DRV2605, true);
+    delay(DRV2605_POWER_SETTLE_MS);
+
+    if (!haptic.init(Wire, BOARD_I2C_SDA, BOARD_I2C_SCL, DRV2605_ADDR)) {
+        haptic_ready = false;
+        powerIoctl(WATCH_POWER_DRV2605, false);
+        return false;
+    }
+
+    haptic.selectLibrary(1);
+    haptic.setMode(DRV2605_MODE_INTTRIG);
+    haptic.useERM();
+    haptic.setWaveform(0, 15);
+    haptic.setWaveform(1, 0);
+    haptic_ready = true;
+    return true;
+}
+
+void TWatchUltraHal::endHaptic() {
+    if (haptic_ready) {
+        haptic.stop();
+    }
+    haptic_ready = false;
+    powerIoctl(WATCH_POWER_DRV2605, false);
+}
+
 bool TWatchUltraHal::expanderRead(uint8_t reg, uint8_t &value) {
     Wire.beginTransmission(XL9555_ADDR);
     Wire.write(reg);
@@ -366,10 +396,18 @@ void TWatchUltraHal::powerIoctl(PowerCtrlChannel ch, bool enable) {
             enable ? power.enableALDO3() : power.disableALDO3();
             break;
         case WATCH_POWER_DRV2605:
-            if ( expander_ready ) {
-                expanderDigitalWrite(EXPANDS_DRV_EN, enable);
+            if ( enable ) {
+                power.enableBLDO2();
+                if ( expander_ready ) {
+                    expanderDigitalWrite(EXPANDS_DRV_EN, true);
+                }
             }
-            enable ? power.enableBLDO2() : power.disableBLDO2();
+            else {
+                if ( expander_ready ) {
+                    expanderDigitalWrite(EXPANDS_DRV_EN, false);
+                }
+                power.disableBLDO2();
+            }
             break;
         case WATCH_POWER_GPS:
             if ( enable ) {
@@ -468,6 +506,24 @@ void TWatchUltraHal::shutdown() {
 }
 
 void TWatchUltraHal::run() {
+    vibrate();
+}
+
+bool TWatchUltraHal::vibrate(uint8_t effect) {
+    if (!beginHaptic()) {
+        return false;
+    }
+
+    haptic.setWaveform(0, effect);
+    haptic.setWaveform(1, 0);
+    haptic.run();
+    delay(DRV2605_CLICK_PLAY_MS);
+    endHaptic();
+    return true;
+}
+
+bool TWatchUltraHal::hasHaptic() const {
+    return true;
 }
 
 #endif

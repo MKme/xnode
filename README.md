@@ -162,7 +162,8 @@ npm run build
 Known T-Deck Plus limits:
 - Support has been build-verified and flashed on the attached T-Deck Plus, but it still needs more field validation.
 - Trackball handling is not wired yet.
-- Speaker, microphone, vibration/motor, IMU/compass, pedometer, and RTC alarm integration are not implemented for T-Deck Plus yet.
+- Speaker, microphone, IMU/compass, pedometer, and RTC alarm integration are not implemented for T-Deck Plus yet.
+- T-Deck Plus does not expose an onboard vibration motor in the current LilyGO T-Deck Plus hardware target; XNODE logs that haptics are unavailable and leaves motor feedback as a no-op on this target.
 - Battery reporting is an ADC estimate, not a PMU fuel-gauge reading.
 - GPS still requires real satellite lock. On the GPS status page, `Raw RX:0` means the receiver is silent or not wired/powered; rising `Raw RX` with `NMEA` counts means the receiver is talking; a valid map/time fix still requires satellites.
 - T-Deck Plus display timeout currently favors UI responsiveness over deepest idle power because the full watch standby path left the T-Deck UI sluggish after wake.
@@ -216,6 +217,8 @@ BLE:
 Display and PMU rails:
 - Ultra GPS BLDO1 and haptic BLDO2 start disabled at PMU boot.
 - Ultra haptic expander enable starts low; `WATCH_POWER_DRV2605` controls the rail and enable line together.
+- Ultra haptic feedback lazy-initializes the DRV2605 at `0x5A`, plays the configured click waveform, then cuts the haptic rail again.
+- T-Watch S3 keeps the existing LilyGO `SensorDRV2605` path.
 - Ultra standby defensively cuts GPS and haptic power again before entering light sleep.
 - Ultra display standby now calls `display.sleep()` after setting brightness to zero, and wake calls `display.wakeup()`.
 - The shared display/touch rail is intentionally not cut on Ultra because touch wake depends on it.

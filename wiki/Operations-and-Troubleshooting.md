@@ -59,6 +59,21 @@ Small screens need large press targets and press-event handling. If a page becom
 - Ensure duplicate click suppression is not blocking the first press.
 - Run `npm test` and verify the button regression checks pass.
 
+## Vibration missing
+
+Target behavior:
+
+- T-Watch Ultra uses the DRV2605 haptic driver at I2C `0x5A`. The firmware enables the Ultra haptic rail and XL9555 enable line only while a click waveform is being played.
+- T-Watch S3 uses the existing LilyGO `SensorDRV2605` path.
+- T-Deck Plus does not expose an onboard vibration motor in the current hardware target, so haptic feedback is intentionally unavailable on that target.
+
+If Ultra vibration fails, check:
+
+- `src/hardware/twatch_ultra_hal.*` for `beginHaptic()` and `vibrate()`.
+- `src/hardware/motor.cpp` for the Ultra branch calling `watch.vibrate()`.
+- The haptic rail behavior through `WATCH_POWER_DRV2605`.
+- I2C access to DRV2605 address `0x5A`.
+
 ## T-Deck display sleeps and wakes slowly
 
 T-Deck Plus intentionally blanks the backlight instead of entering the full watch standby path. This keeps LVGL, touch, and keyboard active and avoids the slow-motion/stutter state seen when the UI stack was partially suspended.
@@ -99,4 +114,3 @@ If Windows chimes repeatedly or the device appears stuck after flashing:
 - Verify Unit ID, channel, and destination before relying on SOS or CheckIn.
 - Test mesh send/receive before leaving the staging area.
 - Keep XTOC/XCOM as the operational record; XNODE is the fast endpoint and display.
-

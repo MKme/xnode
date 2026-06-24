@@ -306,6 +306,30 @@ def run_checks():
         ],
     )
     require_tokens(
+        "src/hardware/twatch_ultra_hal.cpp",
+        "Ultra haptic feedback uses the real DRV2605 path",
+        [
+            "DRV2605_ADDR = 0x5A",
+            "powerIoctl(WATCH_POWER_DRV2605, true);",
+            "haptic.init(Wire, BOARD_I2C_SDA, BOARD_I2C_SCL, DRV2605_ADDR)",
+            "haptic.setMode(DRV2605_MODE_INTTRIG);",
+            "haptic.run();",
+            "powerIoctl(WATCH_POWER_DRV2605, false);",
+        ],
+    )
+    require_tokens(
+        "src/hardware/motor.cpp",
+        "watch haptic routing stays target-specific",
+        [
+            "defined( LILYGO_WATCH_ULTRA )",
+            "watch.vibrate();",
+            "defined( LILYGO_WATCH_S3 )",
+            "watch.run();",
+            "defined( LILYGO_T_DECK_PLUS )",
+            "no onboard vibration motor",
+        ],
+    )
+    require_tokens(
         "src/hardware/wifictl.cpp",
         "Ultra WiFi idle defaults stay off",
         [

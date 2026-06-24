@@ -7,6 +7,7 @@
 #include <Wire.h>
 #include <LovyanGFX.hpp>
 #include <RadioLib.h>
+#include <SensorDRV2605.hpp>
 #include <XPowersLib.h>
 
 #define BOARD_TFT_WIDTH             (410)
@@ -139,10 +140,14 @@ public:
     void shutdown();
 
     void run();
+    bool vibrate(uint8_t effect = 15);
+    bool hasHaptic() const;
 
 private:
     bool beginPower(Stream *stream);
     bool beginExpander();
+    bool beginHaptic();
+    void endHaptic();
     bool expanderRead(uint8_t reg, uint8_t &value);
     bool expanderWrite(uint8_t reg, uint8_t value);
     bool expanderPinMode(uint8_t pin, bool output);
@@ -151,9 +156,11 @@ private:
 
     TWatchUltraDisplay display;
     XPowersAXP2101 power;
+    SensorDRV2605 haptic;
     uint8_t rotation = 0;
     bool touch_ready = false;
     bool expander_ready = false;
+    bool haptic_ready = false;
 };
 
 extern TWatchUltraHal watch;

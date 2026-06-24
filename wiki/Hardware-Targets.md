@@ -18,6 +18,7 @@ Role:
 - Meshtastic radio service.
 - BLE bridge for XTOC/XCOM.
 - Power-managed idle behavior.
+- DRV2605 haptic feedback through the Ultra haptic rail and XL9555 enable line.
 
 Important build traits:
 
@@ -86,5 +87,5 @@ Important T-Deck behavior:
 - Post-upload reset is handled by `support/tdeck_plus_post_upload_reset.py`.
 - The display timeout blanks backlight without entering the full watch standby path.
 - Touch and hardware keyboard remain activity/wake sources.
-- The target currently does not implement trackball, speaker, microphone, vibration, IMU/compass, pedometer, or RTC alarm integration.
-
+- The target currently does not implement trackball, speaker, microphone, IMU/compass, pedometer, or RTC alarm integration.
+- The current T-Deck Plus hardware target does not expose an onboard vibration motor, so XNODE treats haptic feedback as unavailable on this target.

@@ -30,6 +30,7 @@
     #ifdef M5PAPER
     #elif defined( LILYGO_WATCH_ULTRA )
         #include "hardware/twatch_ultra_hal.h"
+    #elif defined( LILYGO_T_DECK_PLUS )
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -133,6 +134,8 @@ void motor_setup( void ) {
     #else
         #ifdef M5PAPER
         #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_T_DECK_PLUS )
+            log_w("Motor init: T-Deck Plus target has no onboard vibration motor");
         #elif defined( LILYGO_WATCH_2020_V2 )
             /**
              * check if an DRV2605 connected
@@ -185,7 +188,7 @@ bool motor_powermgm_event_cb( EventBits_t event, void *arg ) {
 
     #else
         #if defined( M5PAPER )
-        #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_WATCH_S3 ) || defined( LILYGO_T_DECK_PLUS )
         #elif defined( LILYGO_WATCH_2020_V2 )
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V3 ) || defined( LILYGO_WATCH_2021 )
             switch( event ) {
@@ -228,8 +231,11 @@ void motor_vibe( int time, bool enforced ) {
     #else
         #if defined( M5PAPER )
 
-        #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_WATCH_S3 )
+        #elif defined( LILYGO_WATCH_ULTRA )
+            watch.vibrate();
+        #elif defined( LILYGO_WATCH_S3 )
             watch.run();
+        #elif defined( LILYGO_T_DECK_PLUS )
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V3 ) || defined( LILYGO_WATCH_2021 )
             /*
             * set critical section
