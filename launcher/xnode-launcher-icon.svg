@@ -54,4 +54,10 @@
   <g fill="none" stroke="#f0b35a" stroke-width="8" stroke-linecap="round" opacity="0.9">
     <path d="M124 92h-32v32M388 92h32v32M124 420h-32v-32M388 420h32v-32"/>
   </g>
+
+  <g>
+    <rect x="124" y="390" width="264" height="58" rx="18" fill="#07100e" opacity="0.86"/>
+    <rect x="124" y="390" width="264" height="58" rx="18" fill="none" stroke="#71f0a2" stroke-width="3" opacity="0.38"/>
+    <text x="256" y="432" fill="#f4f6f0" font-family="Arial, Helvetica, sans-serif" font-size="48" font-weight="800" letter-spacing="5" text-anchor="middle">XNODE</text>
+  </g>
 </svg>
