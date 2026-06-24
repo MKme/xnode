@@ -59,6 +59,7 @@ Role:
 - Larger 320x240 screen XNODE device.
 - Built-in hardware keyboard for mesh/message entry.
 - Same core launcher, messages, mesh, tactical map, GPS status, Alert Summary, SOS, and CheckIn workflows.
+- Wide tactical map view showing synced XTOC/XCOM markers on the larger display.
 - Produces a firmware binary suitable for manual install or bmorcelli Launcher testing.
 
 Firmware output:

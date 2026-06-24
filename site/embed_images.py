@@ -43,6 +43,10 @@ ASSETS = {
         "image/jpeg",
         ROOT / "images" / "T-dec" / "IMG_6810.jpg",
     ),
+    "https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6817.jpg": (
+        "image/jpeg",
+        ROOT / "images" / "T-dec" / "IMG_6817.jpg",
+    ),
     "https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6811.jpg": (
         "image/jpeg",
         ROOT / "images" / "T-dec" / "IMG_6811.jpg",

@@ -2,6 +2,12 @@
 
 The tactical map is the main visual link between XTOC/XCOM and XNODE.
 
+## T-Deck Plus field view
+
+![T-Deck Plus XNODE tactical map showing synced XTOC and XCOM markers on the larger screen](https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6817.jpg)
+
+The T-Deck Plus target now has the tactical map working on the larger 320x240 display. The view shows synced XTOC/XCOM markers on the active basemap, with the same overlay sync path as the watch targets but more room for controls and map context.
+
 ## Map source
 
 The watch-flash map mode uses one installed raster basemap. XTOC/XCOM can clear and stream a current map tile/raster to the watch. The firmware stores the basemap and its projection metadata in SPIFFS, then displays it as the active tactical map.
@@ -67,7 +73,7 @@ Recent fixes changed the map interaction model so marker hit targets do not brea
 - Raw touch deltas own drag/pan behavior.
 - Visible zoom, exit, and layer controls remain clickable.
 
-On the T-Deck Plus, base zoom still shows the square map with side bars when the raster itself is square. Zooming in uses the wider viewport and crops vertically, which makes better use of the 320x240 screen without rebuilding the map-loader pipeline.
+On the T-Deck Plus, base zoom still shows the square map with side bars when the raster itself is square. Zooming in uses the wider viewport and crops vertically, which makes better use of the 320x240 screen without rebuilding the map-loader pipeline. The large screen is the preferred display for inspecting dense synced XTOC/XCOM markers.
 
 ## GPS diagnostics
 
@@ -86,4 +92,3 @@ Useful interpretations:
 - Valid fix/time: map position and GPS time sync can work.
 
 T-Deck Plus supports both the LilyGO GPS Shield/L76K PCAS sequence and a u-blox/M10 fallback probe at `38400` and `9600`.
-

@@ -19,12 +19,17 @@ These XNODE screens show the LilyGO T-Watch S3 firmware and the current T-Watch 
 
 ### Current T-Deck Plus build
 
-The T-Deck Plus target carries the XNODE workflow onto a larger 320x240 screen with a built-in hardware keyboard. It keeps the watch launcher, message, mesh, GPS, tactical map, SOS, and CheckIn flows, but makes message entry and map/diagnostic viewing less cramped than a watch-only display.
+The T-Deck Plus target carries the XNODE workflow onto a larger 320x240 screen with a built-in hardware keyboard. It keeps the watch launcher, message, mesh, GPS, tactical map, SOS, and CheckIn flows, but makes message entry and map/diagnostic viewing less cramped than a watch-only display. The tactical map now uses the wider screen well and shows synced XTOC/XCOM markers on the field basemap.
 
-| Clock + moon | Launcher | Utilities | Mesh compose | CheckIn |
-| --- | --- | --- | --- | --- |
-| <img src="site/images/T-dec/IMG_6809.jpg" alt="T-Deck Plus running the XNODE clock screen with moon phase" width="180"> | <img src="site/images/T-dec/IMG_6810.jpg" alt="T-Deck Plus XNODE launcher showing messages, mesh, Tac Map, CheckIn, Alert Summary, and SOS" width="180"> | <img src="site/images/T-dec/IMG_6811.jpg" alt="T-Deck Plus XNODE utilities launcher showing GPS status and other tools" width="180"> | <img src="site/images/T-dec/IMG_6812.jpg" alt="T-Deck Plus XNODE mesh compose screen using the hardware keyboard" width="180"> | <img src="site/images/T-dec/IMG_6813.jpg" alt="T-Deck Plus XNODE CheckIn screen" width="180"> |
-| Larger clock face with the moon phase indicator. | Main XNODE actions on the larger T-Deck display. | GPS/status utilities available from the launcher. | Physical keyboard entry for mesh messages. | Fast CheckIn packet flow with current position. |
+| Clock + moon | Launcher | Tactical map |
+| --- | --- | --- |
+| <img src="site/images/T-dec/IMG_6809.jpg" alt="T-Deck Plus running the XNODE clock screen with moon phase" width="200"> | <img src="site/images/T-dec/IMG_6810.jpg" alt="T-Deck Plus XNODE launcher showing messages, mesh, Tac Map, CheckIn, Alert Summary, and SOS" width="200"> | <img src="site/images/T-dec/IMG_6817.jpg" alt="T-Deck Plus XNODE tactical map showing synced XTOC and XCOM markers on the larger screen" width="200"> |
+| Larger clock face with the moon phase indicator. | Main XNODE actions on the larger T-Deck display. | Wide tactical map view with synced XTOC/XCOM markers and large-screen controls. |
+
+| Utilities | Mesh compose | CheckIn |
+| --- | --- | --- |
+| <img src="site/images/T-dec/IMG_6811.jpg" alt="T-Deck Plus XNODE utilities launcher showing GPS status and other tools" width="200"> | <img src="site/images/T-dec/IMG_6812.jpg" alt="T-Deck Plus XNODE mesh compose screen using the hardware keyboard" width="200"> | <img src="site/images/T-dec/IMG_6813.jpg" alt="T-Deck Plus XNODE CheckIn screen" width="200"> |
+| GPS/status utilities available from the launcher. | Physical keyboard entry for mesh messages. | Fast CheckIn packet flow with current position. |
 
 ### T-Watch S3 reference screens
 

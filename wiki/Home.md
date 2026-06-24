@@ -30,7 +30,13 @@ This directory is the source for the repository wiki. The Markdown files are wri
 | --- | --- | --- |
 | LilyGO T-Watch Ultra | `t-watch-ultra` | Current watch-first XNODE build with GPS, map overlays, Meshtastic, power management, and large tactical markers. |
 | LilyGO T-Watch S3 / Gen3 | `t-watch2020-v3-s3` | Existing watch variant protected by shared regression checks. |
-| LilyGO T-Deck Plus | `tdeck-plus` | Larger-screen XNODE target with hardware keyboard, GPS diagnostics, map, mesh, SOS, CheckIn, and Launcher-ready firmware output. |
+| LilyGO T-Deck Plus | `tdeck-plus` | Larger-screen XNODE target with hardware keyboard, GPS diagnostics, wide tactical map, synced XTOC/XCOM markers, mesh, SOS, CheckIn, and Launcher-ready firmware output. |
+
+## T-Deck Plus map proof
+
+![T-Deck Plus XNODE tactical map showing synced XTOC and XCOM markers on the larger screen](https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6817.jpg)
+
+The T-Deck Plus tactical map now shows the synced XTOC/XCOM tactical markers on the larger display. This gives the same XNODE map workflow more usable screen area than the watch-only layout while preserving the shared overlay and basemap sync path.
 
 ## Primary source references
 
