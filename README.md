@@ -155,8 +155,12 @@ Display timeout and wake behavior:
 - The T-Deck display sleep path avoids ST7789 sleep/wake commands that caused flashing and failed wake on the attached hardware.
 
 Launcher compatibility:
-- The bmorcelli Launcher can install/run ESP32 binaries from SD/WebUI/GitHub links. Use `.pio/build/tdeck-plus/firmware.bin` as the app binary for this branch.
-- This repo does not yet include a Launcher package manifest, icon bundle, or release-hosted binary URL. It currently produces the binary that Launcher can load.
+- The bmorcelli Launcher can install/run ESP32 binaries from SD/WebUI/GitHub links. The current launcher-ready binaries are published at `https://github.com/MKme/xnode/releases/tag/xnode-2026.06.24`.
+- Use the hardware-specific release asset names so catalog entries do not cross-flash the wrong board:
+  - `xnode-t-watch-ultra-launcher-20260624-101247.bin` for LilyGO T-Watch Ultra / XNODE Ultra.
+  - `xnode-t-watch-s3-gen3-launcher-20260624-101247.bin` for LilyGO T-Watch S3 / Gen3.
+  - `xnode-tdeck-plus-launcher-20260624-101247.bin` for LilyGO T-Deck Plus.
+- Local builds still produce `.pio/build/<env>/firmware.bin`; release packaging renames those outputs with the target hardware and timestamp before upload.
 
 Pre-merge verification commands:
 
@@ -172,7 +176,7 @@ Known T-Deck Plus limits:
 - Battery reporting is an ADC estimate, not a PMU fuel-gauge reading.
 - GPS still requires real satellite lock. On the GPS status page, `Raw RX:0` means the receiver is silent or not wired/powered; rising `Raw RX` with `NMEA` counts means the receiver is talking; a valid map/time fix still requires satellites.
 - T-Deck Plus display timeout currently favors UI responsiveness over deepest idle power because the full watch standby path left the T-Deck UI sluggish after wake.
-- OTA URL is intentionally blank for this new target until a release path exists.
+- Device OTA settings may still be blank in firmware; for Launcher/catalog installs use the hardware-specific GitHub Release asset URL until a package manifest/icon bundle is added.
 - T-Deck Pro/Max are not targeted here; this branch is specifically for T-Deck Plus.
 
 ## Power management status (2026-06-21)
