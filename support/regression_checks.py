@@ -232,6 +232,25 @@ def run_checks():
     )
     require_tokens(
         "src/app/osmmap/osmmap_app_main.cpp",
+        "Tac map touch pan ignores marker hit targets",
+        [
+            "osmmap_touch_pan_consuming",
+            "osmmap_touch_starts_on_foreground_control",
+            "osmmap_handle_touch_pan( const touch_t *touch )",
+            "handled = osmmap_handle_touch_pan( (const touch_t *)arg );",
+            "return( handled );",
+            "osmmap_adjust_watch_flash_pan( dx, dy );",
+            "osm_map_nav_direction( osmmap_location, total_dx > 0 ? west : east );",
+            "lv_obj_set_click( item->marker_label_obj, false );",
+            "lv_obj_set_click( osmmap_app_pos_img, false );",
+            "lv_obj_set_click( osmmap_ext_pos_img, false );",
+            "lv_obj_set_click( osmmap_north_btn, false );",
+            "lv_obj_set_click( osmmap_zoom_southeast_btn, false );",
+            "osmmap_reset_touch_pan();",
+        ],
+    )
+    require_tokens(
+        "src/app/osmmap/osmmap_app_main.cpp",
         "T-Deck Plus tac map zooms inside the full wide viewport",
         [
             "#elif defined( LILYGO_T_DECK_PLUS )",

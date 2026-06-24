@@ -120,6 +120,12 @@ static volatile bool osmmap_gps_state = false;                  /** @brief osm g
 static volatile bool osmmap_gps_on_standby_state = false;       /** @brief osm gps on standby on enter osmmap */
 static volatile bool osmmap_wifi_state = false;                 /** @brief osm wifi state on enter osmmap */
 static volatile uint64_t last_touch = 0;
+static bool osmmap_touch_pan_active = false;
+static bool osmmap_touch_pan_consuming = false;
+static int16_t osmmap_touch_pan_start_x = 0;
+static int16_t osmmap_touch_pan_start_y = 0;
+static int16_t osmmap_touch_pan_last_x = 0;
+static int16_t osmmap_touch_pan_last_y = 0;
 osm_location_t *osmmap_location = NULL;             /** @brief osm location obj */
 osmmap_config_t osmmap_config;
 static bool osmmap_external_marker_valid = false;
@@ -290,6 +296,10 @@ static void osmmap_apply_image_zoom( void );
 static void osmmap_configure_primary_control( lv_obj_t *button );
 static void osmmap_raise_primary_controls( void );
 static bool osmmap_accept_primary_control_event( lv_event_t event, uint32_t &last_event_ms );
+static bool osmmap_obj_contains_touch_point( lv_obj_t *obj, int16_t x, int16_t y );
+static bool osmmap_touch_starts_on_foreground_control( int16_t x, int16_t y );
+static void osmmap_reset_touch_pan( void );
+static bool osmmap_handle_touch_pan( const touch_t *touch );
 static bool osmmap_watch_flash_uses_current_tile( void );
 static bool osmmap_marker_uses_image_transform( void );
 static bool osmmap_watch_flash_pixel_to_view( double pixel_x, double pixel_y, uint16_t *x, uint16_t *y );
@@ -585,6 +595,7 @@ static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item ) {
         lv_obj_set_style_local_bg_opa( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, LV_OPA_TRANSP );
         lv_obj_set_hidden( item->marker_obj, true );
     }
+    lv_obj_set_click( item->marker_obj, false );
     lv_obj_set_size( item->marker_obj, marker_size, marker_size );
     lv_obj_set_style_local_border_width( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_marker_border_width() );
     lv_obj_set_style_local_radius(
@@ -596,6 +607,7 @@ static lv_obj_t *osmmap_ensure_overlay_marker( osmmap_overlay_item_t *item ) {
     lv_obj_set_style_local_bg_color( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_item_bg_color( item ) );
     lv_obj_set_style_local_border_color( item->marker_obj, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_item_border_color( item ) );
     if ( item->marker_label_obj ) {
+        lv_obj_set_click( item->marker_label_obj, false );
         lv_label_set_text( item->marker_label_obj, osmmap_overlay_badge_text( item->kind ) );
         lv_obj_set_style_local_text_font( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_marker_font() );
         lv_obj_set_style_local_text_color( item->marker_label_obj, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, osmmap_overlay_item_text_color( item ) );
@@ -757,6 +769,7 @@ static void osmmap_create_local_position_marker( lv_obj_t *parent ) {
 #else
     osmmap_app_pos_img = lv_img_create( parent, NULL );
     lv_img_set_src( osmmap_app_pos_img, &info_fail_16px );
+    lv_obj_set_click( osmmap_app_pos_img, false );
 #endif
 }
 
@@ -1228,6 +1241,127 @@ static bool osmmap_accept_primary_control_event( lv_event_t event, uint32_t &las
     return( true );
 }
 
+static int16_t osmmap_abs_i16( int16_t value ) {
+    return( value < 0 ? (int16_t)-value : value );
+}
+
+static bool osmmap_obj_contains_touch_point( lv_obj_t *obj, int16_t x, int16_t y ) {
+    if ( !obj || lv_obj_get_hidden( obj ) ) {
+        return( false );
+    }
+
+    lv_area_t coords;
+    lv_obj_get_coords( obj, &coords );
+
+    return( x >= coords.x1 && x <= coords.x2 && y >= coords.y1 && y <= coords.y2 );
+}
+
+static bool osmmap_touch_starts_on_foreground_control( int16_t x, int16_t y ) {
+    return(
+        osmmap_obj_contains_touch_point( osmmap_layers_btn, x, y ) ||
+        osmmap_obj_contains_touch_point( osmmap_exit_btn, x, y ) ||
+        osmmap_obj_contains_touch_point( osmmap_zoom_in_btl, x, y ) ||
+        osmmap_obj_contains_touch_point( osmmap_zoom_out_btl, x, y ) ||
+        osmmap_obj_contains_touch_point( osmmap_sub_menu_layers, x, y ) ||
+        osmmap_obj_contains_touch_point( osmmap_sub_menu_setting, x, y )
+    );
+}
+
+static void osmmap_reset_touch_pan( void ) {
+    osmmap_touch_pan_active = false;
+    osmmap_touch_pan_consuming = false;
+    osmmap_touch_pan_start_x = 0;
+    osmmap_touch_pan_start_y = 0;
+    osmmap_touch_pan_last_x = 0;
+    osmmap_touch_pan_last_y = 0;
+}
+
+static bool osmmap_handle_touch_pan( const touch_t *touch ) {
+    static uint32_t last_tile_nav_ms = 0;
+    static const int16_t start_threshold = 10;
+    static const int16_t move_threshold = 4;
+    static const int16_t tile_nav_threshold = 26;
+
+    if ( !osmmap_app_active || !osmmap_location || !touch ) {
+        osmmap_reset_touch_pan();
+        return( false );
+    }
+
+    if ( !touch->touched ) {
+        const bool was_consuming = osmmap_touch_pan_consuming;
+
+        osmmap_reset_touch_pan();
+        return( was_consuming );
+    }
+
+    const int16_t x = touch->x_coor;
+    const int16_t y = touch->y_coor;
+
+    if ( !osmmap_touch_pan_active ) {
+        if ( osmmap_touch_starts_on_foreground_control( x, y ) ) {
+            osmmap_reset_touch_pan();
+            return( false );
+        }
+
+        osmmap_touch_pan_active = true;
+        osmmap_touch_pan_consuming = false;
+        osmmap_touch_pan_start_x = x;
+        osmmap_touch_pan_start_y = y;
+        osmmap_touch_pan_last_x = x;
+        osmmap_touch_pan_last_y = y;
+        return( false );
+    }
+
+    const int16_t total_dx = x - osmmap_touch_pan_start_x;
+    const int16_t total_dy = y - osmmap_touch_pan_start_y;
+    const int16_t dx = x - osmmap_touch_pan_last_x;
+    const int16_t dy = y - osmmap_touch_pan_last_y;
+
+    if ( !osmmap_touch_pan_consuming ) {
+        if ( osmmap_abs_i16( total_dx ) < start_threshold && osmmap_abs_i16( total_dy ) < start_threshold ) {
+            return( false );
+        }
+        osmmap_touch_pan_consuming = true;
+    }
+
+    if ( osmmap_abs_i16( dx ) < move_threshold && osmmap_abs_i16( dy ) < move_threshold ) {
+        return( true );
+    }
+
+    if ( osmmap_watch_flash_mode ) {
+        osmmap_adjust_watch_flash_pan( dx, dy );
+        osmmap_touch_pan_last_x = x;
+        osmmap_touch_pan_last_y = y;
+        return( true );
+    }
+
+    if ( osmmap_abs_i16( total_dx ) < tile_nav_threshold && osmmap_abs_i16( total_dy ) < tile_nav_threshold ) {
+        return( true );
+    }
+
+    const uint32_t now = millis();
+    if ( last_tile_nav_ms != 0 && now - last_tile_nav_ms < 150 ) {
+        return( true );
+    }
+    last_tile_nav_ms = now;
+
+    if ( osmmap_abs_i16( total_dx ) > osmmap_abs_i16( total_dy ) ) {
+        osm_map_nav_direction( osmmap_location, total_dx > 0 ? west : east );
+    }
+    else {
+        osm_map_nav_direction( osmmap_location, total_dy > 0 ? north : south );
+    }
+
+    osmmap_touch_pan_start_x = x;
+    osmmap_touch_pan_start_y = y;
+    osmmap_touch_pan_last_x = x;
+    osmmap_touch_pan_last_y = y;
+    if ( osmmap_app_active ) {
+        osmmap_update_request();
+    }
+    return( true );
+}
+
 static bool osmmap_watch_flash_uses_current_tile( void ) {
     return( osmmap_watch_flash_mode && strstr( osmmap_watch_flash_uri, OSMMAP_WATCH_CURRENT_TILE_PATH ) != NULL );
 }
@@ -1560,6 +1694,7 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
 
     osmmap_ext_pos_img = lv_img_create( osmmap_overlay_layer, NULL );
     lv_img_set_src( osmmap_ext_pos_img, &info_ok_16px );
+    lv_obj_set_click( osmmap_ext_pos_img, false );
     lv_obj_align( osmmap_ext_pos_img, osmmap_overlay_layer, LV_ALIGN_IN_TOP_LEFT, 120, 120 );
     lv_obj_set_hidden( osmmap_ext_pos_img, true );
 
@@ -1601,30 +1736,35 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
     osmmap_north_btn = lv_btn_create( osmmap_cont, NULL );
     lv_obj_set_width( osmmap_north_btn, 80 );
     lv_obj_set_height( osmmap_north_btn, 48 );
+    lv_obj_set_click( osmmap_north_btn, false );
     lv_obj_add_protect( osmmap_north_btn, LV_PROTECT_CLICK_FOCUS );
     lv_obj_add_style( osmmap_north_btn, LV_BTN_PART_MAIN, &osmmap_app_nav_style );
     lv_obj_align( osmmap_north_btn, osmmap_cont, LV_ALIGN_IN_TOP_MID, 0, 0 );
     lv_obj_set_event_cb( osmmap_north_btn, nav_direction_osmmap_app_main_event_cb );
 
     osmmap_south_btn = lv_btn_create( osmmap_cont, osmmap_north_btn );
+    lv_obj_set_click( osmmap_south_btn, false );
     lv_obj_align( osmmap_south_btn, osmmap_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
     lv_obj_set_event_cb( osmmap_south_btn, nav_direction_osmmap_app_main_event_cb );
 
     osmmap_west_btn = lv_btn_create( osmmap_cont, NULL );
     lv_obj_set_width( osmmap_west_btn, 48 );
     lv_obj_set_height( osmmap_west_btn, 80 );
+    lv_obj_set_click( osmmap_west_btn, false );
     lv_obj_add_protect( osmmap_west_btn, LV_PROTECT_CLICK_FOCUS );
     lv_obj_add_style( osmmap_west_btn, LV_BTN_PART_MAIN, &osmmap_app_nav_style );
     lv_obj_align( osmmap_west_btn, osmmap_cont, LV_ALIGN_IN_LEFT_MID, 0, 0 );
     lv_obj_set_event_cb( osmmap_west_btn, nav_direction_osmmap_app_main_event_cb );
 
     osmmap_east_btn = lv_btn_create( osmmap_cont, osmmap_west_btn );
+    lv_obj_set_click( osmmap_east_btn, false );
     lv_obj_align( osmmap_east_btn, osmmap_cont, LV_ALIGN_IN_RIGHT_MID, 0, 0 );
     lv_obj_set_event_cb( osmmap_east_btn, nav_direction_osmmap_app_main_event_cb );
 
     osmmap_zoom_northwest_btn = lv_btn_create( osmmap_cont, NULL );
     lv_obj_set_width( osmmap_zoom_northwest_btn, 72 );
     lv_obj_set_height( osmmap_zoom_northwest_btn, 72 );
+    lv_obj_set_click( osmmap_zoom_northwest_btn, false );
     lv_obj_add_protect( osmmap_zoom_northwest_btn, LV_PROTECT_CLICK_FOCUS );
     lv_imgbtn_set_checkable( osmmap_zoom_northwest_btn, true );
     lv_obj_add_style( osmmap_zoom_northwest_btn, LV_BTN_PART_MAIN, &osmmap_app_nav_style );
@@ -1632,14 +1772,17 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
     lv_obj_set_event_cb( osmmap_zoom_northwest_btn, nav_center_osmmap_app_main_event_cb );
 
     osmmap_zoom_northeast_btn = lv_btn_create( osmmap_cont, osmmap_zoom_northwest_btn );
+    lv_obj_set_click( osmmap_zoom_northeast_btn, false );
     lv_obj_align( osmmap_zoom_northeast_btn, osmmap_cont, LV_ALIGN_CENTER, 36, -36 );
     lv_obj_set_event_cb( osmmap_zoom_northeast_btn, nav_center_osmmap_app_main_event_cb );
 
     osmmap_zoom_southwest_btn = lv_btn_create( osmmap_cont, osmmap_zoom_northwest_btn );
+    lv_obj_set_click( osmmap_zoom_southwest_btn, false );
     lv_obj_align( osmmap_zoom_southwest_btn, osmmap_cont, LV_ALIGN_CENTER, -36, 36 );
     lv_obj_set_event_cb( osmmap_zoom_southwest_btn, nav_center_osmmap_app_main_event_cb );
 
     osmmap_zoom_southeast_btn = lv_btn_create( osmmap_cont, osmmap_zoom_northwest_btn );
+    lv_obj_set_click( osmmap_zoom_southeast_btn, false );
     lv_obj_align( osmmap_zoom_southeast_btn, osmmap_cont, LV_ALIGN_CENTER, 36, 36 );
     lv_obj_set_event_cb( osmmap_zoom_southeast_btn, nav_center_osmmap_app_main_event_cb );
     /**
@@ -1690,14 +1833,17 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
 }
 
 bool osmmap_app_touch_event_cb( EventBits_t event, void *arg ) {
+    bool handled = false;
+
     switch( event ) {
         case( TOUCH_UPDATE ):
             if ( osmmap_app_active ) {
                 last_touch = millis();
+                handled = osmmap_handle_touch_pan( (const touch_t *)arg );
             }
             break;
     }
-    return( false );
+    return( handled );
 }
 
 bool osmmap_button_cb( EventBits_t event, void *arg ) {
@@ -2480,6 +2626,7 @@ void osmmap_activate_cb( void ) {
      * set osm app active
      */
     osmmap_app_active = true;
+    osmmap_reset_touch_pan();
     last_touch = millis();
     if ( osmmap_watch_flash_uses_current_tile() ) {
         osmmap_watch_flash_image_dirty = true;
@@ -2540,6 +2687,7 @@ void osmmap_hibernate_cb( void ) {
      * set osm app inactive
      */
     osmmap_app_active = false;
+    osmmap_reset_touch_pan();
     /**
      * stop background osm tile image update Task
      */
