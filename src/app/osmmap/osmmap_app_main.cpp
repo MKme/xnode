@@ -995,6 +995,8 @@ static uint16_t osmmap_get_viewport_width( void ) {
 
 #if defined( LILYGO_WATCH_ULTRA )
     return( width > 0 ? (uint16_t)width : 240 );
+#elif defined( LILYGO_T_DECK_PLUS )
+    return( width > 0 ? (uint16_t)width : 320 );
 #else
     return( (uint16_t)( width > 512 ? width : 240 ) );
 #endif
@@ -1002,6 +1004,10 @@ static uint16_t osmmap_get_viewport_width( void ) {
 
 static uint16_t osmmap_get_viewport_height( void ) {
 #if defined( LILYGO_WATCH_ULTRA )
+    const lv_coord_t height = lv_disp_get_ver_res( NULL );
+
+    return( height > 0 ? (uint16_t)height : 240 );
+#elif defined( LILYGO_T_DECK_PLUS )
     const lv_coord_t height = lv_disp_get_ver_res( NULL );
 
     return( height > 0 ? (uint16_t)height : 240 );
@@ -1026,6 +1032,18 @@ static double osmmap_get_view_cover_lvgl_zoom( void ) {
     }
 
     return( fmax( 256.0, fmax( view_w, view_h ) ) );
+}
+
+static double osmmap_get_tdeck_fit_height_lvgl_zoom( void ) {
+#if defined( LILYGO_T_DECK_PLUS )
+    const double view_w = (double)osmmap_get_viewport_width();
+    const double view_h = (double)osmmap_get_viewport_height();
+    const double fit_zoom = fmin( view_w, view_h );
+
+    return( fit_zoom > 0.0 ? fit_zoom : 240.0 );
+#else
+    return( 256.0 );
+#endif
 }
 
 static void osmmap_update_gps_status_label( void ) {
@@ -1112,12 +1130,13 @@ static void osmmap_clamp_watch_flash_pan( void ) {
 
 static uint16_t osmmap_get_watch_flash_lvgl_zoom( void ) {
     const double zoom_factor = pow( 2.0, (double)osmmap_watch_flash_render_zoom - (double)osmmap_watch_flash_base_zoom );
-    const double lvgl_zoom = 256.0 * zoom_factor;
+    const double base_lvgl_zoom = osmmap_get_tdeck_fit_height_lvgl_zoom();
+    const double lvgl_zoom = base_lvgl_zoom * zoom_factor;
     const double min_lvgl_zoom =
 #if defined( LILYGO_WATCH_ULTRA )
         osmmap_get_view_cover_lvgl_zoom();
 #else
-        256.0;
+        base_lvgl_zoom;
 #endif
     const double clamped_zoom = fmax( min_lvgl_zoom, fmin( 2048.0, lvgl_zoom ) );
     return( (uint16_t)lround( clamped_zoom ) );
@@ -1238,13 +1257,13 @@ static bool osmmap_watch_flash_pixel_to_view( double pixel_x, double pixel_y, ui
     }
 
     const double scaled_x =
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
         ( dest_w * 0.5 ) + ( pixel_x - 128.0 );
 #else
         pixel_x * ( dest_w / 256.0 );
 #endif
     const double scaled_y =
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
         ( dest_h * 0.5 ) + ( pixel_y - 128.0 );
 #else
         pixel_y * ( dest_h / 256.0 );
@@ -1498,9 +1517,10 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
     lv_style_copy( &osmmap_app_main_style, ws_get_mainbar_style() );
     lv_obj_add_style( osmmap_app_main_tile, LV_OBJ_PART_MAIN, &osmmap_app_main_style );
 
+    const lv_color_t osmmap_control_icon_color = LV_COLOR_MAKE( 0xff, 0xd2, 0x00 );
     lv_style_copy( &osmmap_app_btn_style, ws_get_mainbar_style() );
-    lv_style_set_image_recolor( &osmmap_app_btn_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
-    lv_style_set_image_recolor_opa( &osmmap_app_btn_style, LV_OBJ_PART_MAIN, LV_OPA_100 );
+    lv_style_set_image_recolor( &osmmap_app_btn_style, LV_OBJ_PART_MAIN, osmmap_control_icon_color );
+    lv_style_set_image_recolor_opa( &osmmap_app_btn_style, LV_OBJ_PART_MAIN, LV_OPA_COVER );
 
     lv_style_copy( &osmmap_app_nav_style, ws_get_mainbar_style() );
     lv_style_set_radius( &osmmap_app_nav_style, LV_OBJ_PART_MAIN, 0 );

@@ -215,6 +215,9 @@ def run_checks():
             "LV_EVENT_PRESSED",
             "powermgm_set_perf_mode();",
             "powermgm_set_normal_mode();",
+            "osmmap_control_icon_color = LV_COLOR_MAKE( 0xff, 0xd2, 0x00 );",
+            "lv_style_set_image_recolor( &osmmap_app_btn_style, LV_OBJ_PART_MAIN, osmmap_control_icon_color );",
+            "lv_style_set_image_recolor_opa( &osmmap_app_btn_style, LV_OBJ_PART_MAIN, LV_OPA_COVER );",
         ],
     )
     require_tokens(
@@ -225,6 +228,30 @@ def run_checks():
             "osmmap_config.wifi_autoon = false;",
             "osmmap_config.gps_autoon",
             "gpsctl_on();",
+        ],
+    )
+    require_tokens(
+        "src/app/osmmap/osmmap_app_main.cpp",
+        "T-Deck Plus tac map zooms inside the full wide viewport",
+        [
+            "#elif defined( LILYGO_T_DECK_PLUS )",
+            "return( width > 0 ? (uint16_t)width : 320 );",
+            "return( height > 0 ? (uint16_t)height : 240 );",
+            "defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )",
+            "( dest_w * 0.5 ) + ( pixel_x - 128.0 )",
+            "( dest_h * 0.5 ) + ( pixel_y - 128.0 )",
+            "osmmap_get_tdeck_fit_height_lvgl_zoom",
+            "fmin( view_w, view_h )",
+            "base_lvgl_zoom * zoom_factor",
+        ],
+    )
+    forbid_slice_tokens(
+        "src/app/osmmap/osmmap_app_main.cpp",
+        "T-Deck Plus tac map keeps square side bars at base zoom",
+        "static uint16_t osmmap_get_watch_flash_lvgl_zoom( void ) {",
+        "static uint16_t osmmap_get_display_lvgl_zoom( void ) {",
+        [
+            "LILYGO_T_DECK_PLUS",
         ],
     )
 
