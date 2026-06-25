@@ -395,6 +395,19 @@ void powermgm_set_normal_mode( void ) {
     #endif
 }
 
+void powermgm_set_idle_mode( void ) {
+    #if CONFIG_PM_ENABLE
+        pm_config.max_freq_mhz = 80;
+        pm_config.min_freq_mhz = 80;
+        pm_config.light_sleep_enable = true;
+        ESP_ERROR_CHECK( esp_pm_configure(&pm_config) );
+    #else
+        #ifndef NATIVE_64BIT
+            setCpuFrequencyMhz(80);
+        #endif
+    #endif
+}
+
 void powermgm_set_lightsleep( bool enable ) {
     if( enable ) {
         if( lighsleep > 0 )

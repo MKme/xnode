@@ -30,6 +30,7 @@
     #define DISPLAYCTL_BRIGHTNESS       _BV(0)          /** @brief event mask display brightness, callback arg is (uint32_t*) */
     #define DISPLAYCTL_TIMEOUT          _BV(1)          /** @brief event mask display timeout, callback arg is (bool*) */
     #define DISPLAYCTL_SCREENSHOT       _BV(2)          /** @brief event mask display screenshot, callback arg is (bool*) */
+    #define DISPLAYCTL_IDLE             _BV(3)          /** @brief event mask display idle state, callback arg is (bool*) */
 
     /**
      * @brief setup display
@@ -59,6 +60,12 @@
      * @return inactive time in ms
      */
     uint32_t display_get_inactive_time_ms( void );
+    /**
+     * @brief read the display idle state
+     *
+     * @return true if the display is in a firmware idle state
+     */
+    bool display_is_idle( void );
     /**
      * @brief read the timeout from config
      * 

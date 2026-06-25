@@ -57,6 +57,9 @@ static uint8_t dest_brightness = 0;
 static uint8_t brightness = 0;
 static uint32_t display_timeout = DISPLAY_MIN_TIMEOUT;
 static uint32_t display_last_activity_ms = 0;
+#if defined( LILYGO_T_DECK_PLUS )
+static bool display_tdeck_idle = false;
+#endif
 
 static bool display_powermgm_event_cb( EventBits_t event, void *arg );
 static bool display_powermgm_loop_cb( EventBits_t event, void *arg );
@@ -65,6 +68,10 @@ static uint32_t display_sanitize_timeout( uint32_t timeout, bool allow_no_timeou
 static void display_update_timeout_dimmer( void );
 static void display_standby( void );
 static void display_wakeup( bool silence );
+#if defined( LILYGO_T_DECK_PLUS )
+static void display_tdeck_enter_idle( void );
+static void display_tdeck_exit_idle( void );
+#endif
 
 void display_setup( void ) {
     /**
@@ -298,6 +305,9 @@ static void display_update_timeout_dimmer( void ) {
     const uint32_t timeout = display_get_timeout();
 
     if ( timeout == DISPLAY_NO_TIMEOUT ) {
+        #if defined( LILYGO_T_DECK_PLUS )
+            display_tdeck_exit_idle();
+        #endif
         dest_brightness = configured_brightness;
         return;
     }
@@ -306,7 +316,13 @@ static void display_update_timeout_dimmer( void ) {
     const uint32_t inactive_ms = display_get_inactive_time_ms();
 
     #if defined( LILYGO_T_DECK_PLUS )
-        dest_brightness = inactive_ms >= timeout_ms ? 0 : configured_brightness;
+        if ( inactive_ms >= timeout_ms ) {
+            display_tdeck_enter_idle();
+        }
+        else {
+            display_tdeck_exit_idle();
+            dest_brightness = configured_brightness;
+        }
         return;
     #endif
 
@@ -323,6 +339,41 @@ static void display_update_timeout_dimmer( void ) {
         dest_brightness = configured_brightness;
     }
 }
+
+#if defined( LILYGO_T_DECK_PLUS )
+static void display_tdeck_enter_idle( void ) {
+    if ( display_tdeck_idle ) {
+        dest_brightness = 0;
+        return;
+    }
+
+    display_tdeck_idle = true;
+    brightness = 0;
+    dest_brightness = 0;
+    watch.setBrightness( 0 );
+    powermgm_set_idle_mode();
+
+    bool idle = true;
+    display_send_event_cb( DISPLAYCTL_IDLE, (void *)&idle );
+    log_d("tdeck display idle");
+}
+
+static void display_tdeck_exit_idle( void ) {
+    if ( !display_tdeck_idle ) {
+        return;
+    }
+
+    display_tdeck_idle = false;
+    brightness = display_get_brightness();
+    dest_brightness = brightness;
+    watch.setBrightness( brightness );
+    powermgm_set_perf_mode();
+
+    bool idle = false;
+    display_send_event_cb( DISPLAYCTL_IDLE, (void *)&idle );
+    log_d("tdeck display active");
+}
+#endif
 
 static void display_standby( void ) {
     #ifdef NATIVE_64BIT
@@ -483,6 +534,9 @@ void display_read_config( void ) {
 }
 
 void display_note_activity( void ) {
+    #if defined( LILYGO_T_DECK_PLUS )
+        display_tdeck_exit_idle();
+    #endif
     display_last_activity_ms = millis();
 }
 
@@ -493,6 +547,14 @@ void display_trigger_activity( void ) {
 
 uint32_t display_get_inactive_time_ms( void ) {
     return( millis() - display_last_activity_ms );
+}
+
+bool display_is_idle( void ) {
+    #if defined( LILYGO_T_DECK_PLUS )
+        return( display_tdeck_idle );
+    #else
+        return( false );
+    #endif
 }
 
 uint32_t display_get_timeout( void ) {

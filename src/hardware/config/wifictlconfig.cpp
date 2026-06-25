@@ -31,7 +31,7 @@
 #endif
 
 static bool wifictl_default_autoon( void ) {
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
     return false;
 #else
     return true;

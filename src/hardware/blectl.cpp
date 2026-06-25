@@ -508,6 +508,16 @@ void blectl_read_config( void ) {
         blectl_config.save();
     }
 #endif
+#if defined( LILYGO_T_DECK_PLUS )
+    if ( blectl_config.autoon || blectl_config.advertising ||
+         blectl_config.enable_on_standby || blectl_config.disable_only_disconnected ) {
+        blectl_config.autoon = false;
+        blectl_config.advertising = false;
+        blectl_config.enable_on_standby = false;
+        blectl_config.disable_only_disconnected = false;
+        blectl_config.save();
+    }
+#endif
     blectl_send_event_cb( BLECTL_CONFIG_UPDATE, NULL );
 }
 

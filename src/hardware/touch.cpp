@@ -495,6 +495,35 @@ void touch_set_y_scale( float value ) {
     touch_config.save();
 }
 
+bool touch_has_activity( void ) {
+    #ifdef NATIVE_64BIT
+        return( false );
+    #else
+        bool irq_activity = false;
+        portENTER_CRITICAL(&Touch_IRQ_Mux);
+        irq_activity = touch_irq_flag;
+        portEXIT_CRITICAL(&Touch_IRQ_Mux);
+
+        #if defined( M5PAPER )
+            return( false );
+        #elif defined( M5CORE2 )
+            return( irq_activity || M5.Touch.ispressed() );
+        #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_WATCH_S3 )
+            return( irq_activity || watch.getTouched() );
+        #elif defined( LILYGO_T_DECK_PLUS )
+            return( irq_activity || watch.getTouched() || digitalRead( BOARD_KEYBOARD_INT ) == LOW );
+        #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
+            return( irq_activity || digitalRead( TOUCH_INT ) == LOW );
+        #elif defined( LILYGO_WATCH_2021 )
+            return( irq_activity || digitalRead( Touch_Int ) == LOW );
+        #elif defined( WT32_SC01 )
+            return( irq_activity || ctp.touched() );
+        #else
+            return( irq_activity );
+        #endif
+    #endif
+}
+
 bool touch_getXY( int16_t &x, int16_t &y ) {
     
     /**

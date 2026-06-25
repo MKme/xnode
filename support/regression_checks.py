@@ -339,6 +339,17 @@ def run_checks():
         ],
     )
     require_tokens(
+        "src/hardware/wifictl.cpp",
+        "T-Deck Plus WiFi stays lazy and skips dummy startup scan",
+        [
+            "#if defined( LILYGO_T_DECK_PLUS )",
+            "wifictl_config->autoon = false;",
+            "wifictl_config->webserver = false;",
+            "wifictl_config->ftpserver = false;",
+            "#if !defined( LILYGO_WATCH_ULTRA ) && !defined( LILYGO_T_DECK_PLUS )",
+        ],
+    )
+    require_tokens(
         "src/hardware/blectl.cpp",
         "Ultra BLE idle defaults stay off while BLE remains lazy-started",
         [
@@ -347,6 +358,17 @@ def run_checks():
             "blectl_config.enable_on_standby = false;",
             "blectl_config.advertising = false;",
             "blectl_init_stack();",
+        ],
+    )
+    require_tokens(
+        "src/hardware/blectl.cpp",
+        "T-Deck Plus BLE stays lazy by default",
+        [
+            "#if defined( LILYGO_T_DECK_PLUS )",
+            "blectl_config.autoon = false;",
+            "blectl_config.advertising = false;",
+            "blectl_config.enable_on_standby = false;",
+            "blectl_config.disable_only_disconnected = false;",
         ],
     )
 
@@ -377,6 +399,45 @@ def run_checks():
             "main_tile_ultra_draw_moon",
             "main_tile_ultra_update_moon",
             "Moon: %s %d%%",
+            "LV_IMG_CF_TRUE_COLOR_CHROMA_KEYED",
+        ],
+    )
+    require_tokens(
+        "src/app/compass/compass_app.cpp",
+        "Compass app stays registered on all active targets",
+        [
+            'app_register( "compass"',
+            "mainbar_add_app_tile( 1, 1, \"compass\" );",
+            "compass_app_main_setup( compass_app_main_tile_num );",
+        ],
+    )
+    forbid_tokens(
+        "src/app/compass/compass_app.cpp",
+        "Compass app is not hidden when a target lacks a magnetometer",
+        [
+            "if( !compass_available() )",
+            "if ( !compass_available() )",
+        ],
+    )
+    require_tokens(
+        "src/app/compass/compass_app_main.cpp",
+        "Compass page uses rotating rose with GPS-course fallback",
+        [
+            "compass_app_main_draw_rose",
+            "compass_app_main_draw_tick",
+            "compass_app_main_draw_cardinal",
+            "compass_app_main_draw_fixed_pointer",
+            "GPSCTL_UPDATE_COURSE",
+            "gpsctl_register_cb( GPSCTL_UPDATE_COURSE",
+            "compass_available()",
+            "compass_app_main_set_heading",
+            "\"GPS\"",
+            "\"MAG\"",
+            "display_get_timeout()",
+            "display_set_timeout( DISPLAY_NO_TIMEOUT );",
+            "display_trigger_activity();",
+            "display_set_timeout( compass_display_timeout );",
+            "GPS course needs movement",
             "LV_IMG_CF_TRUE_COLOR_CHROMA_KEYED",
         ],
     )
@@ -566,22 +627,41 @@ def run_checks():
     )
     require_tokens(
         "src/hardware/display.cpp",
-        "T-Deck Plus uses direct backlight updates instead of pulse-count fading",
+        "T-Deck Plus enters shallow display idle instead of pulse-count fading",
         [
             "display_update_timeout_dimmer();",
             "brightness = dest_brightness;",
-            "dest_brightness = inactive_ms >= timeout_ms ? 0 : configured_brightness;",
+            "display_tdeck_enter_idle();",
+            "display_tdeck_exit_idle();",
+            "powermgm_set_idle_mode();",
+            "DISPLAYCTL_IDLE",
         ],
     )
     require_slice_tokens(
         "src/gui/gui.cpp",
-        "T-Deck Plus display timeout keeps LVGL active instead of entering standby",
+        "T-Deck Plus display timeout pauses LVGL in shallow idle",
         "bool gui_powermgm_loop_event_cb",
         "lv_task_handler();",
         [
             "#if !defined( LILYGO_T_DECK_PLUS )",
             "display_get_inactive_time_ms()",
             "POWERMGM_STANDBY_REQUEST",
+            "display_is_idle()",
+            "hardware_detach_lvgl_ticker();",
+            "lv_task_enable( false );",
+            "touch_has_activity()",
+            "delay( 50 );",
+        ],
+    )
+    require_tokens(
+        "src/hardware/gpsctl.cpp",
+        "T-Deck Plus GPS shuts down temporarily during display idle",
+        [
+            "TDECK_GPS_IDLE_GRACE_MS",
+            "display_register_cb( DISPLAYCTL_IDLE, gpsctl_display_event_cb, \"gpsctl display idle\" );",
+            "gpsctl_tdeck_handle_display_idle();",
+            "gpsctl_autoon_off();",
+            "gpsctl_autoon_on();",
         ],
     )
     forbid_slice_tokens(

@@ -57,6 +57,7 @@
 #include "hardware/powermgm.h"
 #include "hardware/framebuffer.h"
 #include "hardware/display.h"
+#include "hardware/touch.h"
 #include "hardware/hardware.h"
 #include "utils/filepath_convert.h"
 
@@ -379,6 +380,31 @@ bool gui_powermgm_loop_event_cb( EventBits_t event, void *arg ) {
                                                     powermgm_set_event( POWERMGM_STANDBY_REQUEST );
                                                 }
                                                 break;
+            }
+        #endif
+        #if defined( LILYGO_T_DECK_PLUS )
+            static bool tdeck_lvgl_idle = false;
+
+            if ( display_is_idle() ) {
+                if ( !tdeck_lvgl_idle ) {
+                    lv_obj_invalidate( lv_scr_act() );
+                    lv_refr_now( NULL );
+                    hardware_detach_lvgl_ticker();
+                    lv_task_enable( false );
+                    tdeck_lvgl_idle = true;
+                }
+                if ( touch_has_activity() ) {
+                    display_trigger_activity();
+                }
+                delay( 50 );
+                return( true );
+            }
+
+            if ( tdeck_lvgl_idle ) {
+                hardware_attach_lvgl_ticker();
+                lv_task_enable( true );
+                lv_obj_invalidate( lv_scr_act() );
+                tdeck_lvgl_idle = false;
             }
         #endif
     #endif

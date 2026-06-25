@@ -70,11 +70,6 @@ void compass_app_setup( void ) {
         return;
     }
     /**
-     * abort if no compass available
-     */
-    if( !compass_available() )
-        return;
-    /**
      * setup compass app
      */
     compass_app_main_tile_num = mainbar_add_app_tile( 1, 1, "compass" );

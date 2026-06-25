@@ -88,5 +88,11 @@
      * @return  true if position valid and touch pressed, false if not valid
      */
     bool touch_getXY( int16_t &x, int16_t &y );
+    /**
+     * @brief check whether the touch or keyboard interrupt source has activity
+     *
+     * @return true if activity is pending
+     */
+    bool touch_has_activity( void );
     
 #endif // _TOUCH_H

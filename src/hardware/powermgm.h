@@ -136,6 +136,10 @@
      */
     void powermgm_set_normal_mode( void );
     /**
+     * @brief set idle mode for display-off active-idle state
+     */
+    void powermgm_set_idle_mode( void );
+    /**
      * @brief enable CPU lightsleep mode
      * 
      * @param enable 

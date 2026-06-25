@@ -23,6 +23,7 @@
 #include "gpsctl.h"
 #include "timesync.h"
 #include "powermgm.h"
+#include "display.h"
 #include "callback.h"
 #include <math.h>
 #include <string.h>
@@ -89,6 +90,12 @@ static uint32_t gpsctl_last_sentence_total = 0;
 static uint32_t gpsctl_time_sync_count = 0;
 static time_t gpsctl_last_time_sync_epoch = 0;
 static uint32_t gpsctl_last_time_sync_millis = 0;
+#if defined( LILYGO_T_DECK_PLUS )
+static const uint32_t TDECK_GPS_IDLE_GRACE_MS = 120000UL;
+static bool gpsctl_tdeck_display_idle = false;
+static bool gpsctl_tdeck_idle_powered_down = false;
+static uint32_t gpsctl_tdeck_idle_started_ms = 0;
+#endif
 
 gpsctl_config_t gpsctl_config;
 callback_t *gpsctl_callback = NULL;
@@ -99,6 +106,10 @@ bool gpsctl_powermgm_event_cb( EventBits_t event, void *arg );
 bool gpsctl_send_cb( EventBits_t event, void *arg );
 void gpsctl_autoon_on( void );
 void gpsctl_autoon_off( void );
+#if defined( LILYGO_T_DECK_PLUS )
+static bool gpsctl_display_event_cb( EventBits_t event, void *arg );
+static void gpsctl_tdeck_handle_display_idle( void );
+#endif
 static uint32_t gpsctl_get_configured_baud( void );
 static void gpsctl_reset_debug_counters( void );
 
@@ -143,6 +154,47 @@ static void gpsctl_reset_debug_counters( void ) {
     gpsctl_last_sentence_total = gps.passedChecksum() + gps.failedChecksum();
 #endif
 }
+
+#if defined( LILYGO_T_DECK_PLUS )
+static bool gpsctl_display_event_cb( EventBits_t event, void *arg ) {
+    if ( !( event & DISPLAYCTL_IDLE ) || arg == NULL ) {
+        return( true );
+    }
+
+    const bool idle = *(bool *)arg;
+    if ( idle ) {
+        gpsctl_tdeck_display_idle = true;
+        gpsctl_tdeck_idle_started_ms = millis();
+        gpsctl_tdeck_idle_powered_down = false;
+    }
+    else {
+        const bool restart_gps = gpsctl_tdeck_idle_powered_down;
+        gpsctl_tdeck_display_idle = false;
+        gpsctl_tdeck_idle_powered_down = false;
+        if ( restart_gps && gpsctl_config.autoon ) {
+            gpsctl_autoon_on();
+        }
+    }
+
+    return( true );
+}
+
+static void gpsctl_tdeck_handle_display_idle( void ) {
+    if ( !gpsctl_tdeck_display_idle || gpsctl_tdeck_idle_powered_down ) {
+        return;
+    }
+    if ( !gpsctl_config.autoon || gpsctl_config.enable_on_standby || !gpsctl_enable ) {
+        return;
+    }
+    if ( (uint32_t)( millis() - gpsctl_tdeck_idle_started_ms ) < TDECK_GPS_IDLE_GRACE_MS ) {
+        return;
+    }
+
+    GPSCTL_INFO_LOG("tdeck idle gps off");
+    gpsctl_tdeck_idle_powered_down = true;
+    gpsctl_autoon_off();
+}
+#endif
 
 #ifndef NATIVE_64BIT
 static void gpsctl_note_serial_byte( int c ) {
@@ -721,6 +773,9 @@ void gpsctl_setup( void ) {
      */
     powermgm_register_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, gpsctl_powermgm_event_cb, "powermgm gpsctl" );
     powermgm_register_loop_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP, gpsctl_powermgm_loop_cb, "powermgm gpsctl loop" );
+    #if defined( LILYGO_T_DECK_PLUS )
+        display_register_cb( DISPLAYCTL_IDLE, gpsctl_display_event_cb, "gpsctl display idle" );
+    #endif
 
     gpsctl_init = true;
 
@@ -900,6 +955,12 @@ bool gpsctl_powermgm_loop_cb( EventBits_t event, void *arg ) {
     if ( !gpsctl_init || !gpsctl_enable ) {
         return( true );
     }
+    #if defined( LILYGO_T_DECK_PLUS )
+        gpsctl_tdeck_handle_display_idle();
+        if ( !gpsctl_enable ) {
+            return( true );
+        }
+    #endif
     /**
      * special case
      */

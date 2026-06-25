@@ -27,7 +27,7 @@
 #endif
 
 static bool blectl_default_autoon( void ) {
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
     return false;
 #else
     return true;
@@ -35,7 +35,7 @@ static bool blectl_default_autoon( void ) {
 }
 
 static bool blectl_default_advertising( void ) {
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
     return false;
 #else
     return true;

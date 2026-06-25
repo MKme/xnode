@@ -112,6 +112,16 @@ void wifictl_setup( void ) {
         wifictl_config->save();
     }
 #endif
+#if defined( LILYGO_T_DECK_PLUS )
+    if ( wifictl_config->autoon || wifictl_config->enable_on_standby ||
+         wifictl_config->webserver || wifictl_config->ftpserver ) {
+        wifictl_config->autoon = false;
+        wifictl_config->enable_on_standby = false;
+        wifictl_config->webserver = false;
+        wifictl_config->ftpserver = false;
+        wifictl_config->save();
+    }
+#endif
 #ifdef NATIVE_64BIT
     wifictl_lv_task = lv_task_create( wifictl_Task, 500, LV_TASK_PRIO_MID, NULL );
 #else
@@ -258,7 +268,7 @@ void wifictl_setup( void ) {
      * change here your network for first use if WPS not work
      * or setup via display not possible
      */
-#if !defined( LILYGO_WATCH_ULTRA )
+#if !defined( LILYGO_WATCH_ULTRA ) && !defined( LILYGO_T_DECK_PLUS )
     if( !wifictl_is_known( "foo" ) )
         wifictl_insert_network( "foo", "bar" );
 #endif
