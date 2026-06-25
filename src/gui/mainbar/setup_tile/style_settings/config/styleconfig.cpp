@@ -33,7 +33,7 @@ style_config_t::style_config_t() : BaseJsonConfig( STYLE_JSON_COFIG_FILE ) {}
 bool style_config_t::onSave(JsonDocument& doc) {
     doc["theme"] = theme;
     doc["anim"] = anim;
-    doc["theme_migrated"] = true;
+    doc["theme_migrated"] = 2;
     needs_save = false;
     return true;
 }
@@ -49,14 +49,24 @@ bool style_config_t::onLoad(JsonDocument& doc) {
         theme = doc["theme"] | 1;
         anim = doc["anim"] | true;
     #endif
-    bool theme_migrated = doc["theme_migrated"] | false;
-    needs_save = !theme_migrated;
+    int theme_migration_version = 0;
+    if ( doc["theme_migrated"].is<int>() ) {
+        theme_migration_version = doc["theme_migrated"].as<int>();
+    }
+    else if ( doc["theme_migrated"] | false ) {
+        theme_migration_version = 1;
+    }
+    needs_save = theme_migration_version < 2;
     #if defined( LILYGO_T_DECK_PLUS )
     if ( theme < 0 || theme > 1 ) {
         theme = 1;
         needs_save = true;
     }
     #else
+    if ( theme_migration_version < 2 && theme == 2 ) {
+        theme = 1;
+        needs_save = true;
+    }
     if ( theme == 3 || theme < 0 || theme > 3 ) {
         theme = 1;
         needs_save = true;

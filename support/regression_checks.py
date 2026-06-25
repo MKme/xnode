@@ -512,8 +512,10 @@ def run_checks():
         "watch theme defaults and invalid recovery stay on dark high contrast",
         [
             'theme = doc["theme"] | 1;',
-            'bool theme_migrated = doc["theme_migrated"] | false;',
-            "needs_save = !theme_migrated;",
+            'theme_migration_version = doc["theme_migrated"].as<int>();',
+            "needs_save = theme_migration_version < 2;",
+            "if ( theme_migration_version < 2 && theme == 2 )",
+            "theme = 1;",
             "if ( theme == 3 || theme < 0 || theme > 3 )",
             "theme = 1;",
             "needs_save = true;",
@@ -525,6 +527,7 @@ def run_checks():
         [
             'theme = doc["theme"] | 2;',
             "theme = 2;",
+            'doc["theme_migrated"] = true;',
         ],
     )
     require_tokens(
