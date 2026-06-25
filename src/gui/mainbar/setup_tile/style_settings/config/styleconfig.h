@@ -38,7 +38,7 @@
             int theme = 1;
             bool anim = true;
         #else
-            int theme = 2;
+            int theme = 1;
             bool anim = true;
         #endif
         bool needs_save = false;

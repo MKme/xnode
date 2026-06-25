@@ -104,7 +104,7 @@ void widget_style_theme_set( int theme ) {
     }
     #else
     if ( theme == 3 || theme < 0 || theme > 3 ) {
-        theme = 2;
+        theme = 1;
     }
     #endif
 

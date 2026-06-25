@@ -76,7 +76,7 @@ void style_settings_tile_setup( void ) {
     }
     #else
     if ( style_config.theme < 0 || style_config.theme > 2 ) {
-        style_config.theme = 2;
+        style_config.theme = 1;
     }
     #endif
     lv_dropdown_set_selected( theme_list, style_config.theme );
@@ -98,7 +98,7 @@ static void select_style_event_cb( lv_obj_t * obj, lv_event_t event ) {
                                             }
                                             #else
                                             if ( selected_theme > 2 ) {
-                                                selected_theme = 2;
+                                                selected_theme = 1;
                                             }
                                             #endif
                                             widget_style_theme_set( selected_theme );

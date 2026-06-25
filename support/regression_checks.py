@@ -493,8 +493,8 @@ def run_checks():
     require_slice_tokens(
         "src/gui/widget_styles.cpp",
         "dark theme keeps white text on dark shared surfaces",
-        "case( 3 ):",
-        "default:",
+        "case( 1 ):",
+        "case( 2 ):",
         [
             "lv_style_set_bg_color( &background_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );",
             "lv_style_set_text_color( &mainbar_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );",
@@ -509,14 +509,39 @@ def run_checks():
     )
     require_tokens(
         "src/gui/mainbar/setup_tile/style_settings/config/styleconfig.cpp",
-        "saved dark theme migrates to readable light theme on watch builds",
+        "watch theme defaults and invalid recovery stay on dark high contrast",
         [
-            'theme = doc["theme"] | 2;',
+            'theme = doc["theme"] | 1;',
             'bool theme_migrated = doc["theme_migrated"] | false;',
             "needs_save = !theme_migrated;",
             "if ( theme == 3 || theme < 0 || theme > 3 )",
-            "theme = 2;",
+            "theme = 1;",
             "needs_save = true;",
+        ],
+    )
+    forbid_tokens(
+        "src/gui/mainbar/setup_tile/style_settings/config/styleconfig.cpp",
+        "watch theme config does not default or recover to the grey light theme",
+        [
+            'theme = doc["theme"] | 2;',
+            "theme = 2;",
+        ],
+    )
+    require_tokens(
+        "src/gui/mainbar/setup_tile/style_settings/config/styleconfig.h",
+        "watch style config constructor default stays on dark high contrast",
+        [
+            "#elif defined( LILYGO_T_DECK_PLUS )",
+            "int theme = 1;",
+            "#else",
+            "int theme = 1;",
+        ],
+    )
+    forbid_tokens(
+        "src/gui/mainbar/setup_tile/style_settings/config/styleconfig.h",
+        "watch style config constructor does not default to grey light theme",
+        [
+            "int theme = 2;",
         ],
     )
     require_tokens(
@@ -531,12 +556,14 @@ def run_checks():
     )
     require_tokens(
         "src/gui/mainbar/setup_tile/style_settings/style_settings.cpp",
-        "dark theme is not exposed on watch light-theme settings until visually verified",
+        "watch theme settings keep invalid selections on dark while light remains manual",
         [
             '"E-Ink\\nE-Ink neg\\nlight"',
             "if ( style_config.theme < 0 || style_config.theme > 2 )",
+            "style_config.theme = 1;",
             "uint16_t selected_theme = lv_dropdown_get_selected( obj );",
             "if ( selected_theme > 2 )",
+            "selected_theme = 1;",
             "style_config.theme = selected_theme;",
         ],
     )
@@ -552,10 +579,10 @@ def run_checks():
     )
     require_tokens(
         "src/gui/widget_styles.cpp",
-        "runtime theme clamp keeps unreadable dark selection from applying",
+        "runtime theme clamp keeps watch startup on dark instead of grey light",
         [
             "if ( theme == 3 || theme < 0 || theme > 3 )",
-            "theme = 2;",
+            "theme = 1;",
         ],
     )
     require_tokens(

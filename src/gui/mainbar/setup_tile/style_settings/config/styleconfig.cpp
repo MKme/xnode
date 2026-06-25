@@ -46,7 +46,7 @@ bool style_config_t::onLoad(JsonDocument& doc) {
         theme = doc["theme"] | 1;
         anim = doc["anim"] | true;
     #else
-        theme = doc["theme"] | 2;
+        theme = doc["theme"] | 1;
         anim = doc["anim"] | true;
     #endif
     bool theme_migrated = doc["theme_migrated"] | false;
@@ -58,7 +58,7 @@ bool style_config_t::onLoad(JsonDocument& doc) {
     }
     #else
     if ( theme == 3 || theme < 0 || theme > 3 ) {
-        theme = 2;
+        theme = 1;
         needs_save = true;
     }
     #endif
@@ -73,7 +73,7 @@ bool style_config_t::onDefault( void ) {
         theme = 1;
         anim = true;
     #else
-        theme = 2;
+        theme = 1;
         anim = true;
     #endif
     needs_save = false;
