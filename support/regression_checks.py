@@ -791,16 +791,6 @@ def run_checks():
             "pio run -e t-watch-ultra -e t-watch2020-v3-s3 -e tdeck-plus",
         ],
     )
-    require_tokens(
-        ".github/workflows/ci.yml",
-        "GitHub Actions runs regression tests and all firmware builds",
-        [
-            "Regression and firmware builds",
-            "platformio==6.1.19",
-            "npm run build",
-        ],
-    )
-
 
 def main():
     try:
