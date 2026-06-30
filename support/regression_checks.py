@@ -191,13 +191,21 @@ def run_checks():
 
     require_tokens(
         "src/app/osmmap/osmmap_app_main.cpp",
-        "Tac map GPS user marker renders as topmost Ultra triangle",
+        "Tac map GPS user marker renders as topmost watch/T-Deck triangle",
         [
+            "OSMMAP_USE_LOCAL_TRIANGLE_MARKER",
+            "defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )",
+            "OSMMAP_LOCAL_MARKER_SIZE",
             "osmmap_create_local_position_marker",
             "osmmap_prepare_local_marker_image",
             "osmmap_app_pos_img",
+            "lv_img_set_src( osmmap_app_pos_img, &osmmap_local_marker_image );",
+            "lv_img_set_pivot( osmmap_app_pos_img, OSMMAP_LOCAL_MARKER_SIZE / 2, OSMMAP_LOCAL_MARKER_SIZE / 2 );",
+            "osmmap_raise_overlay_layer",
+            "lv_obj_move_foreground( osmmap_overlay_layer );",
             "osmmap_raise_local_position_marker",
             "lv_obj_move_foreground( osmmap_app_pos_img );",
+            "osmmap_raise_primary_controls();",
             "osmmap_refresh_local_position_marker",
             "osmmap_set_local_position_from_gps",
             "osmmap_set_local_heading_from_gps",

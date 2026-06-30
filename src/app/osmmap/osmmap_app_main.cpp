@@ -175,7 +175,10 @@ static char osmmap_watch_flash_image_uri[ 160 ] = { 0 };
 static const size_t OSMMAP_OVERLAY_MAX_ITEMS = 96;
 static const size_t OSMMAP_OVERLAY_KEY_LEN = 48;
 static const size_t OSMMAP_OVERLAY_LABEL_LEN = 32;
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
+#define OSMMAP_USE_LOCAL_TRIANGLE_MARKER 1
+#endif
+#if defined( OSMMAP_USE_LOCAL_TRIANGLE_MARKER )
 static const lv_coord_t OSMMAP_LOCAL_MARKER_SIZE = 64;
 static uint8_t osmmap_local_marker_image_buf[ LV_IMG_BUF_SIZE_TRUE_COLOR_ALPHA( OSMMAP_LOCAL_MARKER_SIZE, OSMMAP_LOCAL_MARKER_SIZE ) ] = { 0 };
 static lv_img_dsc_t osmmap_local_marker_image;
@@ -337,6 +340,7 @@ static void osmmap_prepare_local_marker_image( void );
 static void osmmap_update_local_position_marker_heading( void );
 static void osmmap_set_local_position_from_gps( const gps_data_t *gps_data );
 static void osmmap_set_local_heading_from_gps( const gps_data_t *gps_data );
+static void osmmap_raise_overlay_layer( void );
 static void osmmap_raise_local_position_marker( void );
 static void osmmap_create_local_position_marker( lv_obj_t *parent );
 
@@ -671,7 +675,7 @@ static bool osmmap_point_inside_triangle( int32_t x, int32_t y, const lv_point_t
 }
 
 static void osmmap_set_local_marker_pixel( lv_coord_t x, lv_coord_t y, lv_color_t color, lv_opa_t opa ) {
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( OSMMAP_USE_LOCAL_TRIANGLE_MARKER )
     if ( x < 0 || y < 0 || x >= OSMMAP_LOCAL_MARKER_SIZE || y >= OSMMAP_LOCAL_MARKER_SIZE ) {
         return;
     }
@@ -681,7 +685,7 @@ static void osmmap_set_local_marker_pixel( lv_coord_t x, lv_coord_t y, lv_color_
 }
 
 static void osmmap_prepare_local_marker_image( void ) {
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( OSMMAP_USE_LOCAL_TRIANGLE_MARKER )
     if ( osmmap_local_marker_image_ready ) {
         return;
     }
@@ -720,7 +724,7 @@ static void osmmap_prepare_local_marker_image( void ) {
 }
 
 static void osmmap_update_local_position_marker_heading( void ) {
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( OSMMAP_USE_LOCAL_TRIANGLE_MARKER )
     if ( !osmmap_app_pos_img ) {
         return;
     }
@@ -750,6 +754,12 @@ static void osmmap_set_local_heading_from_gps( const gps_data_t *gps_data ) {
     osmmap_update_local_position_marker_heading();
 }
 
+static void osmmap_raise_overlay_layer( void ) {
+    if ( osmmap_overlay_layer ) {
+        lv_obj_move_foreground( osmmap_overlay_layer );
+    }
+}
+
 static void osmmap_raise_local_position_marker( void ) {
     if ( osmmap_app_pos_img ) {
         lv_obj_move_foreground( osmmap_app_pos_img );
@@ -757,7 +767,7 @@ static void osmmap_raise_local_position_marker( void ) {
 }
 
 static void osmmap_create_local_position_marker( lv_obj_t *parent ) {
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( OSMMAP_USE_LOCAL_TRIANGLE_MARKER )
     osmmap_prepare_local_marker_image();
 
     osmmap_app_pos_img = lv_img_create( parent, NULL );
@@ -810,8 +820,10 @@ static void osmmap_refresh_local_position_marker( void ) {
         osmmap_local_marker_visible = false;
     }
 
+    osmmap_raise_overlay_layer();
     osmmap_raise_local_position_marker();
     osmmap_update_gps_status_label();
+    osmmap_raise_primary_controls();
 }
 
 static bool osmmap_is_watch_flash_source_name( const char *name ) {
@@ -1220,6 +1232,12 @@ static void osmmap_raise_primary_controls( void ) {
     osmmap_configure_primary_control( osmmap_exit_btn );
     osmmap_configure_primary_control( osmmap_zoom_in_btl );
     osmmap_configure_primary_control( osmmap_zoom_out_btl );
+    if ( osmmap_sub_menu_layers && !lv_obj_get_hidden( osmmap_sub_menu_layers ) ) {
+        lv_obj_move_foreground( osmmap_sub_menu_layers );
+    }
+    if ( osmmap_sub_menu_setting && !lv_obj_get_hidden( osmmap_sub_menu_setting ) ) {
+        lv_obj_move_foreground( osmmap_sub_menu_setting );
+    }
 }
 
 static bool osmmap_accept_primary_control_event( lv_event_t event, uint32_t &last_event_ms ) {
@@ -1561,8 +1579,10 @@ static void osmmap_refresh_marker_positions( void ) {
             osmmap_place_marker( item->marker_obj, marker_x, marker_y );
         }
     }
+    osmmap_raise_overlay_layer();
     osmmap_raise_local_position_marker();
     osmmap_update_gps_status_label();
+    osmmap_raise_primary_controls();
 }
 
 static bool osmmap_adjust_watch_flash_zoom( int delta ) {
