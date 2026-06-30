@@ -68,8 +68,7 @@ The firmware distinguishes idle power savings from active-use responsiveness:
 
 - Active map/watchface paths use performance mode where needed.
 - Standby/hibernate paths release performance mode.
-- Ultra starts GPS/WiFi/BLE idle paths conservatively to avoid draining the battery.
+- Ultra starts GPS/WiFi idle paths conservatively while keeping BLE discoverable for XTOC/XCOM sync.
 - T-Deck display timeout blanks backlight while keeping LVGL/touch/keyboard active to avoid the previous wake stutter state.
 
 See [Operations and Troubleshooting](Operations-and-Troubleshooting) for field checks.
-

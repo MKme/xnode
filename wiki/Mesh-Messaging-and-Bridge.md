@@ -42,6 +42,7 @@ XTOC and XCOM use the XNODE BLE bridge for device sync. Current bridge capabilit
 - `ble`
 
 The bridge is how the host tools move watch-visible state without treating the watch as a generic text terminal.
+Firmware advertises the XNODE BLE service UUID alongside the Meshtastic BLE service so browser-based XTOC/XCOM sync can discover and open the bridge directly.
 
 ## Alerts and messages
 
@@ -69,4 +70,3 @@ XTOC and XCOM are designed to move compact operational packets across many trans
 - Send minimal high-value packets back.
 - Track and show its own location.
 - Carry mesh traffic without a phone/tablet UI being open all the time.
-

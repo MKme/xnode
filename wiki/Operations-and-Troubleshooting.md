@@ -90,7 +90,7 @@ Ultra idle behavior should keep unnecessary radios off:
 
 - GPS off at clean idle unless an app starts it.
 - WiFi off by default.
-- BLE off/lazy unless needed.
+- BLE advertising on by default so XTOC/XCOM can discover the XNODE bridge.
 - LoRa chip sleeping in standby.
 - Display sleeping after timeout.
 - No background GPS loop pinning performance mode.

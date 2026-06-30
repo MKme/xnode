@@ -363,32 +363,53 @@ static bool gpsctl_wait_for_ls550g_version( uint32_t timeout_ms ) {
 }
 #endif
 
-static void gpsctl_drain_serial_for( uint32_t duration_ms ) {
+static bool gpsctl_drain_serial_for( uint32_t duration_ms, bool parse_nmea = false ) {
     uint32_t start = millis();
+    const uint32_t start_passed = gps.passedChecksum();
+
     while ( (uint32_t)( millis() - start ) < duration_ms ) {
         bool drained = false;
         while ( gps_serial && gps_serial->available() > 0 ) {
-            gpsctl_read_serial_byte();
+            int c = gpsctl_read_serial_byte();
+            if ( parse_nmea && c >= 0 ) {
+                gps.encode( (char)c );
+                const uint32_t sentence_total = gps.passedChecksum() + gps.failedChecksum();
+                if ( sentence_total != gpsctl_last_sentence_total ) {
+                    gpsctl_last_sentence_total = sentence_total;
+                    gpsctl_last_sentence_millis = millis();
+                }
+            }
             drained = true;
         }
         if ( !drained ) {
             delay( 2 );
         }
     }
+
+    return( parse_nmea && gps.passedChecksum() > start_passed );
 }
 
 #if defined( LILYGO_T_DECK_PLUS )
-static bool gpsctl_wait_for_tdeck_ubx( uint8_t requested_class, uint8_t requested_id, uint32_t timeout_ms ) {
+static bool gpsctl_wait_for_tdeck_ubx( uint8_t requested_class, uint8_t requested_id, uint32_t timeout_ms, bool *saw_valid_nmea = NULL ) {
     uint8_t state = 0;
     uint16_t payload_len = 0;
     uint16_t bytes_to_skip = 0;
     uint32_t start = millis();
+    const uint32_t start_passed = gps.passedChecksum();
+
+    if ( saw_valid_nmea ) {
+        *saw_valid_nmea = false;
+    }
 
     while ( (uint32_t)( millis() - start ) < timeout_ms ) {
         while ( gps_serial && gps_serial->available() > 0 ) {
             int c = gpsctl_read_serial_byte();
             if ( c < 0 ) {
                 continue;
+            }
+            gps.encode( (char)c );
+            if ( saw_valid_nmea && gps.passedChecksum() > start_passed ) {
+                *saw_valid_nmea = true;
             }
 
             switch ( state ) {
@@ -478,6 +499,7 @@ static bool gpsctl_probe_tdeck_l76k( void ) {
     const uint32_t start_rx_bytes = gpsctl_rx_bytes;
     gpsctl_begin_serial( BOARD_GPS_BAUDRATE );
     delay( 100 );
+    bool saw_valid_nmea = gpsctl_drain_serial_for( 300, true );
 
     gps_serial->write( "$PCAS03,0,0,0,0,0,0,0,0,0,0,,,0,0*02\r\n" );
     gps_serial->flush();
@@ -494,38 +516,39 @@ static bool gpsctl_probe_tdeck_l76k( void ) {
     delay( 20 );
     gps_serial->write( "$PCAS11,3*1E\r\n" );
     gps_serial->flush();
+    saw_valid_nmea = gpsctl_drain_serial_for( 1200, true ) || saw_valid_nmea;
 
     if ( saw_l76k_version ) {
         gpsctl_set_probe_model( "L76K" );
         return( true );
     }
 
-    if ( gpsctl_rx_bytes > start_rx_bytes ) {
+    if ( saw_valid_nmea ) {
         gpsctl_set_probe_model( "nmea" );
         return( true );
     }
 
-    gpsctl_set_probe_model( "silent" );
+    gpsctl_set_probe_model( gpsctl_rx_bytes > start_rx_bytes ? "rx-no-nmea" : "silent" );
     return( false );
 }
 
-static bool gpsctl_probe_tdeck_ublox_baud( uint32_t baud, bool *saw_rx ) {
+static bool gpsctl_probe_tdeck_ublox_baud( uint32_t baud, bool *saw_valid_nmea ) {
     static const uint8_t cfg_rate_poll[] = { 0xB5, 0x62, 0x06, 0x08, 0x00, 0x00, 0x0E, 0x30 };
-    const uint32_t start_rx_bytes = gpsctl_rx_bytes;
+    bool saw_nmea_during_ubx_wait = false;
 
-    if ( saw_rx ) {
-        *saw_rx = false;
+    if ( saw_valid_nmea ) {
+        *saw_valid_nmea = false;
     }
 
     gpsctl_begin_serial( baud );
     delay( 120 );
-    gpsctl_drain_serial_for( 150 );
+    const bool saw_nmea_before_poll = gpsctl_drain_serial_for( 300, true );
 
     gps_serial->write( cfg_rate_poll, sizeof( cfg_rate_poll ) );
     gps_serial->flush();
-    const bool ok = gpsctl_wait_for_tdeck_ubx( 0x06, 0x08, 900 );
-    if ( saw_rx ) {
-        *saw_rx = gpsctl_rx_bytes > start_rx_bytes;
+    const bool ok = gpsctl_wait_for_tdeck_ubx( 0x06, 0x08, 1200, &saw_nmea_during_ubx_wait );
+    if ( saw_valid_nmea ) {
+        *saw_valid_nmea = saw_nmea_before_poll || saw_nmea_during_ubx_wait;
     }
     return( ok );
 }

@@ -26,7 +26,7 @@
 
     #define CUSTOM_AUDIO_ENTRYS            5
     #define BLECTL_JSON_COFIG_FILE         "/blectl.json"   /** @brief defines json config file name */
-    #define BLECTL_CONFIG_VERSION          1                /** @brief blectl config schema version */
+    #define BLECTL_CONFIG_VERSION          2                /** @brief blectl config schema version */
 
     /**
      * @brief custom audio notification structure

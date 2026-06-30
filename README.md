@@ -199,7 +199,7 @@ Current verified firmware baseline:
 | GPS while using map | Tac map can still auto-start GPS for the user-location marker. | Existing behavior preserved. | Uses the same map GPS path and the T-Deck Serial1 GPS receiver. |
 | GPS in standby | Off unless an app explicitly blocks standby. GPS status no longer enables standby GPS. | Existing tracker/status behavior preserved. | Kept powered across the T-Deck display timeout path so receiver lock/debug state is not lost. |
 | WiFi at boot | Off by default after one-time config migration; dummy setup scan disabled. | Existing behavior preserved. | Existing config path preserved; not auto-enabled by the T-Deck bring-up. |
-| BLE at boot | Off by default after one-time config migration; BLE stack is lazy-initialized. | Existing auto-on behavior preserved unless config says otherwise. | Uses the XNODE/Meshtastic BLE paths when enabled or when host sync needs them. |
+| BLE at boot | On and advertising the XNODE bridge by default so XTOC/XCOM can discover it; standby-blocking BLE options stay off. | Existing auto-on behavior preserved unless config says otherwise. | On and advertising the XNODE bridge by default so host sync works from the browser chooser. |
 | LoRa / Meshtastic | Radio chip is put into sleep on standby; regulator rail is not cut yet to avoid a risky radio re-init path. | Existing behavior preserved. | SX1262 pins and `T_DECK` Meshtastic model are wired; radio power-cut policy is not finalized. |
 | CPU performance mode | Active tac map and normal awake watchface use performance mode; standby handoff, hibernate, and the GPS loop do not globally pin performance. | Shared change applies; S3 build verified. | Display timeout stays in active UI mode; active apps keep normal responsiveness instead of waking into a suspended UI. |
 
@@ -219,10 +219,10 @@ WiFi:
 - WiFi can still be turned on from the UI/statusbar when needed.
 
 BLE:
-- Added `BLECTL_CONFIG_VERSION` and a one-time Ultra migration that turns off BLE auto-on, advertising, standby BLE, and disconnect-only standby blocking.
-- BLE advertising now only starts when BLE is actually on.
-- BLE stack initialization is lazy, so the controller is not brought up on Ultra boot when BLE is off.
-- Turning BLE on later still initializes the normal services, including Gadgetbridge, XNODE, battery/steps, and Meshtastic BLE.
+- `BLECTL_CONFIG_VERSION` now migrates Ultra and T-Deck Plus saved configs back to BLE auto-on plus advertising so XTOC/XCOM can discover the XNODE bridge.
+- Standby-blocking BLE options remain off: `enable_on_standby=false` and `disable_only_disconnected=false`.
+- Meshtastic BLE advertising preserves the XNODE service UUID so the browser chooser can select the same device for XNODE sync.
+- Turning BLE off manually still stops advertising; turning it on initializes Gadgetbridge, XNODE, battery/steps, and Meshtastic BLE services.
 
 Display and PMU rails:
 - Ultra GPS BLDO1 and haptic BLDO2 start disabled at PMU boot.
@@ -249,7 +249,7 @@ Display brightness:
 
 Normal idle:
 - Screen fades after the configured display timeout, the AMOLED panel sleeps, and the watch enters light sleep if no subsystem blocks standby.
-- GPS, WiFi, BLE advertising, and the unused haptic rail should not be running on a clean idle boot.
+- GPS, WiFi, and the unused haptic rail should not be running on a clean idle boot. BLE advertising remains on by default for XNODE host sync.
 - The watch should wake by touch/power/PMU events without requiring a reboot.
 
 Opening the tac map:
@@ -263,8 +263,9 @@ Opening GPS status:
 - The page does not keep GPS alive through standby.
 
 Turning BLE or WiFi on manually:
-- BLE and WiFi still work from the normal UI/statusbar paths.
-- Those radios will cost battery while enabled, especially BLE advertising and WiFi scanning/connection attempts.
+- WiFi still starts only from the normal UI/statusbar paths unless an app explicitly enables it.
+- BLE can still be disabled manually, but default firmware keeps it visible for XTOC/XCOM sync.
+- Those radios cost battery while enabled, especially BLE advertising and WiFi scanning/connection attempts.
 
 ### Known power tradeoffs still open
 

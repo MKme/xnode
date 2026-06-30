@@ -27,19 +27,11 @@
 #endif
 
 static bool blectl_default_autoon( void ) {
-#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
-    return false;
-#else
     return true;
-#endif
 }
 
 static bool blectl_default_advertising( void ) {
-#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
-    return false;
-#else
     return true;
-#endif
 }
 
 blectl_config_t::blectl_config_t() : BaseJsonConfig(BLECTL_JSON_COFIG_FILE) {
@@ -112,7 +104,9 @@ bool blectl_config_t::onLoad(JsonDocument& doc) {
             strncpy( custom_audio_notifications[ i ].value  , doc["custom_audio_notifications"][ i ]["value"], sizeof( custom_audio_notifications[ i ].value ) );
         }
     }
-    config_version = config_version == 0 ? 0 : BLECTL_CONFIG_VERSION;
+    if ( config_version > BLECTL_CONFIG_VERSION ) {
+        config_version = BLECTL_CONFIG_VERSION;
+    }
   
     return true;
 }

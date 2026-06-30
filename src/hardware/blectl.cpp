@@ -498,23 +498,13 @@ void blectl_save_config( void ) {
 
 void blectl_read_config( void ) {
     blectl_config.load();
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
     if ( blectl_config.config_version < BLECTL_CONFIG_VERSION ) {
-        blectl_config.autoon = false;
-        blectl_config.advertising = false;
+        blectl_config.autoon = true;
+        blectl_config.advertising = true;
         blectl_config.enable_on_standby = false;
         blectl_config.disable_only_disconnected = false;
         blectl_config.config_version = BLECTL_CONFIG_VERSION;
-        blectl_config.save();
-    }
-#endif
-#if defined( LILYGO_T_DECK_PLUS )
-    if ( blectl_config.autoon || blectl_config.advertising ||
-         blectl_config.enable_on_standby || blectl_config.disable_only_disconnected ) {
-        blectl_config.autoon = false;
-        blectl_config.advertising = false;
-        blectl_config.enable_on_standby = false;
-        blectl_config.disable_only_disconnected = false;
         blectl_config.save();
     }
 #endif

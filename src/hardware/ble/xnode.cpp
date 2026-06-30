@@ -1686,6 +1686,10 @@
         }
     }
 
+    const char *xnode_ble_service_uuid( void ) {
+        return( XNODE_SERVICE_UUID );
+    }
+
     void xnode_setup( void ) {
         NimBLEServer *pServer = blectl_get_ble_server();
         NimBLEAdvertising *pAdvertising = blectl_get_ble_advertising();
@@ -1810,6 +1814,10 @@
 #else
 
     void xnode_setup( void ) {
+    }
+
+    const char *xnode_ble_service_uuid( void ) {
+        return( "7f35b8a0-8d1c-4f8b-b8d5-1f1f0c0d0001" );
     }
 
     bool xnode_send_meshtastic_rx( const char *from, const char *text ) {

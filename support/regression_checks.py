@@ -351,24 +351,36 @@ def run_checks():
     )
     require_tokens(
         "src/hardware/blectl.cpp",
-        "Ultra BLE idle defaults stay off while BLE remains lazy-started",
+        "Ultra BLE advertises XNODE by default while standby blockers stay off",
         [
             "BLECTL_CONFIG_VERSION",
-            "blectl_config.autoon = false;",
+            "#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )",
+            "blectl_config.autoon = true;",
+            "blectl_config.advertising = true;",
             "blectl_config.enable_on_standby = false;",
-            "blectl_config.advertising = false;",
+            "blectl_config.disable_only_disconnected = false;",
             "blectl_init_stack();",
         ],
     )
     require_tokens(
-        "src/hardware/blectl.cpp",
-        "T-Deck Plus BLE stays lazy by default",
+        "src/hardware/config/blectlconfig.cpp",
+        "Ultra and T-Deck Plus BLE defaults keep XNODE visible",
         [
-            "#if defined( LILYGO_T_DECK_PLUS )",
-            "blectl_config.autoon = false;",
-            "blectl_config.advertising = false;",
-            "blectl_config.enable_on_standby = false;",
-            "blectl_config.disable_only_disconnected = false;",
+            "static bool blectl_default_autoon( void )",
+            "return true;",
+            "static bool blectl_default_advertising( void )",
+            "config_version = doc[\"config_version\"] | 0;",
+            "if ( config_version > BLECTL_CONFIG_VERSION )",
+        ],
+    )
+    require_tokens(
+        "src/hardware/ble/meshtastic_ble.cpp",
+        "Meshtastic BLE advertising preserves the XNODE bridge service UUID",
+        [
+            "#include \"hardware/ble/xnode.h\"",
+            "advertising->reset();",
+            "advertising->addServiceUUID( NimBLEUUID( xnode_ble_service_uuid() ) );",
+            "advertising->addServiceUUID( MESHTASTIC_BLE_SERVICE_UUID );",
         ],
     )
 
@@ -634,6 +646,10 @@ def run_checks():
             "gpsctl_probe_tdeck_l76k",
             "gpsctl_probe_tdeck_ublox_baud",
             "gpsctl_wait_for_tdeck_ubx",
+            "gps.passedChecksum() > start_passed",
+            "bool *saw_valid_nmea",
+            "gpsctl_drain_serial_for( 1200, true )",
+            "\"rx-no-nmea\"",
             "const uint32_t probe_bauds[] = { 38400, BOARD_GPS_BAUDRATE };",
             "gpsctl_set_probe_model( \"M10\" );",
             "$PCAS06,0*1B",
