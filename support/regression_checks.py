@@ -293,6 +293,7 @@ def run_checks():
             "gpsctl_config.enable_on_standby = false;",
             "SHIELD_GPS_RX",
             "SHIELD_GPS_TX",
+            "powermgm_set_perf_mode();",
             "WATCH_POWER_GPS",
             "WATCH_POWER_GPS_DC_CHANNEL",
         ],
@@ -649,17 +650,27 @@ def run_checks():
     )
     require_tokens(
         "src/app/gps_status/gps_status_main.cpp",
-        "Ultra GPS status keeps compact readable row layout",
+        "Ultra GPS status keeps restored wide row layout",
         [
-            "#elif defined( LILYGO_WATCH_ULTRA )",
-            "#define GPS_STATUS_DEBUG_ROW_COUNT 10",
-            "#define GPS_STATUS_DEBUG_STEP 18",
-            "#if defined( LILYGO_WATCH_ULTRA ) && !defined( GPS_STATUS_FULL_DEBUG_LAYOUT )",
-            "lv_obj_set_width(gps_status_debug_rows[i], lv_disp_get_hor_res(NULL) - ( GPS_STATUS_DEBUG_X * 2 ) );",
-            "\"Fix:%s  Pwr:%s  UART:%s\"",
-            "\"Position:%s\"",
-            "\"RX:%lu %s  NMEA:%lu/%lu\"",
-            "\"Time sync:%s\"",
+            "#define GPS_STATUS_DEBUG_ROW_COUNT 12",
+            "#define GPS_STATUS_DEBUG_STEP 29",
+            "#if defined( LILYGO_WATCH_ULTRA )",
+            "lv_style_set_text_font(&gps_status_value_style, LV_STATE_DEFAULT, &lv_font_montserrat_22);",
+            "\"Fix: %s\"",
+            "\"Position: %s\"",
+            "\"Raw RX: %lu  last %s\"",
+            "\"Time sync: %s\"",
+            "gpsctl_set_enable_on_standby( true );",
+        ],
+    )
+    forbid_slice_tokens(
+        "src/app/gps_status/gps_status_main.cpp",
+        "Ultra GPS status rows do not collapse into a narrow cropped column",
+        "    #else\n    for ( uint8_t i = 0; i < GPS_STATUS_DEBUG_ROW_COUNT; i++ ) {",
+        "    #endif\n\n    gpsctl_register_cb",
+        [
+            "lv_obj_set_width(gps_status_debug_rows[i]",
+            "lv_label_set_long_mode(gps_status_debug_rows[i]",
         ],
     )
     require_tokens(

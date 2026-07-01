@@ -78,11 +78,6 @@ static bool gps_status_active = false;
     #define GPS_STATUS_DEBUG_X 6
     #define GPS_STATUS_DEBUG_Y ( STATUSBAR_HEIGHT + 4 )
     #define GPS_STATUS_DEBUG_STEP 18
-#elif defined( LILYGO_WATCH_ULTRA )
-    #define GPS_STATUS_DEBUG_ROW_COUNT 10
-    #define GPS_STATUS_DEBUG_X 6
-    #define GPS_STATUS_DEBUG_Y ( STATUSBAR_HEIGHT + 4 )
-    #define GPS_STATUS_DEBUG_STEP 18
 #else
     #define GPS_STATUS_DEBUG_ROW_COUNT 12
     #define GPS_STATUS_DEBUG_X 10
@@ -119,7 +114,7 @@ void gps_status_main_setup(uint32_t tile_num) {
     lv_style_set_bg_opa(&gps_status_value_style, LV_OBJ_PART_MAIN, LV_OPA_0);
     lv_style_set_border_width(&gps_status_value_style, LV_OBJ_PART_MAIN, 0);
     lv_style_set_text_font(&gps_status_value_style, LV_STATE_DEFAULT, &Ubuntu_16px);
-#if defined( LILYGO_WATCH_ULTRA ) && !defined( GPS_STATUS_FULL_DEBUG_LAYOUT )
+#if defined( LILYGO_WATCH_ULTRA )
     lv_style_set_text_font(&gps_status_value_style, LV_STATE_DEFAULT, &lv_font_montserrat_22);
 #endif
     /*
@@ -149,9 +144,6 @@ void gps_status_main_setup(uint32_t tile_num) {
     for ( uint8_t i = 0; i < GPS_STATUS_DEBUG_ROW_COUNT; i++ ) {
         gps_status_debug_rows[i] = lv_label_create(gps_status_main_tile, NULL);
         lv_obj_add_style(gps_status_debug_rows[i], LV_OBJ_PART_MAIN, &gps_status_value_style);
-        lv_obj_set_width(gps_status_debug_rows[i], lv_disp_get_hor_res(NULL) - ( GPS_STATUS_DEBUG_X * 2 ) );
-        lv_label_set_long_mode(gps_status_debug_rows[i], LV_LABEL_LONG_CROP);
-        lv_label_set_align(gps_status_debug_rows[i], LV_LABEL_ALIGN_LEFT);
         lv_label_set_text(gps_status_debug_rows[i], "");
         lv_obj_align(gps_status_debug_rows[i], gps_status_main_tile, LV_ALIGN_IN_TOP_LEFT, GPS_STATUS_DEBUG_X, GPS_STATUS_DEBUG_Y + ( i * GPS_STATUS_DEBUG_STEP ) );
     }
@@ -338,7 +330,7 @@ bool style_change_event_cb( EventBits_t event, void *arg ) {
                             lv_style_set_bg_opa(&gps_status_value_style, LV_OBJ_PART_MAIN, LV_OPA_0);
                             lv_style_set_border_width(&gps_status_value_style, LV_OBJ_PART_MAIN, 0);
                             lv_style_set_text_font(&gps_status_value_style, LV_STATE_DEFAULT, &Ubuntu_16px);
-                            #if defined( LILYGO_WATCH_ULTRA ) && !defined( GPS_STATUS_FULL_DEBUG_LAYOUT )
+                            #if defined( LILYGO_WATCH_ULTRA )
                                 lv_style_set_text_font(&gps_status_value_style, LV_STATE_DEFAULT, &lv_font_montserrat_22);
                             #endif
                             for ( uint8_t i = 0; i < 12; i++ ) {
@@ -478,28 +470,18 @@ static void gps_status_update_debug_label( void ) {
     }
     #else
     if ( gps_status_debug_rows[GPS_STATUS_DEBUG_ROW_COUNT - 1] ) {
-        lv_label_set_text_fmt( gps_status_debug_rows[0], "Fix:%s  Pwr:%s  UART:%s",
-            debug.valid_location ? "yes" : "no",
-            debug.enabled ? "on" : "off",
-            debug.serial_available ? "ok" : "none"
-        );
-        lv_label_set_text_fmt( gps_status_debug_rows[1], "Probe:%s %s  %lu", probe, debug.probe_model, (unsigned long)active_baud );
-        lv_label_set_text_fmt( gps_status_debug_rows[2], "RX:%lu %s  NMEA:%lu/%lu",
-            (unsigned long)debug.rx_bytes,
-            rx_age,
-            (unsigned long)debug.passed_checksum,
-            (unsigned long)debug.failed_checksum
-        );
-        lv_label_set_text_fmt( gps_status_debug_rows[3], "Position:%s", pos_buf );
-        lv_label_set_text_fmt( gps_status_debug_rows[4], "GPS UTC:%s", utc_buf );
-        lv_label_set_text_fmt( gps_status_debug_rows[5], "Time sync:%s", sync_buf );
-        lv_label_set_text_fmt( gps_status_debug_rows[6], "Pins: RX%ld TX%ld", (long)debug.rx_pin, (long)debug.tx_pin );
-        lv_label_set_text_fmt( gps_status_debug_rows[7], "Last:%s  %s", last_sentence, sentence_age );
-        lv_label_set_text_fmt( gps_status_debug_rows[8], "Chars:%lu  fix:%lu",
-            (unsigned long)debug.chars_processed,
-            (unsigned long)debug.sentences_with_fix
-        );
-        lv_label_set_text_fmt( gps_status_debug_rows[9], "Sats:%lu GP%lu GL%lu BD%lu",
+        lv_label_set_text_fmt( gps_status_debug_rows[0], "Fix: %s", debug.valid_location ? "yes" : "no" );
+        lv_label_set_text_fmt( gps_status_debug_rows[1], "Power: %s  UART: %s", debug.enabled ? "on" : "off", debug.serial_available ? "ok" : "none" );
+        lv_label_set_text_fmt( gps_status_debug_rows[2], "Probe: %s %s", probe, debug.probe_model );
+        lv_label_set_text_fmt( gps_status_debug_rows[3], "Baud: %lu", (unsigned long)active_baud );
+        lv_label_set_text_fmt( gps_status_debug_rows[4], "Raw RX: %lu  last %s", (unsigned long)debug.rx_bytes, rx_age );
+        lv_label_set_text_fmt( gps_status_debug_rows[5], "Position: %s", pos_buf );
+        lv_label_set_text_fmt( gps_status_debug_rows[6], "GPS UTC: %s", utc_buf );
+        lv_label_set_text_fmt( gps_status_debug_rows[7], "Time sync: %s", sync_buf );
+        lv_label_set_text_fmt( gps_status_debug_rows[8], "Pins: RX%ld TX%ld", (long)debug.rx_pin, (long)debug.tx_pin );
+        lv_label_set_text_fmt( gps_status_debug_rows[9], "NMEA: ok %lu  bad %lu", (unsigned long)debug.passed_checksum, (unsigned long)debug.failed_checksum );
+        lv_label_set_text_fmt( gps_status_debug_rows[10], "Last: %s  age %s", last_sentence, sentence_age );
+        lv_label_set_text_fmt( gps_status_debug_rows[11], "Sats: %lu GP%lu GL%lu BD%lu",
             (unsigned long)debug.satellites,
             (unsigned long)debug.gps_satellites,
             (unsigned long)debug.glonass_satellites,
@@ -676,7 +658,7 @@ void gps_status_activate_cb(void)
     gps_status_prev_autoon = gpsctl_get_autoon();
     gps_status_prev_enable_on_standby = gpsctl_get_enable_on_standby();
     gps_status_forced_gps = true;
-    gpsctl_set_enable_on_standby( false );
+    gpsctl_set_enable_on_standby( true );
     gpsctl_on();
     gps_status_update_debug_label();
 }

@@ -990,6 +990,9 @@ bool gpsctl_powermgm_loop_cb( EventBits_t event, void *arg ) {
     #ifdef NATIVE_64BIT
 
     #else
+        #if defined( LILYGO_WATCH_ULTRA )
+            powermgm_set_perf_mode();
+        #endif
         /**
          * abort if we have no serial init
          */
