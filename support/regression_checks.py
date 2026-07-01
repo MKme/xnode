@@ -284,10 +284,12 @@ def run_checks():
 
     require_tokens(
         "src/hardware/gpsctl.cpp",
-        "Ultra GPS pins, debug path, and idle power defaults",
+        "Ultra GPS pins, debug path, and automatic location defaults",
         [
             "GPSCTL_CONFIG_VERSION",
-            "gpsctl_config.autoon = false;",
+            "#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )",
+            "gpsctl_config.autoon = true;",
+            "gpsctl_config.app_use_gps = true;",
             "gpsctl_config.enable_on_standby = false;",
             "SHIELD_GPS_RX",
             "SHIELD_GPS_TX",
@@ -311,6 +313,17 @@ def run_checks():
             "display.wakeup();",
             "WATCH_POWER_GPS",
             "WATCH_POWER_GPS_DC_CHANNEL",
+        ],
+    )
+    require_tokens(
+        "src/hardware/config/gpsctlconfig.cpp",
+        "Ultra and T-Deck Plus GPS config defaults stay automatic and app-usable",
+        [
+            "#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )",
+            'autoon = doc["autoon"] | true;',
+            'app_use_gps = doc["app_use_gps"] | true;',
+            "autoon = true;",
+            "app_use_gps = true;",
         ],
     )
     require_tokens(
@@ -629,20 +642,24 @@ def run_checks():
             "RES_X_MAX - ( GPS_STATUS_DEBUG_X * 2 )",
             "char debug_text[640]",
             "lv_label_set_text(gps_status_debug_text, debug_text);",
+            "gps_status_debug_text || gps_status_debug_rows[GPS_STATUS_DEBUG_ROW_COUNT - 1]",
             "Position:%s\\n",
             "Raw RX:%lu  last:%s\\n",
         ],
     )
     require_tokens(
         "src/app/gps_status/gps_status_main.cpp",
-        "Ultra GPS status keeps row layout",
+        "Ultra GPS status keeps compact readable row layout",
         [
+            "#elif defined( LILYGO_WATCH_ULTRA )",
             "#define GPS_STATUS_DEBUG_ROW_COUNT 10",
             "#define GPS_STATUS_DEBUG_STEP 18",
+            "#if defined( LILYGO_WATCH_ULTRA ) && !defined( GPS_STATUS_FULL_DEBUG_LAYOUT )",
             "lv_obj_set_width(gps_status_debug_rows[i], lv_disp_get_hor_res(NULL) - ( GPS_STATUS_DEBUG_X * 2 ) );",
-            "\"Fix: %s\"",
-            "\"Position: %s\"",
-            "\"Raw RX: %lu  last %s\"",
+            "\"Fix:%s  Pwr:%s  UART:%s\"",
+            "\"Position:%s\"",
+            "\"RX:%lu %s  NMEA:%lu/%lu\"",
+            "\"Time sync:%s\"",
         ],
     )
     require_tokens(

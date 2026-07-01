@@ -704,7 +704,7 @@ void gpsctl_setup( void ) {
     #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
         bool config_changed = false;
         if ( gpsctl_config.config_version < GPSCTL_CONFIG_VERSION ) {
-            #if defined( LILYGO_T_DECK_PLUS )
+            #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
                 gpsctl_config.autoon = true;
                 gpsctl_config.app_use_gps = true;
             #else
@@ -719,7 +719,7 @@ void gpsctl_setup( void ) {
             gpsctl_config.TXPin = SHIELD_GPS_TX;
             config_changed = true;
         }
-        #if defined( LILYGO_T_DECK_PLUS )
+        #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
             if ( !gpsctl_config.autoon ) {
                 gpsctl_config.autoon = true;
                 config_changed = true;
