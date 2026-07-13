@@ -36,6 +36,8 @@
 #include "hardware/powermgm.h"
 #include "hardware/rtcctl.h"
 #include "hardware/button.h"
+#include "hardware/touch.h"
+#include "hardware/motor.h"
 
 #include "utils/alloc.h"
 
@@ -60,6 +62,14 @@ bool mainbar_button_event_cb( EventBits_t event, void *arg );
 bool mainbar_powermgm_event_cb( EventBits_t event, void *arg );
 bool mainbar_rtcctl_event_cb( EventBits_t event, void *arg );
 void mainbar_add_current_tile_to_history( void );
+#if defined( LILYGO_T_DECK_PRO )
+static int32_t mainbar_find_tile_number( lv_coord_t x, lv_coord_t y );
+static bool mainbar_tdeck_pro_jump_relative( lv_coord_t x_delta, lv_coord_t y_delta );
+static void mainbar_tdeck_pro_get_tile_act( lv_coord_t *x, lv_coord_t *y );
+static bool mainbar_tdeck_pro_set_tile_act( uint32_t tile_number );
+static void mainbar_tdeck_pro_event_cb( lv_obj_t *obj, lv_event_t event );
+static uint32_t mainbar_tdeck_pro_active_tile = 0;
+#endif
 
 void mainbar_setup( void ) {
     /*
@@ -72,10 +82,22 @@ void mainbar_setup( void ) {
 
     mainbar_history = (mainbar_history_t*)MALLOC_ASSERT( sizeof( mainbar_history_t ), "error while alloc" );
 
+#if defined( LILYGO_T_DECK_PRO )
+    mainbar = lv_cont_create( lv_scr_act(), NULL );
+    lv_obj_set_size( mainbar, lv_disp_get_hor_res( NULL ), LV_VER_RES );
+    lv_obj_set_pos( mainbar, 0, 0 );
+    lv_obj_set_drag( mainbar, false );
+    lv_obj_set_drag_throw( mainbar, false );
+    lv_obj_set_gesture_parent( mainbar, false );
+    lv_obj_set_event_cb( mainbar, mainbar_tdeck_pro_event_cb );
+#else
     mainbar = lv_tileview_create( lv_scr_act(), NULL);
     lv_tileview_set_edge_flash( mainbar, false);
+#endif
     lv_obj_add_style( mainbar, LV_OBJ_PART_MAIN, ws_get_mainbar_style() );
+#if !defined( LILYGO_T_DECK_PRO )
     lv_page_set_scrlbar_mode( mainbar, LV_SCRLBAR_MODE_OFF);
+#endif
     powermgm_register_cb_with_prio( POWERMGM_STANDBY, mainbar_powermgm_event_cb, "mainbar powermgm", CALL_CB_FIRST );
     powermgm_register_cb_with_prio( POWERMGM_WAKEUP | POWERMGM_SILENCE_WAKEUP, mainbar_powermgm_event_cb, "mainbar powermgm", CALL_CB_LAST );
     rtcctl_register_cb( RTCCTL_ALARM_OCCURRED, mainbar_rtcctl_event_cb, "mainbar rtcctl" );
@@ -94,7 +116,11 @@ bool mainbar_button_event_cb( EventBits_t event, void *arg ) {
     /**
      * get the current tile number
      */
+#if defined( LILYGO_T_DECK_PRO )
+    mainbar_tdeck_pro_get_tile_act( &x, &y );
+#else
     lv_tileview_get_tile_act( mainbar, &x, &y );
+#endif
     for ( int i = 0 ; i < tile_entrys; i++ ) {
         if ( tile_pos_table[ i ].x == x && tile_pos_table[ i ].y == y ) {
             current_tile = i;
@@ -134,7 +160,11 @@ void mainbar_add_current_tile_to_history( lv_anim_enable_t anim ) {
          * get current tile
          */
         lv_coord_t x,y;
+#if defined( LILYGO_T_DECK_PRO )
+        mainbar_tdeck_pro_get_tile_act( &x, &y );
+#else
         lv_tileview_get_tile_act( mainbar, &x, &y );
+#endif
         /**
          * store tile pos in history
          */
@@ -173,12 +203,23 @@ void mainbar_jump_back( void ) {
         /**
          * get the current tile pos for later use
          */
+#if defined( LILYGO_T_DECK_PRO )
+        mainbar_tdeck_pro_get_tile_act( &x, &y );
+#else
         lv_tileview_get_tile_act( mainbar, &x, &y );
+#endif
         /**
          * jump back
          */
         MAINBAR_INFO_LOG("jump back to tile: %d, %d, %d", mainbar_history->tile[ mainbar_history->entrys ].x, mainbar_history->tile[ mainbar_history->entrys ].y, mainbar_history->statusbar[ mainbar_history->entrys ] );
+#if defined( LILYGO_T_DECK_PRO )
+        int32_t back_tile_number = mainbar_find_tile_number( mainbar_history->tile[ mainbar_history->entrys ].x, mainbar_history->tile[ mainbar_history->entrys ].y );
+        if ( back_tile_number >= 0 ) {
+            mainbar_tdeck_pro_set_tile_act( (uint32_t)back_tile_number );
+        }
+#else
         lv_tileview_set_tile_act( mainbar, mainbar_history->tile[ mainbar_history->entrys ].x, mainbar_history->tile[ mainbar_history->entrys ].y, mainbar_history->anim[ mainbar_history->entrys ] );
+#endif
         statusbar_hide( mainbar_history->statusbar[ mainbar_history->entrys ] );
         gui_force_redraw( true );
         /**
@@ -302,9 +343,19 @@ uint32_t mainbar_add_tile( uint16_t x, uint16_t y, const char *id, lv_style_t *s
     tile[ tile_entrys - 1 ].id = id;
     lv_obj_set_size( tile[ tile_entrys - 1 ].tile, lv_disp_get_hor_res( NULL ), LV_VER_RES);
     lv_obj_add_style( tile[ tile_entrys - 1 ].tile, LV_OBJ_PART_MAIN, style );
+#if defined( LILYGO_T_DECK_PRO )
+    if ( tile_entrys == 1 ) {
+        mainbar_tdeck_pro_active_tile = 0;
+    }
+    lv_obj_set_pos( tile[ tile_entrys - 1 ].tile, 0, 0 );
+    lv_obj_set_drag( tile[ tile_entrys - 1 ].tile, false );
+    lv_obj_set_drag_throw( tile[ tile_entrys - 1 ].tile, false );
+    lv_obj_set_hidden( tile[ tile_entrys - 1 ].tile, ( tile_entrys - 1 ) != mainbar_tdeck_pro_active_tile );
+#else
     lv_obj_set_pos( tile[ tile_entrys - 1 ].tile, tile_pos_table[ tile_entrys - 1 ].x * lv_disp_get_hor_res( NULL ) , tile_pos_table[ tile_entrys - 1 ].y * LV_VER_RES );
     lv_tileview_add_element( mainbar, tile[ tile_entrys - 1 ].tile );
     lv_tileview_set_valid_positions( mainbar, tile_pos_table, tile_entrys );
+#endif
     MAINBAR_INFO_LOG("add tile: x=%d, y=%d, id=%s", tile_pos_table[ tile_entrys - 1 ].x, tile_pos_table[ tile_entrys - 1 ].y, tile[ tile_entrys - 1 ].id );
 
     return( tile_entrys - 1 );
@@ -481,6 +532,17 @@ void mainbar_jump_to_tilenumber( uint32_t tile_number, lv_anim_enable_t anim, bo
     /**
      * get the current tile number
      */
+#if defined( LILYGO_T_DECK_PRO )
+    if ( mainbar_tdeck_pro_active_tile < tile_entrys ) {
+        current_tile = mainbar_tdeck_pro_active_tile;
+        x = tile_pos_table[ current_tile ].x;
+        y = tile_pos_table[ current_tile ].y;
+        if ( current_tile == tile_number ) {
+            MAINBAR_INFO_LOG("the destination tile is the current tile");
+            return;
+        }
+    }
+#else
     lv_tileview_get_tile_act( mainbar, &x, &y );
     for ( int i = 0 ; i < tile_entrys; i++ ) {
         if ( tile_pos_table[ i ].x == x && tile_pos_table[ i ].y == y ) {
@@ -494,6 +556,7 @@ void mainbar_jump_to_tilenumber( uint32_t tile_number, lv_anim_enable_t anim, bo
             }
         }
     }
+#endif
     /**
      * check if tile alread in mainbar history to prevent loops
      */
@@ -516,7 +579,11 @@ void mainbar_jump_to_tilenumber( uint32_t tile_number, lv_anim_enable_t anim, bo
          * jump into tile
          */
         MAINBAR_INFO_LOG("jump to tile %d from tile %d", tile_number, current_tile );
+#if defined( LILYGO_T_DECK_PRO )
+        mainbar_tdeck_pro_set_tile_act( tile_number );
+#else
         lv_tileview_set_tile_act( mainbar, tile_pos_table[ tile_number ].x, tile_pos_table[ tile_number ].y, anim );
+#endif
         gui_force_redraw( true );
         /**
          * call hibernate callback for the current tile if exist
@@ -557,7 +624,9 @@ lv_obj_t * mainbar_obj_create(lv_obj_t *parent) {
     ASSERT( mainbar, "main not initialized" );
 
     lv_obj_t * child = lv_obj_create( parent, NULL );
+#if !defined( LILYGO_T_DECK_PRO )
     lv_tileview_add_element( mainbar, child );
+#endif
 
     return child;
 }
@@ -568,5 +637,189 @@ void mainbar_add_slide_element(lv_obj_t *element) {
      */
     ASSERT( mainbar, "mainbar not initialized" );
 
+#if !defined( LILYGO_T_DECK_PRO )
     lv_tileview_add_element( mainbar, element );
+#else
+    (void)element;
+#endif
 }
+
+#if defined( LILYGO_T_DECK_PRO )
+static void mainbar_tdeck_pro_event_cb( lv_obj_t *obj, lv_event_t event ) {
+    (void)obj;
+
+    if ( event != LV_EVENT_GESTURE ) {
+        return;
+    }
+
+    switch ( lv_indev_get_gesture_dir( lv_indev_get_act() ) ) {
+        case LV_GESTURE_DIR_LEFT:
+            mainbar_tdeck_pro_jump_relative( 1, 0 );
+            break;
+        case LV_GESTURE_DIR_RIGHT:
+            mainbar_tdeck_pro_jump_relative( -1, 0 );
+            break;
+        case LV_GESTURE_DIR_TOP:
+            mainbar_tdeck_pro_jump_relative( 0, 1 );
+            break;
+        case LV_GESTURE_DIR_BOTTOM:
+            mainbar_tdeck_pro_jump_relative( 0, -1 );
+            break;
+        default:
+            break;
+    }
+
+    lv_indev_reset( NULL, NULL );
+    gui_force_redraw( true );
+}
+
+static void mainbar_tdeck_pro_get_tile_act( lv_coord_t *x, lv_coord_t *y ) {
+    if ( tile_entrys == 0 || mainbar_tdeck_pro_active_tile >= tile_entrys ) {
+        if ( x != NULL ) {
+            *x = 0;
+        }
+        if ( y != NULL ) {
+            *y = 0;
+        }
+        return;
+    }
+
+    if ( x != NULL ) {
+        *x = tile_pos_table[ mainbar_tdeck_pro_active_tile ].x;
+    }
+    if ( y != NULL ) {
+        *y = tile_pos_table[ mainbar_tdeck_pro_active_tile ].y;
+    }
+}
+
+static bool mainbar_tdeck_pro_set_tile_act( uint32_t tile_number ) {
+    if ( tile_number >= tile_entrys ) {
+        return( false );
+    }
+
+    if ( mainbar_tdeck_pro_active_tile < tile_entrys ) {
+        lv_obj_set_hidden( tile[ mainbar_tdeck_pro_active_tile ].tile, true );
+    }
+
+    mainbar_tdeck_pro_active_tile = tile_number;
+    lv_obj_set_pos( tile[ tile_number ].tile, 0, 0 );
+    lv_obj_set_hidden( tile[ tile_number ].tile, false );
+    lv_obj_invalidate( lv_scr_act() );
+    return( true );
+}
+
+static int32_t mainbar_find_tile_number( lv_coord_t x, lv_coord_t y ) {
+    for ( uint32_t i = 0; i < tile_entrys; i++ ) {
+        if ( tile_pos_table[ i ].x == x && tile_pos_table[ i ].y == y ) {
+            return( (int32_t)i );
+        }
+    }
+    return( -1 );
+}
+
+static bool mainbar_tdeck_pro_jump_relative( lv_coord_t x_delta, lv_coord_t y_delta ) {
+    if ( mainbar == NULL || tile_entrys == 0 ) {
+        return( false );
+    }
+
+    static uint32_t last_jump_ms = 0;
+    const uint32_t now_ms = millis();
+    if ( now_ms - last_jump_ms < 250 ) {
+        return( false );
+    }
+
+    lv_coord_t x = 0;
+    lv_coord_t y = 0;
+    mainbar_tdeck_pro_get_tile_act( &x, &y );
+
+    int32_t tile_number = mainbar_find_tile_number( x + x_delta, y + y_delta );
+    if ( tile_number < 0 ) {
+        MAINBAR_INFO_LOG( "T-Deck PRO gesture ignored: no tile at %d,%d", x + x_delta, y + y_delta );
+        Serial.printf( "T-Deck PRO gesture ignored: %d,%d -> %d,%d\r\n", x, y, x + x_delta, y + y_delta );
+        return( false );
+    }
+
+    MAINBAR_INFO_LOG( "T-Deck PRO gesture jump: %d,%d -> %d,%d", x, y, x + x_delta, y + y_delta );
+    Serial.printf( "T-Deck PRO gesture jump: %d,%d -> %d,%d\r\n", x, y, x + x_delta, y + y_delta );
+    mainbar_jump_to_tilenumber( (uint32_t)tile_number, LV_ANIM_OFF );
+    mainbar_clear_history();
+    lv_indev_reset( NULL, NULL );
+    gui_force_redraw( true );
+    lv_obj_invalidate( lv_scr_act() );
+    motor_vibe( 3, true );
+    last_jump_ms = now_ms;
+    return( true );
+}
+
+bool mainbar_poll_tdeck_pro_gesture( void ) {
+    static bool tracking = false;
+    static lv_point_t start_point = { 0, 0 };
+    static lv_point_t last_point = { 0, 0 };
+    static uint32_t last_touch_ms = 0;
+
+    constexpr lv_coord_t swipe_threshold = 54;
+    constexpr uint32_t release_grace_ms = 140;
+
+    int8_t x_delta = 0;
+    int8_t y_delta = 0;
+    if ( touch_get_swipe_delta( &x_delta, &y_delta ) ) {
+        if ( mainbar_tdeck_pro_jump_relative( x_delta, y_delta ) ) {
+            Serial.printf( "T-Deck PRO touch swipe: %d,%d\r\n", x_delta, y_delta );
+        }
+        lv_indev_reset( NULL, NULL );
+        gui_force_redraw( true );
+        return( true );
+    }
+
+    touch_t touch;
+    if ( !touch_get_last( touch ) || !touch.touched ) {
+        if ( !tracking ) {
+            return( false );
+        }
+
+        const uint32_t now_ms = millis();
+        if ( now_ms - last_touch_ms < release_grace_ms ) {
+            return( true );
+        }
+
+        tracking = false;
+
+        if ( start_point.y <= STATUSBAR_HEIGHT ) {
+            return( false );
+        }
+
+        const lv_coord_t dx = last_point.x - start_point.x;
+        const lv_coord_t dy = last_point.y - start_point.y;
+        const lv_coord_t abs_x = dx < 0 ? -dx : dx;
+        const lv_coord_t abs_y = dy < 0 ? -dy : dy;
+
+        if ( abs_x >= swipe_threshold && abs_x > abs_y ) {
+            mainbar_tdeck_pro_jump_relative( dx < 0 ? 1 : -1, 0 );
+            lv_indev_reset( NULL, NULL );
+            return( true );
+        }
+
+        if ( abs_y >= swipe_threshold && abs_y > abs_x ) {
+            mainbar_tdeck_pro_jump_relative( 0, dy < 0 ? 1 : -1 );
+            lv_indev_reset( NULL, NULL );
+            return( true );
+        }
+
+        return( false );
+    }
+
+    if ( !tracking ) {
+        start_point.x = touch.x_coor;
+        start_point.y = touch.y_coor;
+        last_point = start_point;
+        tracking = true;
+    }
+    else {
+        last_point.x = touch.x_coor;
+        last_point.y = touch.y_coor;
+    }
+
+    last_touch_ms = millis();
+    return( true );
+}
+#endif

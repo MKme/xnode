@@ -13,7 +13,7 @@ Interpretation:
 - NMEA OK count rises but fix is no: receiver works but has not locked satellites yet.
 - Valid fix but no map marker: check map app, marker visibility, basemap projection metadata, and local position update path.
 
-On T-Deck Plus, GPS should use `Serial1` RX `44` and TX `43`.
+On T-Deck Plus and T-Deck Pro, GPS should use `Serial1` RX `44` and TX `43`.
 
 ## Clock not syncing
 
@@ -24,6 +24,7 @@ If Ultra syncs and T-Deck does not, check:
 - T-Deck GPS status raw/NMEA/fix/time fields.
 - Receiver probe result and baud.
 - Whether the build target was `tdeck-plus`.
+- Whether the build target was `tdeck-pro` for a Pro unit.
 - Whether the board was flashed with the current repo output.
 
 ## Map position missing
@@ -83,6 +84,24 @@ If wake becomes slow again, check:
 - `src/hardware/display.cpp`
 - `src/hardware/tdeck_plus_hal.*`
 - T-Deck standby regression checks.
+
+## T-Deck Pro e-paper display only shows status icons
+
+The Pro target needs the full-height e-paper framebuffer and startup redraw path. If the main page regresses to only status icons:
+
+- Verify the build target was `tdeck-pro`, not `tdeck-plus`.
+- Check `src/hardware/framebuffer.h` for the Pro `FRAMEBUFFER_BUFFER_H RES_Y_MAX` setting.
+- Check `src/gui/gui.cpp` for the Pro startup `lv_refr_now(NULL)` plus `framebuffer_refresh()` path.
+- Check `src/hardware/tdeck_pro_hal.cpp` for the GxEPD2 full-window refresh path.
+
+## T-Deck Pro touch or swipe does not navigate
+
+The Pro status bar can receive taps even when the mainbar swipe path is broken. If top-bar taps work but center-screen swipes do not:
+
+- Check that HYN touch initializes in the boot log: `[TDECKPRO] touch: OK (HYN)`.
+- Check `src/hardware/touch.cpp` for Pro HYN polling and `touch_get_swipe_delta`.
+- Check `src/gui/mainbar/mainbar.cpp` for `mainbar_poll_tdeck_pro_gesture`.
+- Swipe from the center of the screen, not from the top status bar.
 
 ## Battery drain at idle
 

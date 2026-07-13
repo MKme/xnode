@@ -67,6 +67,8 @@
         #include <LilyGoLib.h>
     #elif defined( LILYGO_T_DECK_PLUS )
         #include "hardware/tdeck_plus_hal.h"
+    #elif defined( LILYGO_T_DECK_PRO )
+        #include "hardware/tdeck_pro_hal.h"
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #include <TTGO.h>
     #elif defined( LILYGO_WATCH_2021 )    
@@ -171,6 +173,11 @@ void hardware_setup( void ) {
             watch.begin(&Serial);
             lv_init();
         #elif defined( LILYGO_T_DECK_PLUS )
+            Serial.begin(115200);
+            delay(100);
+            watch.begin(&Serial);
+            lv_init();
+        #elif defined( LILYGO_T_DECK_PRO )
             Serial.begin(115200);
             delay(100);
             watch.begin(&Serial);

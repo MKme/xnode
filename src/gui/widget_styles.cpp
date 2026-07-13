@@ -102,6 +102,10 @@ void widget_style_theme_set( int theme ) {
     if ( theme < 0 || theme > 1 ) {
         theme = 1;
     }
+    #elif defined( LILYGO_T_DECK_PRO )
+    if ( theme < 0 || theme > 1 ) {
+        theme = 0;
+    }
     #else
     if ( theme == 3 || theme < 0 || theme > 3 ) {
         theme = 1;

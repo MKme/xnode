@@ -34,7 +34,7 @@
         #if defined( M5PAPER )
             int theme = 0;
             bool anim = false;
-        #elif defined( LILYGO_T_DECK_PLUS )
+        #elif defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
             int theme = 1;
             bool anim = true;
         #else

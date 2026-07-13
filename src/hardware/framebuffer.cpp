@@ -23,6 +23,7 @@
 #include "lvgl.h"
 #include "framebuffer.h"
 #include "powermgm.h"
+#include "touch.h"
 #include "utils/alloc.h"
 /**
  * device depends includes and inits
@@ -55,6 +56,11 @@
         #include <LilyGoLib.h>
     #elif defined( LILYGO_T_DECK_PLUS )
         #include "hardware/tdeck_plus_hal.h"
+    #elif defined( LILYGO_T_DECK_PRO )
+        #include "hardware/tdeck_pro_hal.h"
+        static uint64_t refreshdelay = 0;
+        static lv_coord_t min_x = RES_X_MAX, max_x = 0;
+        static lv_coord_t min_y = RES_Y_MAX, max_y = 0;
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #include <TTGO.h>
     #elif defined( LILYGO_WATCH_2021 )
@@ -122,6 +128,15 @@ void framebuffer_setup( void ) {
             framebuffer_use_dma = false;
             watch.setSwapBytes( true );
             watch.fillScreen( TFT_BLACK );
+        #elif defined( LILYGO_T_DECK_PRO )
+            framebuffer_use_dma = false;
+            watch.setSwapBytes( true );
+            watch.fillScreen( TFT_WHITE );
+            refreshdelay = 0;
+            min_x = RES_X_MAX;
+            max_x = 0;
+            min_y = RES_Y_MAX;
+            max_y = 0;
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             /**
              * enable DMA only for V1 and V2
@@ -271,6 +286,17 @@ bool framebuffer_powermgm_loop_cb( EventBits_t event, void *arg ) {
         #elif defined( LILYGO_WATCH_ULTRA )
         #elif defined( LILYGO_WATCH_S3 )
         #elif defined( LILYGO_T_DECK_PLUS )
+        #elif defined( LILYGO_T_DECK_PRO )
+            if ( refreshdelay != 0 && refreshdelay <= millis() ) {
+                if ( min_x != RES_X_MAX || min_y != RES_Y_MAX || max_x != 0 || max_y != 0 ) {
+                    watch.refreshArea( min_x, min_y, max_x - min_x + 1, max_y - min_y + 1 );
+                }
+                refreshdelay = 0;
+                min_x = RES_X_MAX;
+                max_x = 0;
+                min_y = RES_Y_MAX;
+                max_y = 0;
+            }
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #elif defined( LILYGO_WATCH_2021 )
         #elif defined( WT32_SC01 )
@@ -300,6 +326,13 @@ void framebuffer_refresh( void ) {
         #elif defined( LILYGO_WATCH_ULTRA )
         #elif defined( LILYGO_WATCH_S3 )
         #elif defined( LILYGO_T_DECK_PLUS )
+        #elif defined( LILYGO_T_DECK_PRO )
+            watch.refreshFull();
+            refreshdelay = 0;
+            min_x = RES_X_MAX;
+            max_x = 0;
+            min_y = RES_Y_MAX;
+            max_y = 0;
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #elif defined( LILYGO_WATCH_2021 )
         #elif defined( WT32_SC01 )
@@ -407,6 +440,13 @@ static void framebuffer_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area,
             watch.setAddrWindow(area->x1, area->y1, (area->x2 - area->x1 + 1), (area->y2 - area->y1 + 1));
             watch.pushColors((uint16_t *)color_p, size, true);
             watch.endWrite();
+        #elif defined( LILYGO_T_DECK_PRO )
+            if ( min_x > area->x1 ) min_x = area->x1;
+            if ( min_y > area->y1 ) min_y = area->y1;
+            if ( max_x < area->x2 ) max_x = area->x2;
+            if ( max_y < area->y2 ) max_y = area->y2;
+            watch.flushArea(area, color_p);
+            refreshdelay = millis() + FRAMEBUFFER_REFRESH_DELAY;
         #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
             TTGOClass *ttgo = TTGOClass::getWatch();
             /**

@@ -54,7 +54,7 @@
 
 static bool maintile_init = false;
 
-#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
     #define MAIN_TILE_HAS_MOON 1
 #endif
 
@@ -158,7 +158,7 @@ void main_tile_setup( void ) {
     lv_style_copy( &iconstyle, style);
     lv_style_set_text_font( &iconstyle, LV_STATE_DEFAULT, icon_font );
 
-    #if defined( MAIN_TILE_HAS_MOON )
+    #if defined( MAIN_TILE_HAS_MOON ) && !defined( LILYGO_T_DECK_PRO )
         lv_style_set_text_color( &timestyle, LV_STATE_DEFAULT, LV_COLOR_WHITE );
         lv_style_set_text_color( &datestyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 220, 226, 235 ) );
         lv_style_set_text_color( &infostyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 150, 166, 184 ) );
@@ -603,10 +603,12 @@ static bool main_tile_style_event_cb( EventBits_t event, void *arg ){
 
                                 lv_style_copy( &iconstyle, style);
                                 lv_style_set_text_font( &iconstyle, LV_STATE_DEFAULT, icon_font );
-                                #if defined( MAIN_TILE_HAS_MOON )
+                                #if defined( MAIN_TILE_HAS_MOON ) && !defined( LILYGO_T_DECK_PRO )
                                     lv_style_set_text_color( &timestyle, LV_STATE_DEFAULT, LV_COLOR_WHITE );
                                     lv_style_set_text_color( &datestyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 220, 226, 235 ) );
                                     lv_style_set_text_color( &infostyle, LV_STATE_DEFAULT, LV_COLOR_MAKE( 150, 166, 184 ) );
+                                #endif
+                                #if defined( MAIN_TILE_HAS_MOON )
                                     main_tile_ultra_align_clock();
                                 #endif
                                 break;

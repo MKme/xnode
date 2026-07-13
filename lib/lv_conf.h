@@ -31,6 +31,9 @@
     #elif defined( LILYGO_T_DECK_PLUS )
         #define LV_HOR_RES_MAX          (320)
         #define LV_VER_RES_MAX          (240)
+    #elif defined( LILYGO_T_DECK_PRO )
+        #define LV_HOR_RES_MAX          (240)
+        #define LV_VER_RES_MAX          (320)
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #define LV_HOR_RES_MAX          (240)
         #define LV_VER_RES_MAX          (240)
@@ -57,6 +60,8 @@
     #elif defined( LILYGO_WATCH_ULTRA )
         #define LV_COLOR_16_SWAP   0
     #elif defined( LILYGO_T_DECK_PLUS )
+        #define LV_COLOR_16_SWAP   0
+    #elif defined( LILYGO_T_DECK_PRO )
         #define LV_COLOR_16_SWAP   0
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
         #define LV_COLOR_16_SWAP   0
@@ -160,7 +165,7 @@ typedef int16_t lv_coord_t;
  * Can be changed in the Input device driver (`lv_indev_drv_t`)*/
 
 /* Input device read period in milliseconds */
-#if defined( LILYGO_WATCH_ULTRA )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PRO )
 #define LV_INDEV_DEF_READ_PERIOD          10
 #else
 #define LV_INDEV_DEF_READ_PERIOD          30

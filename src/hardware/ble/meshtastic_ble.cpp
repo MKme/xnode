@@ -1,7 +1,7 @@
 #include "config.h"
 #include "meshtastic_ble.h"
 
-#if !defined( NATIVE_64BIT ) && ( defined( USING_TWATCH_S3 ) || defined( USING_TWATCH_ULTRA ) || defined( USING_TDECK_PLUS ) )
+#if !defined( NATIVE_64BIT ) && ( defined( USING_TWATCH_S3 ) || defined( USING_TWATCH_ULTRA ) || defined( USING_TDECK_PLUS ) || defined( USING_TDECK_PRO ) )
 
     #include <Arduino.h>
     #include <ESP.h>
@@ -308,7 +308,7 @@
             snprintf( user.short_name, sizeof( user.short_name ), "%s", info.short_name[ 0 ] ? info.short_name : meshtastic_ble_owner_short_name );
             #if defined( USING_TWATCH_ULTRA )
                 user.hw_model = meshtastic_HardwareModel_T_WATCH_ULTRA;
-            #elif defined( USING_TDECK_PLUS )
+            #elif defined( USING_TDECK_PLUS ) || defined( USING_TDECK_PRO )
                 user.hw_model = meshtastic_HardwareModel_T_DECK;
             #else
                 user.hw_model = meshtastic_HardwareModel_T_WATCH_S3;
@@ -366,7 +366,7 @@
             metadata.position_flags = meshtastic_ble_config_store.position.position_flags;
             #if defined( USING_TWATCH_ULTRA )
                 metadata.hw_model = meshtastic_HardwareModel_T_WATCH_ULTRA;
-            #elif defined( USING_TDECK_PLUS )
+            #elif defined( USING_TDECK_PLUS ) || defined( USING_TDECK_PRO )
                 metadata.hw_model = meshtastic_HardwareModel_T_DECK;
             #else
                 metadata.hw_model = meshtastic_HardwareModel_T_WATCH_S3;

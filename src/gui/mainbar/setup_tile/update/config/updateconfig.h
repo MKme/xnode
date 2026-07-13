@@ -39,7 +39,7 @@
         #define FIRMWARE_UPDATE_URL            ""
     #elif defined( LILYGO_WATCH_ULTRA )
         #define FIRMWARE_UPDATE_URL            ""
-    #elif defined( LILYGO_T_DECK_PLUS )
+    #elif defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
         #define FIRMWARE_UPDATE_URL            ""
     #elif defined( LILYGO_WATCH_2021 )
         #if defined( VERSION_2 )

@@ -37,6 +37,7 @@ The regression checks protect the recent high-risk behavior:
 - Tactical map controls and performance mode.
 - Map pan behavior over markers.
 - T-Deck Plus viewport behavior.
+- T-Deck Pro e-paper first paint, touch, and swipe behavior.
 - GPS diagnostics layout.
 - GPS pin/probe/time-sync behavior.
 - Power defaults.
@@ -58,6 +59,7 @@ This runs tests and builds:
 t-watch-ultra
 t-watch2020-v3-s3
 tdeck-plus
+tdeck-pro
 ```
 
 ## Build one target
@@ -66,6 +68,7 @@ tdeck-plus
 pio run -e t-watch-ultra
 pio run -e t-watch2020-v3-s3
 pio run -e tdeck-plus
+pio run -e tdeck-pro
 ```
 
 ## Flash
@@ -82,6 +85,12 @@ T-Deck Plus example:
 pio run -e tdeck-plus -t upload --upload-port COM20
 ```
 
+T-Deck Pro example:
+
+```powershell
+pio run -e tdeck-pro -t upload --upload-port COM7
+```
+
 Use the actual COM port Windows assigned to the attached device.
 
 ## Firmware artifacts
@@ -90,6 +99,12 @@ T-Deck Plus binary for manual or Launcher testing:
 
 ```text
 .pio/build/tdeck-plus/firmware.bin
+```
+
+T-Deck Pro binary for manual or Launcher testing:
+
+```text
+.pio/build/tdeck-pro/firmware.bin
 ```
 
 Watch binaries are emitted under their corresponding `.pio/build/<env>/` folders.
@@ -108,14 +123,13 @@ It runs on push, pull request, and manual workflow dispatch. The current workflo
 npm run build
 ```
 
-That means every CI run should cover regression tests and all three active firmware targets.
+That means every CI run should cover regression tests and all four active firmware targets.
 
 ## Post-upload reset behavior
 
-Ultra and T-Deck Plus use post-upload reset helpers so devices do not remain trapped in the flasher stub after programming:
+Ultra and T-Deck Plus use post-upload reset helpers so devices do not remain trapped in the flasher stub after programming. T-Deck Pro currently uses `board_upload.after_reset = no_reset_stub`; if a tool leaves it in the stub, issue an ESP32-S3 run/reset command or power cycle the board.
 
 - `support/twatch_ultra_post_upload_reset.py`
 - `support/tdeck_plus_post_upload_reset.py`
 
 If a device still needs manual power cycling after upload, check the upload port, baud rate, USB cable, and whether the correct target environment was used.
-

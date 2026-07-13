@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "test": "python support/check_watch_overlay_persistence.py && python support/regression_checks.py",
-    "build": "npm test && pio run -e t-watch-ultra -e t-watch2020-v3-s3 -e tdeck-plus",
+    "build": "npm test && pio run -e t-watch-ultra -e t-watch2020-v3-s3 -e tdeck-plus -e tdeck-pro",
     "upload": "pio run -e t-watch-ultra -t upload --upload-port COM10"
   }
 }

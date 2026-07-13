@@ -38,6 +38,8 @@
         #include "hardware/twatch_ultra_hal.h"
     #elif defined( LILYGO_T_DECK_PLUS )
         #include "hardware/tdeck_plus_hal.h"
+    #elif defined( LILYGO_T_DECK_PRO )
+        #include "hardware/tdeck_pro_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )

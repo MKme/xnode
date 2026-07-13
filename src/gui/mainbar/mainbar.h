@@ -195,4 +195,8 @@
      */
     void mainbar_clear_history( void );
 
+    #if defined( LILYGO_T_DECK_PRO )
+        bool mainbar_poll_tdeck_pro_gesture( void );
+    #endif
+
 #endif // _MAINBAR_H

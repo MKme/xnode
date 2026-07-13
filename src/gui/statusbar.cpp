@@ -368,7 +368,12 @@ void statusbar_update_task( lv_task_t * task ) {
 
 bool statusbar_style_event_cb( EventBits_t event, void *arg ) {
     switch( event ) {
-        case STYLE_LIGHTMODE:   statusbar_retracted_color = LV_COLOR_WHITE;
+        case STYLE_LIGHTMODE:
+                                #if defined( LILYGO_T_DECK_PRO )
+                                    statusbar_retracted_color = LV_COLOR_BLACK;
+                                #else
+                                    statusbar_retracted_color = LV_COLOR_WHITE;
+                                #endif
                                 statusbar_extended_color = LV_COLOR_BLACK;
                                 statusbar_set_dark( false );
                                 break;
@@ -952,18 +957,21 @@ void statusbar_event( lv_obj_t * statusbar, lv_event_t event ) {
         return;
     }
 
-    static bool expand = false;
-
     switch( event ) {
+#if defined( LILYGO_T_DECK_PRO )
+        case LV_EVENT_CLICKED:
+            statusbar_expand( !statusbar_expanded );
+            break;
+#else
         case LV_EVENT_PRESSED:
-            if ( expand ) {
+            if ( statusbar_expanded ) {
                 statusbar_expand( false );
-                expand = false;
             } 
             else {
                 statusbar_expand( true );
-                expand = true;
             }
+            break;
+#endif
         default:
             break;
     }

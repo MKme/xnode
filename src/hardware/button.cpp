@@ -62,6 +62,7 @@ bool button_send_cb( EventBits_t event, void *arg );
             }
             return( true );
         }
+    #elif defined( LILYGO_T_DECK_PRO )
     #elif defined( LILYGO_WATCH_2021 ) 
         #include <twatch2021_config.h>
     #elif defined( WT32_SC01 )
@@ -105,6 +106,7 @@ void button_setup( void ) {
              * to the pmu
              */
             pmu_register_cb( PMUCTL_SHORT_PRESS | PMUCTL_LONG_PRESS, button_pmu_event_cb, "button pmu event" );
+        #elif defined( LILYGO_T_DECK_PRO )
         #elif defined( LILYGO_WATCH_2021 ) 
             pinMode( BTN_1, INPUT_PULLUP );
             pinMode( BTN_2, INPUT );

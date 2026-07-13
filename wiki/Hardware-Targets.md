@@ -1,6 +1,6 @@
 # Hardware Targets
 
-XNODE currently builds three supported firmware targets from this repo.
+XNODE currently builds four supported firmware targets from this repo.
 
 ## T-Watch Ultra
 
@@ -90,3 +90,47 @@ Important T-Deck behavior:
 - Touch and hardware keyboard remain activity/wake sources.
 - The target currently does not implement trackball, speaker, microphone, IMU/compass, pedometer, or RTC alarm integration.
 - The current T-Deck Plus hardware target does not expose an onboard vibration motor, so XNODE treats haptic feedback as unavailable on this target.
+
+## T-Deck Pro
+
+PlatformIO environment:
+
+```powershell
+pio run -e tdeck-pro
+```
+
+Role:
+
+- Portrait 240x320 e-paper XNODE handheld target.
+- Built-in hardware keyboard for message entry.
+- Touch and swipe navigation on the Pro e-paper UI.
+- Same core launcher, messages, mesh, tactical map, GPS status, Alert Summary, SOS, and CheckIn workflows.
+- Produces a firmware binary suitable for manual install or bmorcelli Launcher testing.
+
+Firmware output:
+
+```text
+.pio/build/tdeck-pro/firmware.bin
+```
+
+Important hardware mappings:
+
+| Function | Mapping |
+| --- | --- |
+| Display | 240x320 GDEQ031T10 e-paper through GxEPD2 |
+| Touch | HYN/CST touch path on I2C, Pro V2 reset/int pins |
+| Keyboard | TCA8418 I2C keyboard controller |
+| Haptics | DRV2605 at I2C `0x5A` |
+| Battery gauge | BQ27220 at I2C `0x55` |
+| LoRa | SX1262 on shared SPI |
+| GPS | `Serial1`, RX `44`, TX `43` |
+| SD card | Shared SPI bus |
+
+Important T-Deck Pro behavior:
+
+- Upload speed is `460800` for reliability.
+- Pro hardware support libraries are vendored under `support/tdeck-pro-libdeps`.
+- Full-height LVGL draw buffers and an explicit startup refresh are used so the whole e-paper main page paints at boot.
+- HYN touch is polled directly for UI input; swipe navigation has both LVGL gesture and raw-sample fallback paths.
+- Status bar and main page styling are adjusted for black-on-white e-paper contrast.
+- E-paper refresh can briefly invert during full refreshes and is slower than LCD/AMOLED targets.

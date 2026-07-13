@@ -44,6 +44,7 @@
     #elif defined( M5CORE2 )
     #elif defined( LILYGO_WATCH_ULTRA )
     #elif defined( LILYGO_T_DECK_PLUS )
+    #elif defined( LILYGO_T_DECK_PRO )
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
     #elif defined( LILYGO_WATCH_2021 )
     #elif defined( WT32_SC01 )
@@ -498,7 +499,7 @@ void blectl_save_config( void ) {
 
 void blectl_read_config( void ) {
     blectl_config.load();
-#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
+#if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
     if ( blectl_config.config_version < BLECTL_CONFIG_VERSION ) {
         blectl_config.autoon = true;
         blectl_config.advertising = true;

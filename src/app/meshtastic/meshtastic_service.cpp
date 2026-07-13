@@ -5,7 +5,7 @@
 
 #include <string.h>
 
-#if defined( USING_TWATCH_S3 ) || defined( USING_TWATCH_ULTRA ) || defined( USING_TDECK_PLUS )
+#if defined( USING_TWATCH_S3 ) || defined( USING_TWATCH_ULTRA ) || defined( USING_TDECK_PLUS ) || defined( USING_TDECK_PRO )
 
     #include <Arduino.h>
     #include <ArduinoJson.h>
@@ -15,6 +15,8 @@
         #include "hardware/twatch_ultra_hal.h"
     #elif defined( USING_TDECK_PLUS )
         #include "hardware/tdeck_plus_hal.h"
+    #elif defined( USING_TDECK_PRO )
+        #include "hardware/tdeck_pro_hal.h"
     #else
         #include <LilyGoLib.h>
     #endif
@@ -52,7 +54,7 @@
         constexpr uint8_t MESHTASTIC_CR = 5;
         constexpr uint16_t MESHTASTIC_PREAMBLE = 16;
         constexpr int8_t MESHTASTIC_TX_POWER = 22;
-        #if defined( USING_TWATCH_ULTRA ) || defined( USING_TDECK_PLUS )
+        #if defined( USING_TWATCH_ULTRA ) || defined( USING_TDECK_PLUS ) || defined( USING_TDECK_PRO )
             constexpr float MESHTASTIC_TCXO_VOLTAGE = 1.8f;
         #else
             constexpr float MESHTASTIC_TCXO_VOLTAGE = 3.0f;
@@ -591,7 +593,7 @@
             strlcpy( user.short_name, meshtastic_short_name, sizeof( user.short_name ) );
             #if defined( USING_TWATCH_ULTRA )
                 user.hw_model = meshtastic_HardwareModel_T_WATCH_ULTRA;
-            #elif defined( USING_TDECK_PLUS )
+            #elif defined( USING_TDECK_PLUS ) || defined( USING_TDECK_PRO )
                 user.hw_model = meshtastic_HardwareModel_T_DECK;
             #else
                 user.hw_model = meshtastic_HardwareModel_T_WATCH_S3;

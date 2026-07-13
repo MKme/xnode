@@ -794,6 +794,7 @@ def run_checks():
             "[env:t-watch2020-v3-s3]",
             "[env:t-watch-ultra]",
             "[env:tdeck-plus]",
+            "[env:tdeck-pro]",
             "pre:support/regression_checks.py",
             "pre:support/twatch_ultra_asyncwebserver.py",
             "post:support/twatch_ultra_post_upload_reset.py",
@@ -840,7 +841,7 @@ def run_checks():
         "npm build covers all supported firmware targets",
         [
             '"test": "python support/check_watch_overlay_persistence.py && python support/regression_checks.py"',
-            "pio run -e t-watch-ultra -e t-watch2020-v3-s3 -e tdeck-plus",
+            "pio run -e t-watch-ultra -e t-watch2020-v3-s3 -e tdeck-plus -e tdeck-pro",
         ],
     )
 

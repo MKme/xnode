@@ -1,5 +1,9 @@
 #pragma once
 
+#if defined(LILYGO_T_DECK_PRO)
+#include "tdeck_pro_hal.h"
+#endif
+
 #if defined(LILYGO_T_DECK_PLUS)
 
 #include <Arduino.h>

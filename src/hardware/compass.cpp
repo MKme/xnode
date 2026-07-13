@@ -38,6 +38,7 @@
         #include <twatch2021_config.h>
         #include <QMC5883LCompass.h>
         QMC5883LCompass compass;
+    #elif defined( LILYGO_T_DECK_PRO )
     #elif defined( WT32_SC01 )
     #else
         #warning "no hardware driver for compass"
@@ -67,6 +68,7 @@ void compass_setup( void ) {
         #elif defined( LILYGO_WATCH_2021 )
             compass.init();
             compass_off();
+        #elif defined( LILYGO_T_DECK_PRO )
         #elif defined( WT32_SC01 )
         #else
         #endif

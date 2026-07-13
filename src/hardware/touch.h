@@ -89,6 +89,23 @@
      */
     bool touch_getXY( int16_t &x, int16_t &y );
     /**
+     * @brief get the last touch sample consumed by LVGL
+     *
+     * @param touch pointer to touch state output
+     *
+     * @return true when a sample has been read at least once
+     */
+    bool touch_get_last( touch_t &touch );
+    /**
+     * @brief get and clear the last queued swipe direction
+     *
+     * @param x_delta horizontal mainbar tile delta
+     * @param y_delta vertical mainbar tile delta
+     *
+     * @return true when a swipe direction was queued
+     */
+    bool touch_get_swipe_delta( int8_t *x_delta, int8_t *y_delta );
+    /**
      * @brief check whether the touch or keyboard interrupt source has activity
      *
      * @return true if activity is pending

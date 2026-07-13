@@ -1,6 +1,6 @@
 # XNODE Firmware
 
-The XNODE firmware turns LilyGO watch-class hardware and the T-Deck Plus into compact tactical endpoints for the MKME X stack.
+The XNODE firmware turns LilyGO watch-class hardware plus the T-Deck Plus and T-Deck Pro into compact tactical endpoints for the MKME X stack.
 
 ## Main app surfaces
 
@@ -62,6 +62,10 @@ XTOC/XCOM can push news and alert items to the watch. The main clock screen can 
 
 The T-Deck Plus target disables the on-screen LVGL keyboard and uses the physical keyboard. Printable keys, backspace/delete, enter, and escape are injected into the focused LVGL text area.
 
+## T-Deck Pro e-paper behavior
+
+The T-Deck Pro target uses a 240x320 portrait e-paper display. Startup forces a full LVGL render so the whole main page appears, then the Pro framebuffer path handles e-paper refresh separately from the T-Deck Plus LCD path. Touch is read through the local HYN/CST path, and mainbar navigation uses Pro-only swipe handling so the e-paper target does not change the other models' tileview behavior.
+
 ## Power behavior
 
 The firmware distinguishes idle power savings from active-use responsiveness:
@@ -70,5 +74,6 @@ The firmware distinguishes idle power savings from active-use responsiveness:
 - Standby/hibernate paths release performance mode.
 - Ultra starts GPS/WiFi idle paths conservatively while keeping BLE discoverable for XTOC/XCOM sync.
 - T-Deck display timeout blanks backlight while keeping LVGL/touch/keyboard active to avoid the previous wake stutter state.
+- T-Deck Pro keeps the e-paper UI active and refreshes deliberately; deeper Pro-specific power policy still needs field validation.
 
 See [Operations and Troubleshooting](Operations-and-Troubleshooting) for field checks.

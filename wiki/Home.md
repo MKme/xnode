@@ -1,6 +1,6 @@
 # XNODE Wiki
 
-XNODE is the MKME tactical watch and handheld firmware for the X software stack. It runs on LilyGO watch-class ESP32-S3 hardware and the LilyGO T-Deck Plus, then acts as the wrist or handheld edge node for XTOC and XCOM.
+XNODE is the MKME tactical watch and handheld firmware for the X software stack. It runs on LilyGO watch-class ESP32-S3 hardware plus the LilyGO T-Deck Plus and T-Deck Pro, then acts as the wrist or handheld edge node for XTOC and XCOM.
 
 At the system level:
 
@@ -31,6 +31,7 @@ This directory is the source for the repository wiki. The Markdown files are wri
 | LilyGO T-Watch Ultra | `t-watch-ultra` | Current watch-first XNODE build with GPS, map overlays, Meshtastic, power management, and large tactical markers. |
 | LilyGO T-Watch S3 / Gen3 | `t-watch2020-v3-s3` | Existing watch variant protected by shared regression checks. |
 | LilyGO T-Deck Plus | `tdeck-plus` | Larger-screen XNODE target with hardware keyboard, GPS diagnostics, wide tactical map, synced XTOC/XCOM markers, mesh, SOS, CheckIn, and Launcher-ready firmware output. |
+| LilyGO T-Deck Pro | `tdeck-pro` | Portrait 240x320 e-paper XNODE target with local Pro HAL, HYN touch, swipe navigation, keyboard input, haptics, and Launcher-ready firmware output. |
 
 ## T-Deck Plus map proof
 

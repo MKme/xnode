@@ -231,6 +231,14 @@ void gui_setup( void ) {
     lv_img_set_src( watch2021_mask_bin, &rounddisplaymask_240px );
     lv_obj_align( watch2021_mask_bin, NULL, LV_ALIGN_CENTER, 0, 0 );
 #endif
+
+#if defined( LILYGO_T_DECK_PRO )
+    gui_take();
+    lv_obj_invalidate( lv_scr_act() );
+    lv_refr_now( NULL );
+    gui_give();
+    framebuffer_refresh();
+#endif
 }
 
 bool gui_powermgm_lvgl_guard_take_cb( EventBits_t event, void *arg ) {
@@ -371,7 +379,7 @@ bool gui_powermgm_loop_event_cb( EventBits_t event, void *arg ) {
     #ifdef NATIVE_64BIT
 
     #else
-        #if !defined( LILYGO_T_DECK_PLUS )
+        #if !defined( LILYGO_T_DECK_PLUS ) && !defined( LILYGO_T_DECK_PRO )
             const uint32_t timeout = display_get_timeout();
 
             switch ( event ) {
@@ -410,6 +418,13 @@ bool gui_powermgm_loop_event_cb( EventBits_t event, void *arg ) {
     #endif
 
     lv_task_handler();
+
+    #if defined( LILYGO_T_DECK_PRO )
+        if ( mainbar_poll_tdeck_pro_gesture() ) {
+            display_trigger_activity();
+        }
+    #endif
+
     keyboard_poll_hardware();
 
     if ( force_redraw ) {
