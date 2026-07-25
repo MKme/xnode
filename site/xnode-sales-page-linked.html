@@ -59,7 +59,7 @@
     <div class="xnode-hero-content">
       <div class="xnode-kicker">X Suite wearable field node</div>
       <h1>XNODE puts the tactical picture on your wrist.</h1>
-      <p>XNODE turns LilyGO field hardware into a companion for XTOC and XCOM: offline maps, synced tactical markers, pushed alerts, and one-tap Meshtastic SOS or CheckIn packets on the T-Watch family or the larger T-Deck Plus.</p>
+      <p>XNODE turns LilyGO field hardware into a companion for XTOC and XCOM: offline maps, synced tactical markers, pushed alerts, and fast Meshtastic SOS or CheckIn packets on the T-Watch S3, T-Watch Ultra, T-Deck Plus, and T-Deck Pro.</p>
       <div class="xnode-actions">
         <a class="xnode-button dark" href="https://github.com/MKme/xnode" target="_blank" rel="noreferrer">View XNODE on GitHub</a>
         <a class="xnode-button warn" href="https://amzn.to/4sHfvgK" target="_blank" rel="noreferrer">Buy the T-Watch S3 hardware</a>
@@ -97,7 +97,7 @@
       <div class="xnode-split">
         <div>
           <h2>Real watch screens, not vaporware.</h2>
-          <p class="xnode-lead">The current firmware builds for the T-Watch S3, T-Watch Ultra, and T-Deck Plus, exposes the XNODE BLE bridge, installs a compact basemap, displays operational overlays, and keeps alerts visible on the device.</p>
+          <p class="xnode-lead">The current firmware builds for the T-Watch S3, T-Watch Ultra, T-Deck Plus, and T-Deck Pro. Across the supported targets, XNODE exposes its BLE bridge, installs a compact basemap, displays operational overlays, and keeps alerts visible on the device.</p>
           <div class="xnode-actions">
             <a class="xnode-button dark" href="https://github.com/MKme/xnode/blob/main/README.md" target="_blank" rel="noreferrer">Read the project README</a>
             <a class="xnode-button" href="https://github.com/MKme/xnode/blob/main/platformio.ini" target="_blank" rel="noreferrer">PlatformIO build config</a>
@@ -131,8 +131,8 @@
     </section>
 
     <section class="xnode-section">
-      <h2>Now on T-Deck Plus</h2>
-      <p class="xnode-lead">The T-Deck Plus build moves XNODE onto a bigger 320x240 display with a physical keyboard. It keeps the core map, mesh, alert, GPS, SOS, and CheckIn workflows while making typed mesh messages, status screens, and the live tactical picture much easier to use in the field.</p>
+      <h2>XNODE on T-Deck Plus</h2>
+      <p class="xnode-lead">These current hardware photos show the T-Deck Plus build on its larger 320x240 display. The physical keyboard and wider screen keep the core map, mesh, alert, GPS, SOS, and CheckIn workflows while making message entry, diagnostics, and the live tactical picture easier to use in the field.</p>
       <div class="xnode-photo-grid">
         <div class="xnode-photo-card">
           <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6809.jpg" alt="T-Deck Plus running the XNODE clock screen with moon phase" width="1062" height="1416" loading="lazy" decoding="async" />
@@ -158,6 +158,36 @@
           <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6813.jpg" alt="T-Deck Plus XNODE CheckIn screen" width="1062" height="1416" loading="lazy" decoding="async" />
           <div><strong>CheckIn ready</strong><p>Fast CHECKIN/LOC packet flow with current position.</p></div>
         </div>
+      </div>
+    </section>
+
+    <section class="xnode-section">
+      <h2>Supported T-Deck hardware</h2>
+      <p class="xnode-lead">T-Deck support is built and tested as part of the same repository as the active watch firmware. Each handheld has its own board definition, hardware path, and Launcher-ready firmware output.</p>
+      <div class="xnode-grid two">
+        <div class="xnode-card">
+          <h3>T-Deck Plus</h3>
+          <ul>
+            <li>320x240 LCD interface with touch and a physical I2C keyboard.</li>
+            <li>GPS defaults on for map position and GPS time sync, with readable receiver diagnostics.</li>
+            <li>Onboard SX1262 LoRa, SD, battery monitoring, and the shared BLE/XTOC/XCOM workflow.</li>
+            <li>Display timeout keeps touch, keyboard, and LVGL responsive while GPS remains available.</li>
+            <li>Built and flashed on attached hardware; broader field validation is still ongoing.</li>
+          </ul>
+        </div>
+        <div class="xnode-card">
+          <h3>T-Deck Pro</h3>
+          <ul>
+            <li>Portrait 240x320 e-paper interface with a dedicated local Pro hardware layer.</li>
+            <li>HYN touch, tap and swipe navigation, plus TCA8418 physical keyboard input.</li>
+            <li>DRV2605 haptic feedback, battery gauge reads, GPS, and the core launcher/map/message/mesh/alert flows.</li>
+            <li>Full e-paper first paint with readable black-on-white status and main-screen styling.</li>
+            <li>Built, flashed, and verified for boot, touch, and display; e-paper refresh is slower than LCD or AMOLED.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="xnode-callout" style="margin-top:16px">
+        <strong>Four CI build targets:</strong> <code>t-watch-ultra</code>, <code>t-watch2020-v3-s3</code>, <code>tdeck-plus</code>, and <code>tdeck-pro</code>. Hardware-specific release filenames help prevent cross-flashing the wrong board.
       </div>
     </section>
 
@@ -229,7 +259,7 @@
         <div class="xnode-card">
           <h3>Hardware targets</h3>
           <p><a href="https://amzn.to/4sHfvgK" target="_blank" rel="noreferrer">LILYGO T-Watch S3 hardware listing</a></p>
-          <p class="xnode-note">T-Watch S3/Ultra watch targets plus T-Deck Plus support for a larger screen, physical keyboard, GPS, SD, and SX1262 LoRa hardware path.</p>
+          <p class="xnode-note">T-Watch S3 and Ultra targets, T-Deck Plus with its larger LCD, keyboard, GPS, SD, and SX1262 path, plus the portrait e-paper T-Deck Pro with touch, keyboard, haptics, battery gauge, and GPS support.</p>
         </div>
       </div>
     </section>
