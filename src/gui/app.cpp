@@ -22,8 +22,37 @@
 
 #include "config.h"
 #include "app.h"
+#include "gui/widget_styles.h"
 #include "gui/mainbar/mainbar.h"
 #include "gui/mainbar/app_tile/app_tile.h"
+
+#if defined( LILYGO_T_DECK_PRO )
+static const void *app_epaper_icon( const char *name ) {
+    if ( strstr( name, "messages" ) ) return LV_SYMBOL_EDIT;
+    if ( strstr( name, "mesh" ) ) return LV_SYMBOL_WIFI;
+    if ( strstr( name, "Map" ) ) return LV_SYMBOL_GPS;
+    if ( strstr( name, "CheckIn" ) ) return LV_SYMBOL_OK;
+    if ( strstr( name, "Alert" ) ) return LV_SYMBOL_BELL;
+    if ( strstr( name, "SOS" ) ) return LV_SYMBOL_WARNING;
+    if ( strstr( name, "media" ) ) return LV_SYMBOL_PLAY;
+    if ( strstr( name, "watchface" ) ) return LV_SYMBOL_SETTINGS;
+    if ( strstr( name, "weather" ) ) return LV_SYMBOL_IMAGE;
+    if ( strstr( name, "stop" ) ) return LV_SYMBOL_STOP;
+    if ( strstr( name, "Sailing" ) ) return LV_SYMBOL_SHUFFLE;
+    if ( strstr( name, "gps" ) ) return LV_SYMBOL_GPS;
+    if ( strstr( name, "compass" ) ) return LV_SYMBOL_REFRESH;
+    if ( strstr( name, "astro" ) ) return LV_SYMBOL_EYE_OPEN;
+    if ( strstr( name, "activity" ) ) return LV_SYMBOL_CHARGE;
+    if ( strstr( name, "power" ) ) return LV_SYMBOL_BATTERY_FULL;
+    if ( strstr( name, "Find" ) ) return LV_SYMBOL_CALL;
+    if ( strstr( name, "wifi" ) ) return LV_SYMBOL_WIFI;
+    if ( strstr( name, "Calendar" ) ) return LV_SYMBOL_LIST;
+    if ( strstr( name, "Calculator" ) ) return LV_SYMBOL_PLUS;
+    if ( strstr( name, "OsmAnd" ) ) return LV_SYMBOL_DRIVE;
+    if ( strstr( name, "Kodi" ) ) return LV_SYMBOL_VIDEO;
+    return LV_SYMBOL_HOME;
+}
+#endif
 #include "utils/alloc.h"
 
 #ifdef NATIVE_64BIT
@@ -104,11 +133,22 @@ icon_t *app_register( const char* appname, const lv_img_dsc_t *icon, lv_event_cb
     lv_obj_set_hidden( app->label, false );
     // setup icon and set event callback
     app->icon_img = lv_imgbtn_create( app->icon_cont , NULL );
+#if defined( LILYGO_T_DECK_PRO )
+    const void *epaper_icon = app_epaper_icon( appname );
+    lv_imgbtn_set_src( app->icon_img, LV_BTN_STATE_RELEASED, epaper_icon );
+    lv_imgbtn_set_src( app->icon_img, LV_BTN_STATE_PRESSED, epaper_icon );
+    lv_imgbtn_set_src( app->icon_img, LV_BTN_STATE_CHECKED_RELEASED, epaper_icon );
+    lv_imgbtn_set_src( app->icon_img, LV_BTN_STATE_CHECKED_PRESSED, epaper_icon );
+#else
     lv_imgbtn_set_src( app->icon_img, LV_BTN_STATE_RELEASED, icon);
     lv_imgbtn_set_src( app->icon_img, LV_BTN_STATE_PRESSED, icon);
     lv_imgbtn_set_src( app->icon_img, LV_BTN_STATE_CHECKED_RELEASED, icon);
     lv_imgbtn_set_src( app->icon_img, LV_BTN_STATE_CHECKED_PRESSED, icon);
+#endif
     lv_obj_reset_style_list( app->icon_img, LV_OBJ_PART_MAIN );
+#if defined( LILYGO_T_DECK_PRO )
+    lv_obj_add_style( app->icon_img, LV_OBJ_PART_MAIN, ws_get_app_icon_style() );
+#endif
     lv_obj_align( app->icon_img , app->icon_cont, LV_ALIGN_CENTER, 0, 0 );
     lv_obj_set_event_cb( app->icon_img, event_cb );
     // setup icon indicator

@@ -33,7 +33,9 @@ The T-Deck Plus target carries the XNODE workflow onto a larger 320x240 screen w
 
 ### Current T-Deck Pro build
 
-The T-Deck Pro target brings the XNODE handheld workflow to the LilyGO 240x320 e-paper board. It uses the local Pro HAL and bundled Pro hardware support libraries so the release build can produce a board-specific binary from this repo. The current build has the portrait e-paper main page, status bar, touch/swipe navigation, physical keyboard input, haptic feedback, battery gauge reads, and the same core XNODE launcher/map/message/mesh/alert flows used by the other active targets.
+> **Development status: not fully working.** The T-Deck Pro firmware builds, flashes, boots, renders its portrait e-paper launcher, accepts swipe gestures, and provides swipe haptics. Launcher icons currently flash when tapped but do not emit a working menu click/navigation action, so Messages, Mesh, Tac Map, Weather, Stopwatch, Watchface Manager, and the other app pages cannot be opened from the launcher. Do not treat this target as production-ready.
+
+The T-Deck Pro target brings the XNODE handheld workflow to the LilyGO 240x320 e-paper board. It uses the local Pro HAL and bundled Pro hardware support libraries so the release build can produce a board-specific binary from this repo. Hardware bring-up and swipe navigation are functional, but launcher click navigation remains unresolved.
 
 ### T-Watch S3 reference screens
 
@@ -80,7 +82,7 @@ Working now:
 - Stores XTOC/XCOM pushed news and alert items in the XNODE alerts app, with the watch-side `show pushed news` toggle.
 - Removes the main clock-screen message shortcut after the user opens the message view, while keeping the stored messages and the messages launcher entry intact.
 - Supports T-Deck Plus as a larger-screen XNODE device with a physical keyboard, readable GPS diagnostics, Launcher-usable firmware output, and the same core mesh/map/alert workflows.
-- Supports T-Deck Pro as a portrait 240x320 e-paper XNODE device with touch/swipe navigation, physical keyboard input, local HYN touch support, DRV2605 haptics, battery gauge reads, and Launcher-usable firmware output.
+- Partially supports T-Deck Pro as a portrait 240x320 e-paper XNODE device. Builds, flashing, display output, swipe navigation/haptics, physical keyboard input, local HYN touch support, and battery gauge reads are present; launcher taps do not currently open app pages.
 - Keeps the launcher functions active for messages, mesh, Tac Map, media player, Alert Summary, and watchface manager.
 - Inactivity timeout returns the T-Watch S3 build to standby instead of leaving it awake indefinitely.
 - T-Watch S3 standby uses the LilyGo `ext1` touch wake path on `BOARD_TOUCH_INT`.
@@ -189,7 +191,7 @@ Known T-Deck Plus limits:
 
 ## T-Deck Pro support
 
-This branch adds a LilyGO T-Deck Pro target while preserving the active Ultra, S3, and T-Deck Plus targets. The Pro build is intended to run from this repo and to produce a hardware-specific binary that can be loaded manually or by the bmorcelli Launcher.
+This branch adds an experimental LilyGO T-Deck Pro target while preserving the active Ultra, S3, and T-Deck Plus targets. It produces a hardware-specific binary that can be loaded manually or by the bmorcelli Launcher, but the current firmware is not fully operational: launcher taps flash the e-paper display without opening app pages.
 
 Build from this repo:
 
@@ -236,7 +238,8 @@ Runtime behavior now wired:
 - Keeps the Pro display refresh path independent of the T-Deck Plus LCD path so other models are not affected.
 
 Known T-Deck Pro limits:
-- Support has been build-verified and flashed on the attached T-Deck Pro, but it still needs broader field validation.
+- Support has been build-verified and flashed on the attached T-Deck Pro, but it is not fully working.
+- Swipe navigation and swipe haptics work. Tapping a launcher icon causes an e-paper flash, but no click haptic or app-page navigation occurs. Messages, Mesh, Tac Map, Weather, Stopwatch, Watchface Manager, and other launcher pages are therefore inaccessible from the menu.
 - E-paper refresh is slower than LCD/AMOLED targets and can briefly invert during full refreshes.
 - Deep power policy, trackball-style navigation if present, speaker/microphone, IMU/compass, and RTC alarm integration are not finalized for Pro.
 - GPS still requires real satellite lock; the Pro board target uses the same GPS status interpretation as the other XNODE targets.

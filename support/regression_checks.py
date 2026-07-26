@@ -498,15 +498,25 @@ def run_checks():
     )
     require_tokens(
         "src/gui/statusbar.cpp",
-        "T-Deck Plus hides the unsupported step counter",
+        "T-Deck handhelds hide the unsupported step counter",
         [
             "LILYGO_T_DECK_PLUS",
+            "LILYGO_T_DECK_PRO",
             "lv_obj_set_hidden( statusbar_stepcounterlabel, true );",
-            "#if !defined( LILYGO_T_DECK_PLUS )",
+            "#if !defined( LILYGO_T_DECK_PLUS ) && !defined( LILYGO_T_DECK_PRO )",
             "bma_register_cb( BMACTL_STEPCOUNTER, statusbar_bmactl_event_cb, \"statusbar stepcounter\" );",
         ],
     )
-
+    require_tokens(
+        "src/gui/widget_styles.cpp",
+        "T-Deck Pro keeps UI icons black on white",
+        [
+            "lv_style_set_bg_color( &app_icon_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );",
+            "lv_style_set_image_recolor( &app_icon_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );",
+            "lv_style_set_bg_color( &img_button_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );",
+            "lv_style_set_image_recolor( &img_button_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );",
+        ],
+    )
     require_slice_tokens(
         "src/gui/widget_styles.cpp",
         "light theme keeps black text on light shared surfaces",

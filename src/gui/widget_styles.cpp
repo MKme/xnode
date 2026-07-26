@@ -162,6 +162,25 @@ void widget_style_theme_set( int theme ) {
                         lv_style_set_text_color( &app_icon_label_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
                         lv_style_set_text_font( &app_icon_label_style, LV_OBJ_PART_MAIN, app_icon_label_font );
                         lv_style_set_text_color( &label_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+#if defined( LILYGO_T_DECK_PRO )
+                        /*
+                         * The Pro panel is strictly monochrome. Keep every
+                         * shared UI surface white and render image alpha as a
+                         * black silhouette; map/canvas images use their own
+                         * styles and are intentionally left unchanged.
+                         */
+                        lv_style_set_bg_color( &app_icon_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_bg_opa( &app_icon_style, LV_OBJ_PART_MAIN, LV_OPA_COVER );
+                        lv_style_set_image_recolor( &app_icon_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+                        lv_style_set_image_recolor_opa( &app_icon_style, LV_OBJ_PART_MAIN, LV_OPA_COVER );
+                        lv_style_set_text_color( &app_icon_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+                        lv_style_set_text_font( &app_icon_style, LV_OBJ_PART_MAIN, &lv_font_montserrat_32 );
+                        lv_style_set_bg_color( &img_button_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+                        lv_style_set_bg_opa( &img_button_style, LV_OBJ_PART_MAIN, LV_OPA_COVER );
+                        lv_style_set_text_color( &img_button_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+                        lv_style_set_image_recolor( &img_button_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+                        lv_style_set_image_recolor_opa( &img_button_style, LV_OBJ_PART_MAIN, LV_OPA_COVER );
+#endif
                         /** button/switch/slider  style **/
                         lv_style_set_radius( &button_style, LV_STATE_DEFAULT, 0 );
                         lv_style_set_border_color( &button_style, LV_STATE_DEFAULT, LV_COLOR_BLACK );

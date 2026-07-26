@@ -211,7 +211,7 @@ static void bluetooth_message_configure_nav_buttons( void );
 static bool bluetooth_message_accept_nav_event( lv_event_t event, uint32_t &last_event_ms, uint32_t debounce_ms );
 static void bluetooth_message_exit_to_previous( void );
 bool bluetooth_message_event_cb( EventBits_t event, void *arg );
-const lv_img_dsc_t *bluetooth_message_find_img( const char * src_name );
+const void *bluetooth_message_find_img( const char * src_name );
 
 static void bluetooth_message_send_del_json( int32_t entry );
 void bluetooth_add_msg_to_chain( const char *msg );
@@ -245,7 +245,10 @@ void bluetooth_message_tile_setup( void ) {
     lv_obj_align( bluettoth_message_img_cont, bluetooth_message_tile, LV_ALIGN_IN_TOP_LEFT, 0, 0 );
 
     bluetooth_message_img = lv_img_create( bluettoth_message_img_cont, NULL );
-    lv_img_set_src( bluetooth_message_img, default_msg_icon );
+    lv_img_set_src( bluetooth_message_img, bluetooth_message_find_img( "Message" ) );
+#if defined( LILYGO_T_DECK_PRO )
+    lv_obj_add_style( bluetooth_message_img, LV_OBJ_PART_MAIN, ws_get_app_icon_style() );
+#endif
     lv_obj_align( bluetooth_message_img, bluettoth_message_img_cont, LV_ALIGN_CENTER, 0, 0 );
 
     bluetooth_message_notify_source_label = lv_label_create( bluetooth_message_tile, NULL);
@@ -603,7 +606,17 @@ void bluetooth_message_enable( void ) {
     bluetooth_message_active = true;    
 }
 
-const lv_img_dsc_t *bluetooth_message_find_img( const char * src_name ) {
+const void *bluetooth_message_find_img( const char * src_name ) {
+#if defined( LILYGO_T_DECK_PRO )
+    if ( !src_name ) {
+        return( LV_SYMBOL_LIST );
+    }
+    if ( strstr( src_name, "OsmAnd" ) ) return( LV_SYMBOL_GPS );
+    if ( strstr( src_name, "YouTube" ) ) return( LV_SYMBOL_VIDEO );
+    if ( strstr( src_name, "Update" ) ) return( LV_SYMBOL_REFRESH );
+    if ( strstr( src_name, "Mail" ) || strstr( src_name, "mail" ) || strstr( src_name, "Gmail" ) ) return( LV_SYMBOL_FILE );
+    return( LV_SYMBOL_LIST );
+#else
     /*
      * search for the right src icon
      */
@@ -613,6 +626,7 @@ const lv_img_dsc_t *bluetooth_message_find_img( const char * src_name ) {
         }
     }
     return( default_msg_icon );
+#endif
 }
 
 bool bluetooth_message_queue_msg( BluetoothJsonRequest &doc ) {
@@ -788,7 +802,7 @@ void bluetooth_message_show_msg( int32_t entry ) {
                     lv_label_set_text( bluetooth_message_notify_source_label, doc["src"] );
                 }
                 else {
-                    lv_img_set_src( bluetooth_message_img, default_msg_icon );
+                    lv_img_set_src( bluetooth_message_img, bluetooth_message_find_img( "Message" ) );
                     lv_label_set_text( bluetooth_message_notify_source_label, "Message" );
                 }
                 /*
