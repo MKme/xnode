@@ -384,6 +384,24 @@ def run_checks():
             "blectl_init_stack();",
         ],
     )
+    require_slice_tokens(
+        "src/hardware/blectl.cpp",
+        "NimBLE lifecycle callbacks resume power management from task context",
+        "class ServerCallbacks: public NimBLEServerCallbacks",
+        "static void blectl_init_stack",
+        [
+            "powermgm_resume();",
+        ],
+    )
+    forbid_slice_tokens(
+        "src/hardware/blectl.cpp",
+        "NimBLE lifecycle callbacks never use the ISR-only task resume API",
+        "class ServerCallbacks: public NimBLEServerCallbacks",
+        "static void blectl_init_stack",
+        [
+            "powermgm_resume_from_ISR();",
+        ],
+    )
     require_tokens(
         "src/hardware/config/blectlconfig.cpp",
         "Ultra and T-Deck Plus BLE defaults keep XNODE visible",

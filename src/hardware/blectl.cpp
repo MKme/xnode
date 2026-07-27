@@ -129,7 +129,7 @@ static bool blectl_powermgm_event_cb( EventBits_t event, void *arg );
         log_d("BLECTL pairing request, PIN: %s", pin );
         blectl_set_event( BLECTL_PIN_AUTH );
         blectl_send_event_cb( BLECTL_PIN_AUTH, (void *)pin );
-        powermgm_resume_from_ISR();
+        powermgm_resume();
     }
 
     class ServerCallbacks: public NimBLEServerCallbacks {
@@ -148,7 +148,7 @@ static bool blectl_powermgm_event_cb( EventBits_t event, void *arg );
                 blectl_clear_event( BLECTL_DISCONNECT | BLECTL_AUTHWAIT | BLECTL_PIN_AUTH );
                 blectl_send_event_cb( BLECTL_CONNECT, (void *)"connected" );
             }
-            powermgm_resume_from_ISR();
+            powermgm_resume();
             log_d("BLE connected");
             log_i("Client address: %s", NimBLEAddress(desc->peer_ota_addr).toString().c_str() );
         };
@@ -163,7 +163,7 @@ static bool blectl_powermgm_event_cb( EventBits_t event, void *arg );
             if ( pairing_pending ) {
                 blectl_send_event_cb( BLECTL_PAIRING_ABORT, (void *)"abort" );
             }
-            powermgm_resume_from_ISR();
+            powermgm_resume();
             meshtastic_ble_on_disconnect();
             blectl_pair_passkey = 0;
 
@@ -193,7 +193,7 @@ static bool blectl_powermgm_event_cb( EventBits_t event, void *arg );
             snprintf( pin, sizeof( pin ), "%06d", pass_key );
             log_d("BLECTL confirm PIN: %s", pin );
 
-            powermgm_resume_from_ISR();
+            powermgm_resume();
 
             return( true );
         };
@@ -212,7 +212,7 @@ static bool blectl_powermgm_event_cb( EventBits_t event, void *arg );
                 blectl_set_event( BLECTL_CONNECT );
                 blectl_send_event_cb( BLECTL_CONNECT, (void *) "connected" );
             }
-            powermgm_resume_from_ISR();
+            powermgm_resume();
         };
     };
 
