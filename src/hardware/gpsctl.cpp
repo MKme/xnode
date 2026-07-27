@@ -50,6 +50,8 @@
         #include "hardware/twatch_ultra_hal.h"
     #elif defined( LILYGO_T_DECK_PLUS )
         #include "hardware/tdeck_plus_hal.h"
+    #elif defined( LILYGO_T_DECK_PRO )
+        #include "hardware/tdeck_pro_hal.h"
     #elif defined( LILYGO_WATCH_S3 )
         #include <LilyGoLib.h>
     #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 )
@@ -128,6 +130,8 @@ static uint32_t gpsctl_get_configured_baud( void ) {
 #elif defined( LILYGO_WATCH_ULTRA )
     return( BOARD_GPS_BAUDRATE );
 #elif defined( LILYGO_T_DECK_PLUS )
+    return( BOARD_GPS_BAUDRATE );
+#elif defined( LILYGO_T_DECK_PRO )
     return( BOARD_GPS_BAUDRATE );
 #elif defined( LILYGO_WATCH_S3 )
     return( 38400 );
@@ -258,7 +262,7 @@ static int gpsctl_read_serial_byte( void ) {
     return( c );
 }
 
-#if ( defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) ) && !defined( USE_SOFTWARE_SERIAL )
+#if ( defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO ) ) && !defined( USE_SOFTWARE_SERIAL )
 static void gpsctl_set_probe_model( const char *model ) {
     if ( !model ) {
         model = "unknown";
@@ -389,7 +393,7 @@ static bool gpsctl_drain_serial_for( uint32_t duration_ms, bool parse_nmea = fal
     return( parse_nmea && gps.passedChecksum() > start_passed );
 }
 
-#if defined( LILYGO_T_DECK_PLUS )
+#if defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
 static bool gpsctl_wait_for_tdeck_ubx( uint8_t requested_class, uint8_t requested_id, uint32_t timeout_ms, bool *saw_valid_nmea = NULL ) {
     uint8_t state = 0;
     uint16_t payload_len = 0;
@@ -648,7 +652,7 @@ static void gpsctl_prepare_receiver_after_power_on( void ) {
 
     gpsctl_begin_serial( BOARD_GPS_BAUDRATE );
     GPSCTL_ERROR_LOG( "T-Watch Ultra GPS probe failed" );
-#elif defined( LILYGO_T_DECK_PLUS ) && !defined( USE_SOFTWARE_SERIAL )
+#elif ( defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO ) ) && !defined( USE_SOFTWARE_SERIAL )
     gpsctl_probe_done = true;
     gpsctl_probe_ok = false;
     gpsctl_set_probe_model( "unknown" );
@@ -701,10 +705,10 @@ void gpsctl_setup( void ) {
      * load config from json
      */
     gpsctl_config.load();
-    #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
+    #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
         bool config_changed = false;
         if ( gpsctl_config.config_version < GPSCTL_CONFIG_VERSION ) {
-            #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
+            #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
                 gpsctl_config.autoon = true;
                 gpsctl_config.app_use_gps = true;
             #else
@@ -719,7 +723,7 @@ void gpsctl_setup( void ) {
             gpsctl_config.TXPin = SHIELD_GPS_TX;
             config_changed = true;
         }
-        #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
+        #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
             if ( !gpsctl_config.autoon ) {
                 gpsctl_config.autoon = true;
                 config_changed = true;
@@ -756,6 +760,9 @@ void gpsctl_setup( void ) {
             #elif defined( LILYGO_T_DECK_PLUS )
                 gpsctl_config.RXPin = SHIELD_GPS_RX;
                 gpsctl_config.TXPin = SHIELD_GPS_TX;
+            #elif defined( LILYGO_T_DECK_PRO )
+                gpsctl_config.RXPin = SHIELD_GPS_RX;
+                gpsctl_config.TXPin = SHIELD_GPS_TX;
             #elif defined( LILYGO_WATCH_S3 )
                 gpsctl_config.RXPin = SHIELD_GPS_RX;
                 gpsctl_config.TXPin = SHIELD_GPS_TX;
@@ -778,7 +785,7 @@ void gpsctl_setup( void ) {
                 gps_serial = new SoftwareSerial( gpsctl_config.RXPin, gpsctl_config.TXPin );
                 gpsctl_begin_serial( GPSBaud );
             #else
-                #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
+                #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
                     gps_serial = &Serial1;
                 #else
                     gps_serial = &Serial2;
@@ -1208,6 +1215,8 @@ void gpsctl_on( void ) {
                 watch.powerIoctl( WATCH_POWER_GPS, true );
             #elif defined( LILYGO_T_DECK_PLUS )
                 watch.powerIoctl( WATCH_POWER_GPS, true );
+            #elif defined( LILYGO_T_DECK_PRO )
+                watch.powerIoctl( WATCH_POWER_GPS, true );
             #elif defined( LILYGO_WATCH_S3 )
                 watch.powerIoctl( WATCH_POWER_GPS, true );
                 watch.powerIoctl( WATCH_POWER_GPS_DC_CHANNEL, true );
@@ -1264,6 +1273,8 @@ void gpsctl_off( void ) {
                 watch.powerIoctl( WATCH_POWER_GPS, false );
             #elif defined( LILYGO_T_DECK_PLUS )
                 watch.powerIoctl( WATCH_POWER_GPS, false );
+            #elif defined( LILYGO_T_DECK_PRO )
+                watch.powerIoctl( WATCH_POWER_GPS, false );
             #elif defined( LILYGO_WATCH_S3 )
                 watch.powerIoctl( WATCH_POWER_GPS, false );
                 watch.powerIoctl( WATCH_POWER_GPS_DC_CHANNEL, false );
@@ -1317,6 +1328,8 @@ void gpsctl_autoon_on( void ) {
                     watch.powerIoctl( WATCH_POWER_GPS, true );
                 #elif defined( LILYGO_T_DECK_PLUS )
                     watch.powerIoctl( WATCH_POWER_GPS, true );
+                #elif defined( LILYGO_T_DECK_PRO )
+                    watch.powerIoctl( WATCH_POWER_GPS, true );
                 #elif defined( LILYGO_WATCH_S3 )
                     watch.powerIoctl( WATCH_POWER_GPS, true );
                     watch.powerIoctl( WATCH_POWER_GPS_DC_CHANNEL, true );
@@ -1339,7 +1352,7 @@ void gpsctl_autoon_on( void ) {
     else {
         #ifdef NATIVE_64BIT
         #else
-            #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
+            #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
                 watch.powerIoctl( WATCH_POWER_GPS, false );
             #endif
         #endif
@@ -1360,6 +1373,8 @@ void gpsctl_autoon_off( void ) {
         #elif defined( LILYGO_WATCH_ULTRA )
             watch.powerIoctl( WATCH_POWER_GPS, false );
         #elif defined( LILYGO_T_DECK_PLUS )
+            watch.powerIoctl( WATCH_POWER_GPS, false );
+        #elif defined( LILYGO_T_DECK_PRO )
             watch.powerIoctl( WATCH_POWER_GPS, false );
         #elif defined( LILYGO_WATCH_S3 )
             watch.powerIoctl( WATCH_POWER_GPS, false );
@@ -1410,7 +1425,7 @@ bool gpsctl_get_gps_over_ip( void ) {
 }
 
 void gpsctl_set_gps_rx_tx_pin( int8_t rx, int8_t tx ) {
-    #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
+    #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
         rx = SHIELD_GPS_RX;
         tx = SHIELD_GPS_TX;
     #endif

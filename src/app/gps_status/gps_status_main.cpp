@@ -352,7 +352,11 @@ static void gps_status_config_value_label( lv_obj_t *label ) {
         return;
     }
 
+#if defined( LILYGO_T_DECK_PRO )
+    lv_obj_set_width( label, lv_disp_get_hor_res( NULL ) - 64 );
+#else
     lv_obj_set_width( label, lv_disp_get_hor_res( NULL ) - 88 );
+#endif
     lv_label_set_long_mode( label, LV_LABEL_LONG_CROP );
     lv_label_set_align( label, LV_LABEL_ALIGN_RIGHT );
 }

@@ -101,8 +101,10 @@ static bool touch_last_valid = false;
 static bool touch_swipe_tracking = false;
 static bool touch_swipe_queued = false;
 static bool touch_swipe_sent = false;
+static bool touch_swipe_suppress_click = false;
 static lv_coord_t touch_swipe_start_x = 0;
 static lv_coord_t touch_swipe_start_y = 0;
+static uint32_t touch_swipe_start_ms = 0;
 static int8_t touch_swipe_x_delta = 0;
 static int8_t touch_swipe_y_delta = 0;
 #endif
@@ -779,25 +781,29 @@ bool touch_get_swipe_delta( int8_t *x_delta, int8_t *y_delta ) {
 
 #if defined( LILYGO_T_DECK_PRO )
 static void touch_tdeck_pro_update_swipe( lv_indev_data_t *data ) {
-    constexpr lv_coord_t swipe_threshold = 38;
-    constexpr lv_coord_t axis_margin = 8;
+    constexpr lv_coord_t swipe_threshold = 54;
+    constexpr lv_coord_t axis_margin = 12;
     constexpr lv_coord_t statusbar_guard = 32;
+    constexpr uint32_t swipe_min_duration_ms = 70;
 
     if ( data == NULL || data->state != LV_INDEV_STATE_PR ) {
         touch_swipe_tracking = false;
         touch_swipe_sent = false;
+        touch_swipe_suppress_click = false;
         return;
     }
 
     if ( !touch_swipe_tracking ) {
         touch_swipe_start_x = data->point.x;
         touch_swipe_start_y = data->point.y;
+        touch_swipe_start_ms = millis();
         touch_swipe_tracking = true;
         touch_swipe_sent = false;
         return;
     }
 
-    if ( touch_swipe_sent || touch_swipe_start_y <= statusbar_guard ) {
+    if ( touch_swipe_sent || touch_swipe_start_y <= statusbar_guard ||
+         millis() - touch_swipe_start_ms < swipe_min_duration_ms ) {
         return;
     }
 
@@ -811,12 +817,14 @@ static void touch_tdeck_pro_update_swipe( lv_indev_data_t *data ) {
         touch_swipe_y_delta = 0;
         touch_swipe_queued = true;
         touch_swipe_sent = true;
+        touch_swipe_suppress_click = true;
     }
     else if ( abs_y >= swipe_threshold && abs_y > abs_x + axis_margin ) {
         touch_swipe_x_delta = 0;
         touch_swipe_y_delta = dy < 0 ? 1 : -1;
         touch_swipe_queued = true;
         touch_swipe_sent = true;
+        touch_swipe_suppress_click = true;
     }
 }
 #endif
@@ -985,6 +993,14 @@ static bool touch_read(lv_indev_drv_t * drv, lv_indev_data_t*data) {
     if( data->point.y >= lv_disp_get_ver_res( NULL ) ) data->point.y = lv_disp_get_ver_res( NULL ) - 1;
 #if defined( LILYGO_T_DECK_PRO )
     touch_tdeck_pro_update_swipe( data );
+    /*
+     * A recognized swipe owns the pointer until the finger is physically
+     * released.  Otherwise the newly displayed page sees the still-held
+     * finger as a fresh press and may open an unrelated control.
+     */
+    if ( touch_swipe_suppress_click ) {
+        data->state = LV_INDEV_STATE_REL;
+    }
 #endif
     /**
      * send touch event

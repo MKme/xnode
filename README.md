@@ -33,9 +33,9 @@ The T-Deck Plus target carries the XNODE workflow onto a larger 320x240 screen w
 
 ### Current T-Deck Pro build
 
-> **Development status: not fully working.** The T-Deck Pro firmware builds, flashes, boots, renders its portrait e-paper launcher, accepts swipe gestures, and provides swipe haptics. Launcher icons currently flash when tapped but do not emit a working menu click/navigation action, so Messages, Mesh, Tac Map, Weather, Stopwatch, Watchface Manager, and the other app pages cannot be opened from the launcher. Do not treat this target as production-ready.
+The T-Deck Pro target brings the XNODE handheld workflow to the LilyGO 240x320 e-paper board. It uses the local Pro HAL and bundled Pro hardware support libraries so the release build can produce a board-specific binary from this repo. The portrait launcher, touch menus, swipe navigation, haptics, Back controls, GPS receiver, GPS time sync, and physical keyboard are operational on the attached hardware.
 
-The T-Deck Pro target brings the XNODE handheld workflow to the LilyGO 240x320 e-paper board. It uses the local Pro HAL and bundled Pro hardware support libraries so the release build can produce a board-specific binary from this repo. Hardware bring-up and swipe navigation are functional, but launcher click navigation remains unresolved.
+> **Known issue:** Tac Map is not working properly on T-Deck Pro and still needs separate debugging.
 
 ### T-Watch S3 reference screens
 
@@ -82,7 +82,7 @@ Working now:
 - Stores XTOC/XCOM pushed news and alert items in the XNODE alerts app, with the watch-side `show pushed news` toggle.
 - Removes the main clock-screen message shortcut after the user opens the message view, while keeping the stored messages and the messages launcher entry intact.
 - Supports T-Deck Plus as a larger-screen XNODE device with a physical keyboard, readable GPS diagnostics, Launcher-usable firmware output, and the same core mesh/map/alert workflows.
-- Partially supports T-Deck Pro as a portrait 240x320 e-paper XNODE device. Builds, flashing, display output, swipe navigation/haptics, physical keyboard input, local HYN touch support, and battery gauge reads are present; launcher taps do not currently open app pages.
+- Supports T-Deck Pro as a portrait 240x320 e-paper XNODE device with working launcher menus, swipe navigation/haptics, Back controls, physical keyboard input, local HYN/CST touch support, battery gauge reads, GPS diagnostics, and GPS time sync.
 - Keeps the launcher functions active for messages, mesh, Tac Map, media player, Alert Summary, and watchface manager.
 - Inactivity timeout returns the T-Watch S3 build to standby instead of leaving it awake indefinitely.
 - T-Watch S3 standby uses the LilyGo `ext1` touch wake path on `BOARD_TOUCH_INT`.
@@ -191,7 +191,7 @@ Known T-Deck Plus limits:
 
 ## T-Deck Pro support
 
-This branch adds an experimental LilyGO T-Deck Pro target while preserving the active Ultra, S3, and T-Deck Plus targets. It produces a hardware-specific binary that can be loaded manually or by the bmorcelli Launcher, but the current firmware is not fully operational: launcher taps flash the e-paper display without opening app pages.
+This branch adds a LilyGO T-Deck Pro target while preserving the active Ultra, S3, and T-Deck Plus targets. It produces a hardware-specific binary that can be loaded manually or by the bmorcelli Launcher.
 
 Build from this repo:
 
@@ -232,14 +232,14 @@ Runtime behavior now wired:
 - Uses a portrait 240x320 LVGL layout with full-height Pro draw buffers for reliable e-paper first paint and partial/full refresh handoff.
 - Forces an initial full LVGL render after the UI is built so the full main page appears instead of only status icons.
 - Uses black-on-white Pro theme handling for the e-paper main page and status bar.
-- Polls HYN touch directly instead of relying on a sticky/short touch IRQ line for normal UI reads.
-- Supports top status-bar taps and center-screen swipe navigation through a Pro-only LVGL gesture hook plus raw touch-sample fallback.
+- Consumes HYN/CST touch reports from the controller interrupt path and clears release frames so LVGL receives stable press/release events.
+- Supports top status-bar taps and qualified center-screen swipe navigation without leaking a swipe into destination-page clicks.
 - Keeps physical keyboard input available for text entry and navigation.
 - Keeps the Pro display refresh path independent of the T-Deck Plus LCD path so other models are not affected.
 
 Known T-Deck Pro limits:
-- Support has been build-verified and flashed on the attached T-Deck Pro, but it is not fully working.
-- Swipe navigation and swipe haptics work. Tapping a launcher icon causes an e-paper flash, but no click haptic or app-page navigation occurs. Messages, Mesh, Tac Map, Weather, Stopwatch, Watchface Manager, and other launcher pages are therefore inaccessible from the menu.
+- Support has been build-verified, flashed, and exercised on the attached T-Deck Pro.
+- Tac Map is not working properly and remains deferred for separate debugging.
 - E-paper refresh is slower than LCD/AMOLED targets and can briefly invert during full refreshes.
 - Deep power policy, trackball-style navigation if present, speaker/microphone, IMU/compass, and RTC alarm integration are not finalized for Pro.
 - GPS still requires real satellite lock; the Pro board target uses the same GPS status interpretation as the other XNODE targets.
@@ -259,8 +259,8 @@ Current verified firmware baseline:
 | --- | --- | --- | --- | --- |
 | Idle timeout | Uses the shared display activity timer and standby request path. | Uses the shared display activity timer and restored timeout-to-standby path. | Blanks the backlight but keeps LVGL/touch/keyboard active to avoid post-wake UI stutter. | Keeps the active e-paper UI path responsive; deeper Pro power policy still needs field validation. |
 | Display standby | AMOLED brightness is set to zero and the panel is put into `display.sleep()`. | Backlight/display is turned off through the S3/LilyGo path. | Avoids ST7789 sleep/wake commands; backlight is driven directly. | Uses a Pro-only e-paper refresh path; full low-power display standby is not finalized. |
-| Touch wake | Touch/display rail stays powered because it is shared; touch interrupt can wake the watch. | Uses LilyGo-style `ext1` wake on `BOARD_TOUCH_INT`. | Touch and hardware keyboard interrupts are activity/wake sources. | HYN touch is polled directly for UI input; wake policy still needs Pro field validation. |
-| GPS at boot | Off by default after one-time config migration. | Existing behavior preserved. | On by default so GPS time/map location can work without manual enable. | Existing config path preserved; GPS hardware is mapped on `Serial1` RX `44` / TX `43`. |
+| Touch wake | Touch/display rail stays powered because it is shared; touch interrupt can wake the watch. | Uses LilyGo-style `ext1` wake on `BOARD_TOUCH_INT`. | Touch and hardware keyboard interrupts are activity/wake sources. | HYN/CST interrupt-driven input is operational; deeper wake policy still needs Pro field validation. |
+| GPS at boot | Off by default after one-time config migration. | Existing behavior preserved. | On by default so GPS time/map location can work without manual enable. | On by default with fixed `Serial1` RX `44` / TX `43` at `38400` baud so diagnostics and GPS UTC sync work without manual pin setup. |
 | GPS while using map | Tac map can still auto-start GPS for the user-location marker. | Existing behavior preserved. | Uses the same map GPS path and the T-Deck Serial1 GPS receiver. | Uses the same map GPS path and Pro `Serial1` GPS receiver once enabled. |
 | GPS in standby | Off unless an app explicitly blocks standby. GPS status no longer enables standby GPS. | Existing tracker/status behavior preserved. | Kept powered across the T-Deck display timeout path so receiver lock/debug state is not lost. | Deeper Pro standby/GPS policy is still open. |
 | WiFi at boot | Off by default after one-time config migration; dummy setup scan disabled. | Existing behavior preserved. | Existing config path preserved; not auto-enabled by the T-Deck bring-up. | Existing config path preserved; not changed by the Pro display/touch work. |

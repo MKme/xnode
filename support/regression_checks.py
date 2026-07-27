@@ -555,6 +555,36 @@ def run_checks():
     )
     require_tokens(
         "src/hardware/touch.cpp",
+        "T-Deck Pro swipes suppress destination-page clicks until release",
+        [
+            "swipe_threshold = 54",
+            "swipe_min_duration_ms = 70",
+            "touch_swipe_suppress_click = true;",
+            "if ( touch_swipe_suppress_click )",
+            "data->state = LV_INDEV_STATE_REL;",
+        ],
+    )
+    require_tokens(
+        "src/hardware/gpsctl.cpp",
+        "T-Deck Pro GPS uses its powered 38400-baud Serial1 receiver",
+        [
+            '#include "hardware/tdeck_pro_hal.h"',
+            "defined( LILYGO_T_DECK_PRO )",
+            "gps_serial = &Serial1;",
+            "gpsctl_config.RXPin = SHIELD_GPS_RX;",
+            "watch.powerIoctl( WATCH_POWER_GPS, true );",
+        ],
+    )
+    require_tokens(
+        "src/app/gps_status/gps_status_main.cpp",
+        "T-Deck Pro GPS status values use a wider right column",
+        [
+            "#if defined( LILYGO_T_DECK_PRO )",
+            "lv_disp_get_hor_res( NULL ) - 64",
+        ],
+    )
+    require_tokens(
+        "src/hardware/touch.cpp",
         "T-Deck Pro touch press forces real haptic feedback",
         [
             "motor_vibe( 3, true );",

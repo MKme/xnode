@@ -746,7 +746,6 @@ static bool mainbar_tdeck_pro_jump_relative( lv_coord_t x_delta, lv_coord_t y_de
     lv_indev_reset( NULL, NULL );
     gui_force_redraw( true );
     lv_obj_invalidate( lv_scr_act() );
-    motor_vibe( 3, true );
     last_jump_ms = now_ms;
     return( true );
 }
