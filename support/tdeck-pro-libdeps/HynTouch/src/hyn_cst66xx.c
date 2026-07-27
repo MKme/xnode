@@ -57,6 +57,13 @@ static int cst66xx_report(void)
     u8 finger_num = 0,key_num=0,report_typ= 0,key_state=0,key_id = 0,tmp_dat=0;
     int ret = 0,retry = 2;
 
+    /*
+     * A zero-finger/release frame does not enter the finger_num branch below.
+     * Clear the preceding frame first so a released finger cannot remain
+     * permanently pressed in LVGL.
+     */
+    hyn_66xxdata->rp_buf.rep_num = 0;
+
     while(retry--){ //read point
         ret = hyn_wr_reg(hyn_66xxdata,0xD0070000,0x80|4,buf,9); 
         report_typ = buf[2];//FF:pos F0:ges E0:prox

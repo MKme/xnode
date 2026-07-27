@@ -517,6 +517,50 @@ def run_checks():
             "lv_style_set_image_recolor( &img_button_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );",
         ],
     )
+    require_tokens(
+        "support/tdeck-pro-libdeps/HynTouch/src/hyn_touch.cpp",
+        "T-Deck Pro consumes touch reports on interrupts like the factory demo",
+        [
+            "if (touch_press_flag)",
+            "touch_press_flag = false;",
+            "return hyn_data->rp_buf.rep_num;",
+            "consume one controller report for",
+        ],
+    )
+    require_tokens(
+        "support/tdeck-pro-libdeps/HynTouch/src/hyn_cst66xx.c",
+        "T-Deck Pro CST66xx release frames clear the prior touch",
+        [
+            "hyn_66xxdata->rp_buf.rep_num = 0;",
+            "A zero-finger/release frame",
+        ],
+    )
+    require_tokens(
+        "src/gui/app.cpp",
+        "T-Deck Pro launcher callbacks use the full LVGL icon cell",
+        [
+            "lv_obj_set_click( app->icon_img, false );",
+            "lv_obj_set_click( app->icon_cont, true );",
+            "lv_obj_set_event_cb( app->icon_cont, event_cb );",
+        ],
+    )
+    require_tokens(
+        "src/hardware/touch.cpp",
+        "T-Deck Pro LVGL press survives gaps between IRQ reports",
+        [
+            "report_quiet_release_ms = 140",
+            "press_latched && millis() - last_report_ms < report_quiet_release_ms",
+            "A missing frame between",
+        ],
+    )
+    require_tokens(
+        "src/hardware/touch.cpp",
+        "T-Deck Pro touch press forces real haptic feedback",
+        [
+            "motor_vibe( 3, true );",
+            "The Pro has a DRV2605",
+        ],
+    )
     require_slice_tokens(
         "src/gui/widget_styles.cpp",
         "light theme keeps black text on light shared surfaces",

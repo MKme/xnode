@@ -150,7 +150,18 @@ icon_t *app_register( const char* appname, const lv_img_dsc_t *icon, lv_event_cb
     lv_obj_add_style( app->icon_img, LV_OBJ_PART_MAIN, ws_get_app_icon_style() );
 #endif
     lv_obj_align( app->icon_img , app->icon_cont, LV_ALIGN_CENTER, 0, 0 );
+#if defined( LILYGO_T_DECK_PRO )
+    /*
+     * Font-symbol image buttons only expose the glyph bounds as their hit
+     * area.  Use the launcher's existing full-size cell as the LVGL button so
+     * every app has the same target regardless of symbol width.
+     */
+    lv_obj_set_click( app->icon_img, false );
+    lv_obj_set_click( app->icon_cont, true );
+    lv_obj_set_event_cb( app->icon_cont, event_cb );
+#else
     lv_obj_set_event_cb( app->icon_img, event_cb );
+#endif
     // setup icon indicator
     app->icon_indicator = lv_img_create( app->icon_cont, NULL );
     lv_img_set_src( app->icon_indicator, &info_ok_16px );

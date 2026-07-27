@@ -22,7 +22,6 @@ const static char *TAG = "[HYN]";
 static struct hyn_ts_data *hyn_data;
 static xQueueHandle gpio_evt_queue;
 static volatile bool touch_press_flag = false;
-static bool touch_active = false;
 
 static void IRAM_ATTR gpio_isr_handler(void *arg)
 {
@@ -76,28 +75,23 @@ uint8_t hyn_touch_get_point(int16_t *x_array, int16_t *y_array, uint8_t get_poin
         return 0;
     }
 
-    // The T-Deck Pro demo polls the controller from the UI loop.  Do not gate
-    // reads on the IRQ line here; some boards do not hold the line low long
-    // enough for a polling app to observe it.
-    bool irq_seen = touch_press_flag;
-    touch_press_flag = false;
-    bool irq_low = gpio_get_level((gpio_num_t)CONFIG_EXAMPLE_TOUCH_INT_PIN) == 0;
-    (void)irq_seen;
-    (void)irq_low;
+    // Match LilyGo's working factory demo: consume one controller report for
+    // each falling-edge touch interrupt.  Continuous polling drains/replays
+    // the controller FIFO and destroys the move sequence LVGL needs.
+    if (touch_press_flag)
+    {
+        touch_press_flag = false;
+    }
+    else
+    {
+        return 0;
+    }
 
     int ret;
-    uint8_t count = 0;
     hyn_data->hyn_irq_flg = 1;
     if (hyn_data->work_mode < DIFF_MODE)
     {
         ret = hyn_data->hyn_fuc_used->tp_report(); // Read point
-        if (ret)
-        {
-            hyn_data->rp_buf.rep_num = 0;
-            hyn_data->rp_buf.report_need = REPORT_NONE;
-            touch_active = false;
-            return 0;
-        }
 
         for (u8 i = 0; i < hyn_data->rp_buf.rep_num; i++)
         { // Modify the coordinate origin according to the configuration
@@ -112,24 +106,21 @@ uint8_t hyn_touch_get_point(int16_t *x_array, int16_t *y_array, uint8_t get_poin
             if (hyn_data->plat_data.reverse_y)
                 hyn_data->rp_buf.pos_info[i].pos_y = hyn_data->plat_data.y_resolution - hyn_data->rp_buf.pos_info[i].pos_y;
         }
-        count = hyn_data->rp_buf.rep_num;
-        if (count > get_point)
-        {
-            count = get_point;
-        }
         // printf("ret:%d num:%d xy:", ret, hyn_data->rp_buf.rep_num);
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < hyn_data->rp_buf.rep_num; i++)
         {
-            x_array[i] = hyn_data->rp_buf.pos_info[i].pos_x;
-            y_array[i] = hyn_data->rp_buf.pos_info[i].pos_y;
+            if (i < get_point)
+            {
+                x_array[i] = hyn_data->rp_buf.pos_info[i].pos_x;
+                y_array[i] = hyn_data->rp_buf.pos_info[i].pos_y;
+            }
             // printf("(%d,%d) ", hyn_data->rp_buf.pos_info[i].pos_x, hyn_data->rp_buf.pos_info[i].pos_y);
         }
         // printf("\n");
     }
-    touch_active = hyn_data->rp_buf.rep_num > 0;
     hyn_data->rp_buf.report_need = REPORT_NONE;
 
-    return count;
+    return hyn_data->rp_buf.rep_num;
 }
 
 int hyn_touch_init(void)

@@ -633,16 +633,29 @@ bool touch_getXY( int16_t &x, int16_t &y ) {
             y -= T_WATCH_ULTRA_SAFE_TOP;
             touched = true;
         #elif defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
+            static bool touch_press = false;
             bool getTouchResult = false;
             if ( touch_lock_take() ) {
                 getTouchResult = watch.getPoint( &x, &y ) > 0;
                 touch_lock_give();
             }
             if ( !getTouchResult ) {
+                touch_press = false;
                 touched = false;
                 return( false );
             }
+#if defined( LILYGO_T_DECK_PRO )
             touched = true;
+            if ( !touch_press ) {
+                touch_press = true;
+                /*
+                 * The Pro has a DRV2605, so acknowledge the initial contact
+                 * instead of waiting for a page-swipe callback.  This also
+                 * makes ordinary launcher and back-button taps tactile.
+                 */
+                motor_vibe( 3, true );
+            }
+#endif
         #elif defined( LILYGO_WATCH_S3 )
             int16_t raw_x = 0;
             int16_t raw_y = 0;
@@ -857,15 +870,33 @@ static bool touch_read(lv_indev_drv_t * drv, lv_indev_data_t*data) {
         #elif defined( LILYGO_T_DECK_PRO )
             static lv_coord_t last_x = 0;
             static lv_coord_t last_y = 0;
+            static uint32_t last_report_ms = 0;
+            static bool press_latched = false;
+            constexpr uint32_t report_quiet_release_ms = 140;
             if ( touch_getXY( data->point.x, data->point.y ) ) {
                 last_x = data->point.x;
                 last_y = data->point.y;
+                last_report_ms = millis();
+                press_latched = true;
                 data->state = LV_INDEV_STATE_PR;
             }
             else {
                 data->point.x = last_x;
                 data->point.y = last_y;
-                data->state = LV_INDEV_STATE_REL;
+                /*
+                 * HYN reports are IRQ-driven and do not necessarily produce a
+                 * fresh frame on every LVGL read.  A missing frame between
+                 * move reports is not a finger release.  Preserve one
+                 * continuous press until the controller has been quiet long
+                 * enough, matching the gesture tracker's release grace.
+                 */
+                if ( press_latched && millis() - last_report_ms < report_quiet_release_ms ) {
+                    data->state = LV_INDEV_STATE_PR;
+                }
+                else {
+                    press_latched = false;
+                    data->state = LV_INDEV_STATE_REL;
+                }
             }
         #elif defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS )
             data->state = touch_getXY( data->point.x, data->point.y ) ? LV_INDEV_STATE_PR : LV_INDEV_STATE_REL;
