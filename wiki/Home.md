@@ -39,6 +39,14 @@ This directory is the source for the repository wiki. The Markdown files are wri
 
 The T-Deck Plus tactical map now shows the synced XTOC/XCOM tactical markers on the larger display. This gives the same XNODE map workflow more usable screen area than the watch-only layout while preserving the shared overlay and basemap sync path.
 
+## T-Deck Pro hardware proof
+
+| Clock and status | Main launcher | Meshtastic messaging |
+| --- | --- | --- |
+| ![T-Deck Pro running the XNODE clock and device status screen](https://raw.githubusercontent.com/MKme/xnode/main/site/images/tdeck%20pro/IMG_7371.jpg) | ![T-Deck Pro running the XNODE main launcher](https://raw.githubusercontent.com/MKme/xnode/main/site/images/tdeck%20pro/IMG_7372.jpg) | ![T-Deck Pro running the XNODE Meshtastic message screen](https://raw.githubusercontent.com/MKme/xnode/main/site/images/tdeck%20pro/IMG_7373.jpg) |
+
+These photos show XNODE running on real T-Deck Pro hardware: the e-paper clock/status screen, the six-action field launcher, and the LongFast Meshtastic compose/inbox workflow with the built-in keyboard.
+
 ## Primary source references
 
 - XNODE GitHub repo: https://github.com/MKme/xnode

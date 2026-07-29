@@ -35,6 +35,11 @@ The T-Deck Plus target carries the XNODE workflow onto a larger 320x240 screen w
 
 The T-Deck Pro target brings the XNODE handheld workflow to the LilyGO 240x320 e-paper board. It uses the local Pro HAL and bundled Pro hardware support libraries so the release build can produce a board-specific binary from this repo. The portrait launcher, touch menus, swipe navigation, haptics, Back controls, GPS receiver, GPS time sync, and physical keyboard are operational on the attached hardware.
 
+| Clock and device status | Main launcher | Meshtastic messaging |
+| --- | --- | --- |
+| <img src="site/images/tdeck%20pro/IMG_7371.jpg" alt="LilyGO T-Deck Pro running the XNODE clock screen with date, battery status, moon phase, and message shortcut" width="240"> | <img src="site/images/tdeck%20pro/IMG_7372.jpg" alt="LilyGO T-Deck Pro running the XNODE launcher with Messages, Mesh, Tac Map, CheckIn, Alert Summary, and SOS actions" width="240"> | <img src="site/images/tdeck%20pro/IMG_7373.jpg" alt="LilyGO T-Deck Pro running the XNODE Meshtastic message screen with LongFast channel, compose area, Send, and Inbox controls" width="240"> |
+| Live e-paper clock/status view on the working device. | Touch-friendly portrait launcher for the main XNODE field workflows. | Meshtastic compose and inbox interface with the built-in physical keyboard. |
+
 > **Known issue:** Tac Map is not working properly on T-Deck Pro and still needs separate debugging.
 
 ### T-Watch S3 reference screens

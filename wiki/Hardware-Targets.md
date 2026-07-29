@@ -134,3 +134,9 @@ Important T-Deck Pro behavior:
 - HYN touch is polled directly for UI input; swipe navigation has both LVGL gesture and raw-sample fallback paths.
 - Status bar and main page styling are adjusted for black-on-white e-paper contrast.
 - E-paper refresh can briefly invert during full refreshes and is slower than LCD/AMOLED targets.
+
+### T-Deck Pro running XNODE
+
+| Clock and status | Main launcher | Meshtastic messaging |
+| --- | --- | --- |
+| ![T-Deck Pro running the XNODE clock and device status screen](https://raw.githubusercontent.com/MKme/xnode/main/site/images/tdeck%20pro/IMG_7371.jpg) | ![T-Deck Pro running the XNODE main launcher](https://raw.githubusercontent.com/MKme/xnode/main/site/images/tdeck%20pro/IMG_7372.jpg) | ![T-Deck Pro running the XNODE Meshtastic message screen](https://raw.githubusercontent.com/MKme/xnode/main/site/images/tdeck%20pro/IMG_7373.jpg) |
