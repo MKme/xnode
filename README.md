@@ -22,11 +22,11 @@ Tap an icon card or its caption to open the tool. Tactical icon colors distingui
 
 Open **mesh** from **APPS** to read the selected channel's conversation immediately. **CHAT** and **RADIO** are neighboring left/right pages; conversation text scrolls vertically. The channel selector and 80-character composer stay on the chat page. T-Deck Plus uses its physical keyboard; watches use a full-screen editor with large letter/number pages and a checkmark to return to chat. T-Deck Pro keeps the monochrome portrait layout and on-screen editor.
 
-Mesh Chat opens directly into live traffic, with no example mode or preview button. Watches use separate conversation, WRITE/review, and RADIO pages with larger text and touch controls. Mesh Chat retains the latest 24 real text records across channels in RAM until restart. **TX SENT (LOCAL)** confirms only the local transmission. **SEND** broadcasts to the chosen channel even after a received **DIRECT** message. See [Mesh Chat instructions](USAGE.md#mesh-chat) for entry, status and recovery details.
+Mesh Chat opens directly into live traffic, with no example mode or preview button. Watches use separate conversation, WRITE/review, and RADIO pages with larger text and touch controls. Mesh Chat retains the latest 24 real text records across channels in RAM until restart. A checkmark appears only after a matching radio acknowledgment; otherwise there is no status suffix. **SEND** broadcasts to the chosen channel even after a received **DIRECT** message. See [Mesh Chat instructions](USAGE.md#mesh-chat) for entry, status and recovery details.
 
 ### Watch conversation and text entry
 
-The captures below document the earlier demonstration build. Production now opens directly into live chat without the Examples button.
+Production opens directly into live chat without an Examples button. The USB capture below is from the earlier demonstration build; the rendered chat images show the current acknowledgment checkmark.
 
 ![Mesh Chat captured over USB from the flashed T-Deck Plus, with Examples ON](site/images/mesh-chat-2026-09-28/tdeck-plus-mesh-device.png)
 
@@ -34,9 +34,9 @@ The image above is the actual T-Deck Plus screen after flashing, including its g
 
 | T-Watch S3 chat | S3 full-screen editor | T-Watch Ultra chat | Ultra full-screen editor |
 | --- | --- | --- | --- |
-| <img src="site/images/mesh-chat-2026-09-28/watch-s3-dark-chat.png" alt="T-Watch S3 Mesh Chat firmware capture with examples" width="200"> | <img src="site/images/mesh-chat-2026-09-28/watch-s3-dark-compose.png" alt="T-Watch S3 full-screen text editor firmware capture" width="200"> | <img src="site/images/mesh-chat-2026-09-28/watch-ultra-dark-chat.png" alt="T-Watch Ultra Mesh Chat firmware capture with examples" width="200"> | <img src="site/images/mesh-chat-2026-09-28/watch-ultra-dark-compose.png" alt="T-Watch Ultra full-screen text editor firmware capture" width="200"> |
+| <img src="site/images/mesh-chat-2026-09-28/watch-s3-dark-chat.png" alt="T-Watch S3 Mesh Chat firmware rendering with illustrative messages" width="200"> | <img src="site/images/mesh-chat-2026-09-28/watch-s3-dark-compose.png" alt="T-Watch S3 full-screen text editor firmware capture" width="200"> | <img src="site/images/mesh-chat-2026-09-28/watch-ultra-dark-chat.png" alt="T-Watch Ultra Mesh Chat firmware rendering with illustrative messages" width="200"> | <img src="site/images/mesh-chat-2026-09-28/watch-ultra-dark-compose.png" alt="T-Watch Ultra full-screen text editor firmware capture" width="200"> |
 
-These firmware screen captures show illustrative example messages and drafts. The watch editor gives text entry its own screen; accepting the draft returns to chat before sending.
+These firmware renderings show illustrative messages, acknowledgments and drafts; they do not establish a physical radio exchange. The watch editor gives text entry its own screen; accepting the draft returns to chat before sending.
 
 ### Current T-Watch Ultra build
 
@@ -56,7 +56,7 @@ The T-Deck Plus target carries the XNODE workflow onto a larger 320x240 screen w
 
 | Setup | Mesh Chat | CheckIn |
 | --- | --- | --- |
-| <img src="site/images/home-tactical-2026-09-28/tdeck-plus-dark-setup.png" alt="T-Deck Plus XNODE Setup menu with labeled tactical icons" width="200"> | <img src="site/images/mesh-chat-2026-09-28/tdeck-plus-dark-chat.png" alt="T-Deck Plus Mesh Chat firmware capture with example conversation" width="200"> | <img src="site/images/T-dec/IMG_6813.jpg" alt="T-Deck Plus XNODE CheckIn screen" width="200"> |
+| <img src="site/images/home-tactical-2026-09-28/tdeck-plus-dark-setup.png" alt="T-Deck Plus XNODE Setup menu with labeled tactical icons" width="200"> | <img src="site/images/mesh-chat-2026-09-28/tdeck-plus-dark-chat.png" alt="T-Deck Plus Mesh Chat firmware rendering with illustrative messages" width="200"> | <img src="site/images/T-dec/IMG_6813.jpg" alt="T-Deck Plus XNODE CheckIn screen" width="200"> |
 | Display, Wi-Fi, Bluetooth, clock, battery and sound settings. | Channel conversation with the composer ready for physical keyboard entry. | Fast CheckIn packet flow with current position. |
 
 ### Current T-Deck Pro build
@@ -65,7 +65,7 @@ The T-Deck Pro target brings the XNODE handheld workflow to the LilyGO 240x320 e
 
 | Clock and device status | Main launcher | Meshtastic messaging |
 | --- | --- | --- |
-| <img src="site/images/home-tactical-2026-09-28/tdeck-pro-light.png" alt="XNODE monochrome Field Chronometer home for T-Deck Pro" width="240"> | <img src="site/images/home-tactical-2026-09-28/tdeck-pro-light-apps.png" alt="LilyGO T-Deck Pro running the XNODE launcher with Messages, Mesh, Tac Map, CheckIn, Alert Summary, and SOS actions" width="240"> | <img src="site/images/mesh-chat-2026-09-28/tdeck-pro-light-chat.png" alt="T-Deck Pro monochrome Mesh Chat firmware capture with example conversation" width="240"> |
+| <img src="site/images/home-tactical-2026-09-28/tdeck-pro-light.png" alt="XNODE monochrome Field Chronometer home for T-Deck Pro" width="240"> | <img src="site/images/home-tactical-2026-09-28/tdeck-pro-light-apps.png" alt="LilyGO T-Deck Pro running the XNODE launcher with Messages, Mesh, Tac Map, CheckIn, Alert Summary, and SOS actions" width="240"> | <img src="site/images/mesh-chat-2026-09-28/tdeck-pro-light-chat.png" alt="T-Deck Pro monochrome Mesh Chat firmware rendering with illustrative messages" width="240"> |
 | Monochrome Field Chronometer layout for the portrait e-paper display. | Touch-friendly portrait launcher for the main XNODE field workflows. | Monochrome channel conversation with a portrait on-screen editor. |
 
 > **Known issue:** Tac Map is not working properly on T-Deck Pro and still needs separate debugging.

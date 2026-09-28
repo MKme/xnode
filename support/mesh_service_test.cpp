@@ -21,7 +21,7 @@ constexpr uint8_t MESHTASTIC_FLAG_HOP_START_SHIFT = 5, MESHTASTIC_FLAG_HOP_START
 constexpr uint32_t MESHTASTIC_TEXT_MESSAGE_APP = 1, MESHTASTIC_NODEINFO_INTERVAL_MS = 900000;
 constexpr uint32_t MESHTASTIC_NODEINFO_RETRY_DELAY_MS = 5000;
 constexpr uint32_t MESHTASTIC_BROADCAST=0xffffffff,MESHTASTIC_NODEINFO_APP=4,MESHTASTIC_POSITION_APP=3;
-struct meshtastic_decoded_data_t {bool valid=false;uint32_t portnum=0,dest=0,source=0;size_t payload_len=0;uint8_t payload[255]={};};
+struct meshtastic_decoded_data_t {bool valid=false;uint32_t portnum=0,dest=0,source=0,request_id=0;size_t payload_len=0;uint8_t payload[255]={};};
 struct meshtastic_decoded_text_t {bool valid=false;uint32_t portnum=0,dest=0,source=0;size_t text_len=0;char text[201]={};};
 struct meshtastic_decoded_position_t {bool valid=false,has_altitude=false;int32_t latitude_i=0,longitude_i=0,altitude=0;};
 struct meshtastic_User {};
@@ -39,7 +39,8 @@ struct Radio {
     int readData(uint8_t *out,size_t n) {++rx_reads;memcpy(out,rx_packet,n);return read_result;}
     float getRSSI() {return -75;}
     float getSNR() {return 8;}
-    int startTransmit(uint8_t *, size_t) { ++starts; return start_result; }
+    uint8_t last_tx_flags=0;
+    int startTransmit(uint8_t *packet, size_t) { last_tx_flags=packet[12];++starts; return start_result; }
     int finishTransmit() { return finish_result; }
     int setCRC(uint8_t value) {crc_value=value;return crc_result;}
     #if RADIOLIB_VERSION_MAJOR >= 7
@@ -74,6 +75,7 @@ unsigned notifications = 0;
 uint32_t millis() {return fake_now;}
 size_t strlcpy(char *out, const char *in, size_t n) {size_t len=strlen(in); if(n){size_t copy=len<n-1?len:n-1;memcpy(out,in,copy);out[copy]=0;}return len;}
 uint32_t mesh_history_add(const mesh_message_t &message) {return history.add(message);}
+bool mesh_history_ack(uint32_t id,uint8_t slot,uint32_t local,uint32_t peer,const char *text=nullptr) {return history.acknowledge(id,slot,local,peer,text);}
 void mesh_history_status(uint32_t sequence, mesh_message_status_t status) {history.set_status(sequence,status);}
 mesh_message_t meshtastic_history_record(const char *sender,const char *text,uint32_t from,uint32_t to,uint8_t slot,uint32_t id,bool outgoing) {
     mesh_message_t r={};r.from_node=from;r.to_node=to;r.channel_slot=slot;r.packet_id=id;r.outgoing=outgoing;
@@ -115,6 +117,87 @@ static void incoming(uint32_t id,uint32_t destination=MESHTASTIC_BROADCAST,uint8
     const uint8_t body[]={0x08,0x01,0x12,0x05,'h','e','l','l','o'};
     memcpy(meshtastic_radio.rx_packet+sizeof(header),body,sizeof(body));
     meshtastic_radio.rx_len=sizeof(header)+sizeof(body);meshtastic_radio_irq=true;
+}
+static void ack_packet(uint32_t request,uint32_t peer=123,uint32_t to=42,uint8_t hash=8,uint8_t error=0) {
+    const meshtastic_packet_header_t header={to,peer,700,3,hash,0,0};
+    memcpy(meshtastic_radio.rx_packet,&header,sizeof(header));
+    uint8_t body[]={0x08,5,0x12,2,0x18,error,0x35,0,0,0,0};
+    memcpy(body+7,&request,sizeof(request));
+    memcpy(meshtastic_radio.rx_packet+sizeof(header),body,sizeof(body));
+    meshtastic_radio.rx_len=sizeof(header)+sizeof(body);meshtastic_radio_irq=true;
+}
+static mesh_message_t channel_last(uint8_t slot) {
+    mesh_message_t out={};assert(history.get(slot,history.count(slot)-1,&out));return out;
+}
+static void ack_tests() {
+    const auto delivered=rx_delivery;
+    assert(meshtastic_service_send_text_internal("ACK me",MESHTASTIC_BROADCAST,0));
+    assert(meshtastic_radio.last_tx_flags & 0x08);
+    auto outgoing=channel_last(0);
+    complete(RADIOLIB_SX126X_IRQ_TX_DONE);
+    assert(channel_last(0).status==MESH_MESSAGE_TRANSMITTED); // Local completion is never ACK.
+    ack_packet(outgoing.packet_id+1);meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    ack_packet(outgoing.packet_id,123,999);meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    ack_packet(outgoing.packet_id,123,42,99);meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    ack_packet(outgoing.packet_id,123,42,8,3);meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    ack_packet(outgoing.packet_id,42);meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    assert(channel_last(0).status==MESH_MESSAGE_TRANSMITTED);
+    ack_packet(outgoing.packet_id);
+    meshtastic_radio.rx_packet[meshtastic_radio.rx_len++]=0;
+    meshtastic_radio.rx_packet[meshtastic_radio.rx_len++]=0; // Invalid field zero in outer Data.
+    meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    assert(channel_last(0).status==MESH_MESSAGE_TRANSMITTED);
+    ack_packet(outgoing.packet_id);
+    const size_t payload_at=sizeof(meshtastic_packet_header_t)+4;
+    memmove(meshtastic_radio.rx_packet+payload_at+4,meshtastic_radio.rx_packet+payload_at+2,5);
+    meshtastic_radio.rx_packet[payload_at-1]=4;
+    meshtastic_radio.rx_packet[payload_at+2]=0;
+    meshtastic_radio.rx_packet[payload_at+3]=0; // Invalid field zero inside Routing payload.
+    meshtastic_radio.rx_len+=2;
+    meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    assert(channel_last(0).status==MESH_MESSAGE_TRANSMITTED);
+    ack_packet(outgoing.packet_id);meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    assert(channel_last(0).status==MESH_MESSAGE_ACKNOWLEDGED && rx_delivery==delivered);
+    auto revision=history.revision();
+    ack_packet(outgoing.packet_id);meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    assert(history.revision()==revision); // Duplicate ACK is idempotent.
+    assert(meshtastic_service_send_text_internal("Direct",321,0));
+    outgoing=channel_last(0);complete(RADIOLIB_SX126X_IRQ_TX_DONE);
+    ack_packet(outgoing.packet_id,123);meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    assert(channel_last(0).status==MESH_MESSAGE_TRANSMITTED);
+    ack_packet(outgoing.packet_id,321);meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    assert(channel_last(0).status==MESH_MESSAGE_ACKNOWLEDGED);
+    assert(meshtastic_service_send_text_internal("hello",MESHTASTIC_BROADCAST,0));
+    outgoing=channel_last(0);complete(RADIOLIB_SX126X_IRQ_TX_DONE);
+    incoming(outgoing.packet_id);
+    meshtastic_packet_header_t echoed={MESHTASTIC_BROADCAST,42,outgoing.packet_id,3,8,0,0};
+    memcpy(meshtastic_radio.rx_packet,&echoed,sizeof(echoed));
+    meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    assert(channel_last(0).status==MESH_MESSAGE_TRANSMITTED); // Unchanged own packet is not a relay.
+    echoed.flags=2;memcpy(meshtastic_radio.rx_packet,&echoed,sizeof(echoed));meshtastic_radio_irq=true;
+    meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    assert(channel_last(0).status==MESH_MESSAGE_ACKNOWLEDGED && rx_delivery==delivered);
+    assert(meshtastic_service_send_text_internal("Lost TX_DONE",MESHTASTIC_BROADCAST,0));
+    outgoing=channel_last(0);fake_now+=30000;
+    meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    assert(channel_last(0).status==MESH_MESSAGE_FAILED);
+    ack_packet(outgoing.packet_id);meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
+    assert(channel_last(0).status==MESH_MESSAGE_ACKNOWLEDGED);
+    assert(!history.set_status(outgoing.sequence,MESH_MESSAGE_FAILED));
+    assert(meshtastic_service_send_text_internal("Early ACK",MESHTASTIC_BROADCAST,0));
+    outgoing=channel_last(0);ack_packet(outgoing.packet_id);
+    meshtastic_delivery_t received_ack;
+    { MeshtasticRadioLock lock;assert(meshtastic_handle_rx(received_ack)); }
+    assert(channel_last(0).status==MESH_MESSAGE_ACKNOWLEDGED);
+    complete(RADIOLIB_SX126X_IRQ_TX_DONE);
+    assert(channel_last(0).status==MESH_MESSAGE_ACKNOWLEDGED);
+    const uint8_t error_then_none[]={0x18,3,0x18,0};
+    const uint8_t discovery[]={0x0a,0};
+    const uint8_t malformed[]={0x18,0x80};
+    assert(!meshtastic_routing_ack(error_then_none,sizeof(error_then_none)));
+    assert(!meshtastic_routing_ack(discovery,sizeof(discovery)));
+    assert(!meshtastic_routing_ack(malformed,sizeof(malformed)));
+    assert(!meshtastic_routing_ack(nullptr,0));
 }
 static void malformed_protobuf_tests() {
     const uint8_t max32[]={0xff,0xff,0xff,0xff,0x0f};
@@ -199,5 +282,6 @@ int main() {
     a.join();b.join();assert(first!=second);
     complete(RADIOLIB_SX126X_IRQ_TX_DONE);
     assert(!meshtastic_tx_active);
-    puts("Production mesh bodies: protobuf RX/header channel and destination routing, corrupt/CRC-rejected RX, dedupe, CRC config/failure, TX concurrency, standby RX/TX and delivery after RX restart/mutex release passed. Radio/crypto are fixtures; no RF claim.");
+    ack_tests();
+    puts("Production mesh bodies: explicit/implicit ACK correlation and rejection, protobuf RX/header channel and destination routing, corrupt/CRC-rejected RX, dedupe, CRC config/failure, TX concurrency, standby RX/TX and delivery after RX restart/mutex release passed. Radio/crypto are fixtures; no RF claim.");
 }

@@ -26,6 +26,10 @@ namespace {
         MeshHistoryLock lock;
         return mesh_history.add(message);
     }
+    bool mesh_history_ack(uint32_t id, uint8_t slot, uint32_t local, uint32_t peer, const char *text = nullptr) {
+        MeshHistoryLock lock;
+        return mesh_history.acknowledge(id, slot, local, peer, text);
+    }
     void mesh_history_status(uint32_t sequence, mesh_message_status_t status) {
         MeshHistoryLock lock;
         mesh_history.set_status(sequence, status);
@@ -136,6 +140,7 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
             uint32_t portnum = 0;
             uint32_t dest = 0;
             uint32_t source = 0;
+            uint32_t request_id = 0;
             size_t payload_len = 0;
             uint8_t payload[ MESHTASTIC_MAX_PACKET_LEN ] = { 0 };
         };
@@ -970,6 +975,7 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
                 }
 
                 const uint32_t field_num = key >> 3;
+                if (field_num == 0) return false;
                 const uint8_t wire_type = key & 0x07;
 
                 switch( field_num ) {
@@ -1005,6 +1011,11 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
                         }
                         memcpy( &decoded.source, &buffer[ offset ], sizeof( decoded.source ) );
                         offset += sizeof( decoded.source );
+                        break;
+                    case 6:
+                        if (wire_type != 5 || sizeof(decoded.request_id) > len - offset) return false;
+                        memcpy(&decoded.request_id, &buffer[offset], sizeof(decoded.request_id));
+                        offset += sizeof(decoded.request_id);
                         break;
                     default:
                         if ( !meshtastic_skip_field( buffer, len, offset, wire_type ) ) {
@@ -1149,6 +1160,27 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
             powermgm_resume_from_ISR();
         }
 
+        // Routing is a oneof: require the explicit NONE variant, not a route
+        // discovery response, empty payload, or a malformed/error packet.
+        bool meshtastic_routing_ack(const uint8_t *payload, size_t len) {
+            size_t offset = 0;
+            bool success = false;
+            while (offset < len) {
+                uint32_t key = 0, error = 0;
+                if (!meshtastic_read_varint(payload, len, offset, key)) return false;
+                if ((key >> 3) == 0) return false;
+                if ((key >> 3) == 3) {
+                    if ((key & 7) != 0 || !meshtastic_read_varint(payload, len, offset, error)) return false;
+                    if (error != 0) return false;
+                    success = true;
+                } else {
+                    if ((key >> 3) == 1 || (key >> 3) == 2) return false;
+                    if (!meshtastic_skip_field(payload, len, offset, key & 7)) return false;
+                }
+            }
+            return success;
+        }
+
         bool meshtastic_handle_rx( meshtastic_delivery_t &delivery ) {
             uint8_t packet[ MESHTASTIC_MAX_PACKET_LEN ] = { 0 };
             meshtastic_decoded_data_t data;
@@ -1169,7 +1201,7 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
             }
 
             const meshtastic_packet_header_t *header = (const meshtastic_packet_header_t *)packet;
-            if ( header->from == 0 || header->from == meshtastic_node_id ) {
+            if ( header->from == 0 ) {
                 return( false );
             }
 
@@ -1192,6 +1224,22 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
             const uint32_t destination = data.dest ? data.dest : header->to;
             if ( destination != MESHTASTIC_BROADCAST && destination != meshtastic_node_id ) {
                 return( false );
+            }
+
+            if (header->from == meshtastic_node_id) {
+                // Upstream ReliableRouter treats overheard broadcast relays as
+                // implicit ACKs. Match channel/id/body and require reduced hops.
+                if (header->to == MESHTASTIC_BROADCAST && destination == MESHTASTIC_BROADCAST &&
+                    (header->flags & 0x10) == 0 && (header->flags & 7) < MESHTASTIC_HOP_RELIABLE &&
+                    meshtastic_decode_text_message(data, decoded) && data.payload_len == strlen(decoded.text))
+                    return mesh_history_ack(header->id, channel_slot, meshtastic_node_id,
+                                            header->from, decoded.text);
+                return false;
+            }
+            if (data.portnum == 5) { // ROUTING_APP
+                if (header->to != meshtastic_node_id || destination != meshtastic_node_id ||
+                    !data.request_id || !meshtastic_routing_ack(data.payload, data.payload_len)) return false;
+                return mesh_history_ack(data.request_id, channel_slot, meshtastic_node_id, header->from);
             }
 
             meshtastic_last_peer = header->from;
@@ -1480,6 +1528,7 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
         header->from = meshtastic_node_id;
         header->id = meshtastic_generate_packet_id();
         header->flags = MESHTASTIC_HOP_RELIABLE |
+                        (portnum == MESHTASTIC_TEXT_MESSAGE_APP ? 0x08 : 0) |
                         ( ( MESHTASTIC_HOP_RELIABLE << MESHTASTIC_FLAG_HOP_START_SHIFT ) & MESHTASTIC_FLAG_HOP_START_MASK );
         header->channel = tx_channel->hash;
         header->next_hop = 0;

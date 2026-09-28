@@ -4,42 +4,42 @@
     {
       "target": "tdeck-plus",
       "file": "artifacts/xnode-tdeck-plus-field-chronometer-20260928.bin",
-      "sha256": "d09d696ce3623bfbafaf77a5acc29c93344613ce5ddd901a509ae058fa3c7800",
-      "bytes": 3986848,
-      "log": "longfast-tdeck-build.log",
+      "sha256": "558c25aacfd9a05d83e1d2ee4ed09b7f60f971bc5e0b7449216a77ee1d1e31bd",
+      "bytes": 3987568,
+      "log": "ack-other-targets-build.log",
       "type": "application image; not merged full-flash installer",
-      "repair": "GUI event ownership, CRC, standby RX, parser bounds and notification memory"
+      "repair": "GUI event ownership, CRC, standby RX, parser bounds, notification memory and ACK-only message checkmark"
     },
     {
       "target": "t-watch2020-v3-s3",
       "file": "artifacts/xnode-t-watch2020-v3-s3-field-chronometer-20260928.bin",
-      "sha256": "b8f3854fe5ef411fa13d3364aa7c85a63d118b46d03b27ba2180bd6ba448f67e",
-      "bytes": 3887248,
-      "log": "longfast-t-watch2020-v3-s3-build.log",
+      "sha256": "a96129e0ef8cc60ab9d71e1bddbd29505c4ce91da475a445a74ae38357485118",
+      "bytes": 3888128,
+      "log": "ack-other-targets-build.log",
       "type": "application image; not merged full-flash installer",
       "watch_layout": "separate conversation, WRITE/review and RADIO",
-      "repair": "GUI event ownership, CRC, standby RX, parser bounds and notification memory"
+      "repair": "GUI event ownership, CRC, standby RX, parser bounds, notification memory and ACK-only message checkmark"
     },
     {
       "target": "t-watch-ultra",
       "file": "artifacts/xnode-t-watch-ultra-field-chronometer-20260928.bin",
-      "sha256": "3cf6de380cf329eda65e7de767eaeeb43eb0b26d4dbb7ad00150ec0aba3d0ce7",
-      "bytes": 4337280,
-      "log": "longfast-t-watch-ultra-build.log",
+      "sha256": "70a50d74aac09333778426664d6401812b4da893023e6ce18752a03ed2519ff4",
+      "bytes": 4338176,
+      "log": "ack-ultra-flash-receipt.json",
       "type": "application image; not merged full-flash installer",
       "watch_layout": "separate conversation, WRITE/review and RADIO",
-      "repair": "GUI event ownership, CRC, standby RX, parser bounds and notification memory"
+      "repair": "GUI event ownership, CRC, standby RX, parser bounds, notification memory and ACK-only message checkmark"
     },
     {
       "target": "tdeck-pro",
       "file": "artifacts/xnode-tdeck-pro-field-chronometer-20260928.bin",
-      "sha256": "3307055d590c76ce8b523d1340660ee7d824b39744871c0f12b3e6c96e963f75",
-      "bytes": 3901664,
-      "log": "longfast-tdeck-pro-build.log",
+      "sha256": "85c0d521c5f99a50f276d2e21cdacdaed9ae59520d5a0c119d6043e80c76f606",
+      "bytes": 3902496,
+      "log": "ack-other-targets-build.log",
       "type": "application image; not merged full-flash installer",
-      "repair": "GUI event ownership, CRC, standby RX, parser bounds and notification memory"
+      "repair": "GUI event ownership, CRC, standby RX, parser bounds, notification memory and ACK-only message checkmark"
     }
   ],
-  "description": "Production live Mesh Chat with deferred GUI event delivery and LongFast radio repairs. Watch layouts use separate conversation, WRITE/review and RADIO pages. All four targets rebuilt from the repaired source. Application images require matching bootloader/partition layout.",
-  "validation": "Local concurrency, allocation failure, actual decoder/RX fixture and native LVGL tests passed. T-Deck Plus flashed and local Bluetooth notification/UI verified. Physical two-radio LongFast exchange and repaired watch hardware are not yet verified."
+  "description": "Production live Mesh Chat with checkmark-only acknowledgments, deferred GUI event delivery and LongFast repairs. Watch layouts use separate conversation, WRITE/review and RADIO pages. All four targets rebuilt. Application images require matching bootloader/partition layout.",
+  "validation": "History, actual decoder/RX fixtures, native LVGL across four boards/two themes, concurrency and allocation tests passed. Ultra flashed with this ACK update and live USB status/framebuffer verified. T-Deck Plus has earlier crash repair but is not flashed with this ACK update. Physical two-radio LongFast ACK exchange remains unverified."
 }

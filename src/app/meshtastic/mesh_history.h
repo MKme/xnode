@@ -9,7 +9,9 @@ enum mesh_message_status_t : uint8_t {
     MESH_MESSAGE_QUEUED,
     // The local radio reported TX_DONE. This is not a recipient acknowledgement.
     MESH_MESSAGE_TRANSMITTED,
-    MESH_MESSAGE_FAILED
+    MESH_MESSAGE_FAILED,
+    // A correlated over-the-air routing ACK or broadcast rebroadcast was received.
+    MESH_MESSAGE_ACKNOWLEDGED
 };
 
 struct mesh_message_t {
@@ -33,6 +35,8 @@ public:
     static constexpr size_t CAPACITY = 24;
     uint32_t add(const mesh_message_t &message);
     bool set_status(uint32_t sequence, mesh_message_status_t status);
+    bool acknowledge(uint32_t packet_id, uint8_t channel_slot, uint32_t local_node,
+                     uint32_t peer, const char *rebroadcast_text = nullptr);
     size_t count(uint8_t channel_slot) const;
     bool get(uint8_t channel_slot, size_t chronological_index, mesh_message_t *out) const;
     uint32_t revision() const { return revision_; }

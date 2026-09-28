@@ -12,14 +12,14 @@ import serial
 from PIL import Image
 
 
-def capture(port, output, timeout=45):
+def capture(port, output, timeout=45, dtr=False):
     if output.exists():
         raise FileExistsError(f"Refusing to overwrite {output}")
     connection = serial.Serial()
     connection.port = port
     connection.baudrate = 115200
     connection.timeout = 1
-    connection.dtr = False
+    connection.dtr = dtr
     connection.rts = False
     connection.open()
     try:
@@ -68,5 +68,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--dtr", action="store_true", help="Assert DTR for the Ultra software USB CDC console")
     args = parser.parse_args()
-    capture(args.port, args.output)
+    capture(args.port, args.output, dtr=args.dtr)

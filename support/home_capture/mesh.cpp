@@ -26,7 +26,7 @@ static bool radio_accepts=true;
 static bool long_channel_names=false;
 void bluetooth_message_open(){inbox_calls++;}
 void meshtastic_service_setup(){}
-bool meshtastic_service_send_text(const char*text){radio_calls++;if(!text||!text[0]||strlen(text)>200)return false;mesh_message_t m={};m.outgoing=true;m.status=radio_accepts?MESH_MESSAGE_QUEUED:MESH_MESSAGE_FAILED;m.channel_slot=meshtastic_service_get_channel_slot(selected_channel);m.from_node=0xabcdef01;m.timestamp=1790617200;strncpy(m.sender,"YOU",39);strncpy(m.text,text,200);history.add(m);return radio_accepts;}
+bool meshtastic_service_send_text(const char*text){radio_calls++;if(!text||!text[0]||strlen(text)>200)return false;mesh_message_t m={};m.outgoing=true;m.status=radio_accepts?MESH_MESSAGE_QUEUED:MESH_MESSAGE_FAILED;m.channel_slot=meshtastic_service_get_channel_slot(selected_channel);m.from_node=0xabcdef01;m.to_node=UINT32_MAX;m.packet_id=radio_calls;m.timestamp=1790617200;strncpy(m.sender,"YOU",39);strncpy(m.text,text,200);history.add(m);return radio_accepts;}
 bool meshtastic_service_is_ready(){return radio_accepts;}
 bool meshtastic_service_is_receiving(){return false;}
 const char*meshtastic_service_get_status(){return radio_accepts?"Radio ready":"Radio offline";}
@@ -92,7 +92,7 @@ int main(int argc,char**argv){
     save(argv[4],"empty");
     if(mesh_watch){mainbar_jump_to_tilenumber(meshtastic_app_tile_num+1,LV_ANIM_OFF,false);pump();assert(lv_obj_get_height(meshtastic_send_btn)>=mesh_touch);assert(lv_obj_get_height(meshtastic_input)>=48);save(argv[4],"review");}
     lv_textarea_set_text(meshtastic_input,"Rejected draft stays");radio_accepts=false;click(meshtastic_send_btn);assert(radio_calls==1);assert(strcmp(lv_textarea_get_text(meshtastic_input),"Rejected draft stays")==0);assert(history.count(0)==1);save(argv[4],"rejected");
-    radio_accepts=true;incoming("North trail clear.");meshtastic_app_refresh();click(meshtastic_send_btn);assert(radio_calls==2&&history.count(0)==3);assert(strlen(lv_textarea_get_text(meshtastic_input))==0);assert(tree_contains(meshtastic_timeline,"QUEUED"));save(argv[4],"live");mesh_message_t sent;assert(history.get(0,2,&sent));assert(history.set_status(sent.sequence,MESH_MESSAGE_TRANSMITTED));meshtastic_app_refresh();assert(tree_contains(meshtastic_timeline,"TX SENT"));save(argv[4],"transmitted");
+    radio_accepts=true;incoming("North trail clear.");meshtastic_app_refresh();click(meshtastic_send_btn);assert(radio_calls==2&&history.count(0)==3);assert(strlen(lv_textarea_get_text(meshtastic_input))==0);assert(!tree_contains(meshtastic_timeline,"QUEUED"));assert(!tree_contains(meshtastic_timeline,LV_SYMBOL_OK));save(argv[4],"live");mesh_message_t sent;assert(history.get(0,2,&sent));assert(history.set_status(sent.sequence,MESH_MESSAGE_TRANSMITTED));meshtastic_app_refresh();assert(!tree_contains(meshtastic_timeline,"TX SENT"));assert(!tree_contains(meshtastic_timeline,"LOCAL"));assert(!tree_contains(meshtastic_timeline,"UNCONFIRMED"));assert(!tree_contains(meshtastic_timeline,LV_SYMBOL_OK));save(argv[4],"transmitted");assert(history.acknowledge(sent.packet_id,0,sent.from_node,0x12345678));meshtastic_app_refresh();assert(tree_contains(meshtastic_timeline,LV_SYMBOL_OK));save(argv[4],"acknowledged");
     // Test mapped channel list index 1 => actual slot 3, with separate history.
     lv_textarea_set_text(meshtastic_input,"LongFast draft");incoming("Team channel only.",3,2);select_channel(1);assert(strlen(lv_textarea_get_text(meshtastic_input))==0);lv_textarea_set_text(meshtastic_input,"Team draft");pump();assert(selected_channel==1);save(argv[4],"channel");
     select_channel(0);assert(strcmp(lv_textarea_get_text(meshtastic_input),"LongFast draft")==0);
@@ -173,5 +173,14 @@ int main(int argc,char**argv){
         lv_dropdown_close(meshtastic_channel_dropdown);select_channel(1);assert(selected_channel==1);
         save(argv[4],"long-channel");
     }
+    // Publication fixture only: no radio call and no bundled production examples.
+    history=MeshHistory{};selected_channel=0;long_channel_names=false;
+    mainbar_jump_to_tilenumber(meshtastic_app_tile_num,LV_ANIM_OFF,false);
+    incoming("North trail clear.",0,901);
+    mesh_message_t acknowledged_reply={};acknowledged_reply.outgoing=true;
+    acknowledged_reply.channel_slot=0;acknowledged_reply.timestamp=1790617260;
+    acknowledged_reply.status=MESH_MESSAGE_ACKNOWLEDGED;
+    strcpy(acknowledged_reply.text,"Copy. Moving out.");history.add(acknowledged_reply);
+    meshtastic_rendered_slot=-2;meshtastic_app_refresh();pump();save(argv[4],"publication");
     puts("PASS production live chat, legacy example preference ignored, mapped channels, send, history, keyboard and navigation");
 }

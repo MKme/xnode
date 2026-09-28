@@ -1,4 +1,5 @@
 #include "mesh_history.h"
+#include <string.h>
 
 uint32_t MeshHistory::add(const mesh_message_t &message) {
     if (!message.text[0]) return 0;
@@ -34,6 +35,24 @@ bool MeshHistory::set_status(uint32_t sequence, mesh_message_status_t status) {
         if (!message.outgoing || message.status != MESH_MESSAGE_QUEUED ||
             (status != MESH_MESSAGE_TRANSMITTED && status != MESH_MESSAGE_FAILED)) return false;
         message.status = status;
+        ++revision_;
+        return true;
+    }
+    return false;
+}
+
+bool MeshHistory::acknowledge(uint32_t packet_id, uint8_t channel_slot, uint32_t local_node,
+                              uint32_t peer, const char *rebroadcast_text) {
+    if (!packet_id || !local_node || !peer || peer == 0xffffffffu) return false;
+    if (!rebroadcast_text && peer == local_node) return false;
+    for (size_t i = 0; i < size_; ++i) {
+        mesh_message_t &message = messages_[(head_ + i) % CAPACITY];
+        if (!message.outgoing || message.packet_id != packet_id || message.channel_slot != channel_slot ||
+            message.from_node != local_node || message.status == MESH_MESSAGE_ACKNOWLEDGED) continue;
+        if (rebroadcast_text) {
+            if (peer != local_node || message.to_node != 0xffffffffu || strcmp(message.text, rebroadcast_text)) continue;
+        } else if (message.to_node != 0xffffffffu && message.to_node != peer) continue;
+        message.status = MESH_MESSAGE_ACKNOWLEDGED;
         ++revision_;
         return true;
     }

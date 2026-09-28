@@ -1,16 +1,16 @@
 {
-  "description": "Native LVGL captures with synthetic test traffic. Watch images show the revised reading/WRITE/RADIO layout; handheld images retain the earlier demonstration layout.",
+  "description": "Actual native LVGL interface with synthetic test traffic and an illustrative acknowledged outgoing message. No physical radio exchange implied.",
   "method": "native-lvgl",
   "hardware_capture": false,
   "synthetic_state": true,
   "scope": "Actual firmware Mesh Chat, history and keyboard UI. Global statusbar excluded. Physical input/radio/NVS/clock replaced by deterministic fixtures.",
   "source_sha256": {
-    "src/app/meshtastic/meshtastic_app.cpp": "24bbb564ba37e4708d7b2c9b786271b19d0d7825ae7af7d7812afac7c16035f0",
-    "src/app/meshtastic/mesh_history.cpp": "ff88252594aa475ece36dee5b05300a9efcb731efa894ff06ee3007f8b2833e7",
-    "src/app/meshtastic/mesh_history.h": "2d7237da8f2f8fdda20f62fc21015d6168dba9efda5a41f2e4f29284113d80c1",
+    "src/app/meshtastic/meshtastic_app.cpp": "e5fab0ff2fc9ebf85a4c2369bcc24cc978d8143880924b7b827ce5e819489f46",
+    "src/app/meshtastic/mesh_history.cpp": "ad567e210717fb814b2d45942352d32c7ae9aeb404998aa0ebd8eb88a489492f",
+    "src/app/meshtastic/mesh_history.h": "312a32730512603b5079d7a29cb0cca9840f9211547a161bb5ff45a9c3dcf64b",
     "src/gui/keyboard.cpp": "3a5ad6c743908f55f73d24b39f8188914220da0d56a5366d93f1b7c7e1457cf2",
-    "support/home_capture/mesh.cpp": "89d7c49a88af76032dc6892c78b7319f74c14adffadb369cedb26e5cbfc9f25d",
-    "support/home_capture/capture.py": "94769b7dec8476147275d572bb4009dfe63404da26a15655013ef7f588c63fcc"
+    "support/home_capture/mesh.cpp": "ce032ce43b7007ec930217cf0cc088d35d8048d461d876d702a521ae541969a4",
+    "support/home_capture/capture.py": "5c70b1788bc1b4859816b318c57d64f4320667aea05146fdfbc3538b8aebf023"
   },
   "screenshots": [
     {
@@ -20,8 +20,8 @@
       "target": "tdeck-plus",
       "theme": "dark",
       "screen": "chat",
-      "state": "Bundled examples ON; no radio transmission",
-      "sha256": "e90547226cda5433ade5bc46d9c7e019e9e7469d34c4f30f0aa98df547abfb68"
+      "state": "Synthetic conversation fixture; outgoing acknowledgment simulated in native UI test; no radio transmission",
+      "sha256": "c52660aef2c9210bdcfb42826fa467abdb9cebba17482b7bcf0c5cee6b09baa0"
     },
     {
       "file": "tdeck-plus-light-chat.png",
@@ -30,8 +30,8 @@
       "target": "tdeck-plus",
       "theme": "light",
       "screen": "chat",
-      "state": "Bundled examples ON; no radio transmission",
-      "sha256": "a5dc0d09991e05ff86e43603fb5d1b8bece531f465db1b73bc97d828b9035cf0"
+      "state": "Synthetic conversation fixture; outgoing acknowledgment simulated in native UI test; no radio transmission",
+      "sha256": "73a19ac878f6467476d8380b3787f8fc40feb41af9e03033b4fd26a6de08b7d5"
     },
     {
       "file": "watch-ultra-dark-chat.png",
@@ -40,8 +40,8 @@
       "target": "watch-ultra",
       "theme": "dark",
       "screen": "chat",
-      "state": "Native service fixtures; production has no Examples mode",
-      "sha256": "fd12e500a6e745775c458fb9ffb859ad69a7c211e0b11e7bbc20db757d90fb50"
+      "state": "Synthetic conversation fixture; outgoing acknowledgment simulated in native UI test; no radio transmission",
+      "sha256": "b9a4056692ef623b694060a69af4b8084ad4d7a35f31e571911de3deb09c3c6e"
     },
     {
       "file": "watch-ultra-light-chat.png",
@@ -50,8 +50,8 @@
       "target": "watch-ultra",
       "theme": "light",
       "screen": "chat",
-      "state": "Native service fixtures; production has no Examples mode",
-      "sha256": "12e808311307269f860f4a38295ab5f8a724fae1f7b881488837f75b45fc93ee"
+      "state": "Synthetic conversation fixture; outgoing acknowledgment simulated in native UI test; no radio transmission",
+      "sha256": "0420063ba9d88aa79b8794aef88dd9019e224b5a6fcb9a045cda57bd23c921ac"
     },
     {
       "file": "watch-s3-dark-chat.png",
@@ -60,8 +60,8 @@
       "target": "watch-s3",
       "theme": "dark",
       "screen": "chat",
-      "state": "Native service fixtures; production has no Examples mode",
-      "sha256": "012a1c1809f39557547e8ed0656140f40d509426078577b94e5329e2a4805e50"
+      "state": "Synthetic conversation fixture; outgoing acknowledgment simulated in native UI test; no radio transmission",
+      "sha256": "86b72aa9cf014ee4bb9677676a87a15dc20eac6ee892b58eb3c2b034bb2410c5"
     },
     {
       "file": "watch-s3-light-chat.png",
@@ -70,8 +70,8 @@
       "target": "watch-s3",
       "theme": "light",
       "screen": "chat",
-      "state": "Native service fixtures; production has no Examples mode",
-      "sha256": "6d18834b3578301cbb6e7ef6e5b5b17e95aee6bb98314928d765c58ff0f7e915"
+      "state": "Synthetic conversation fixture; outgoing acknowledgment simulated in native UI test; no radio transmission",
+      "sha256": "f99c557af094fca244bfe3601595c67017e363b142f69f02c400690c6fb09dbd"
     },
     {
       "file": "tdeck-pro-dark-chat.png",
@@ -80,8 +80,8 @@
       "target": "tdeck-pro",
       "theme": "dark",
       "screen": "chat",
-      "state": "Bundled examples ON; no radio transmission",
-      "sha256": "bd312fc6adfcf25ac0f06b1a9bdf2489dd3a235428132e28dcb105fc30f2b62c"
+      "state": "Synthetic conversation fixture; outgoing acknowledgment simulated in native UI test; no radio transmission",
+      "sha256": "fccbf70a5fc3945224c94081b26999b6f04b7b00821d1c327f391cbfb30dc73d"
     },
     {
       "file": "tdeck-pro-light-chat.png",
@@ -90,8 +90,8 @@
       "target": "tdeck-pro",
       "theme": "light",
       "screen": "chat",
-      "state": "Bundled examples ON; no radio transmission",
-      "sha256": "ce808d469ff97921a56559a284385da3ddd1e95e18da985fa6cb224603d1da72"
+      "state": "Synthetic conversation fixture; outgoing acknowledgment simulated in native UI test; no radio transmission",
+      "sha256": "18b782875772ab5cf011dfe57585ee38ab6190e4b10563336ee9852b0a22e2b5"
     },
     {
       "file": "watch-s3-dark-compose.png",

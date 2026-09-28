@@ -201,12 +201,17 @@ static int mesh_card(const mesh_message_t &message, int y) {
         if (localtime_r(&epoch, &local)) strftime(stamp, sizeof(stamp), "%H:%M", &local);
     }
     char meta[88];
-    const char *state = !message.outgoing ? "" : message.status == MESH_MESSAGE_QUEUED ? " / QUEUED" :
-        message.status == MESH_MESSAGE_TRANSMITTED ? " / TX SENT (LOCAL)" : " / TX UNCONFIRMED";
-    snprintf(meta, sizeof(meta), "%s  %s%s%s", message.outgoing ? "YOU" : message.sender, stamp, state,
+    const bool acknowledged = message.outgoing && message.status == MESH_MESSAGE_ACKNOWLEDGED;
+    snprintf(meta, sizeof(meta), "%s  %s%s", message.outgoing ? "YOU" : message.sender, stamp,
         message.to_node != 0 && message.to_node != UINT32_MAX ? "  DIRECT" : "");
-    lv_obj_t *sender = mesh_label(card, meta, 6, 2, width - 12, true);
-    lv_obj_t *body = mesh_label(card, message.text, 6, 2 + lv_obj_get_height(sender), width - 12);
+    lv_obj_t *sender = mesh_label(card, meta, 6, 2, width - 12 - (acknowledged ? 26 : 0), true);
+    int meta_height = lv_obj_get_height(sender);
+    if (acknowledged) {
+        lv_obj_t *ack = mesh_label(card, LV_SYMBOL_OK, width - 28, 2, 22, true);
+        lv_obj_set_style_local_text_font(ack, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, &lv_font_montserrat_22);
+        if (lv_obj_get_height(ack) > meta_height) meta_height = lv_obj_get_height(ack);
+    }
+    lv_obj_t *body = mesh_label(card, message.text, 6, 2 + meta_height, width - 12);
     const int bottom = lv_obj_get_y(body) + lv_obj_get_height(body) + 1;
     lv_obj_set_height(card, bottom);
     return y + bottom + 3;
@@ -298,7 +303,7 @@ static void meshtastic_app_refresh(void) {
     char peer[88];
     if (meshtastic_service_get_last_peer()) snprintf(peer, sizeof(peer), "LAST PEER  !%08" PRIX32 "\n%d dBm / %.1f dB SNR", meshtastic_service_get_last_peer(), meshtastic_service_get_last_rssi(), meshtastic_service_get_last_snr());
     else snprintf(peer, sizeof(peer), "LAST PEER\nNo packet observed");
-    snprintf(info, sizeof(info), "LOCAL NODE\n%s (%s)\n!%08" PRIX32 "\n\nRADIO\n%s\n%s / %.3f MHz\n\n%s\n\nHISTORY\nLast 24 texts across channels.\nCleared on restart. Times are local.\nTX SENT means local transmission,\nnot confirmation of delivery.\n\nREPLY\nSend broadcasts to the selected\nchannel, including after a direct RX.",
+    snprintf(info, sizeof(info), "LOCAL NODE\n%s (%s)\n!%08" PRIX32 "\n\nRADIO\n%s\n%s / %.3f MHz\n\n%s\n\nHISTORY\nLast 24 texts across channels.\nCleared on restart. Times are local.\nCheckmark: acknowledgment received.\nNo mark: no acknowledgment yet.\n\nREPLY\nSend broadcasts to the selected\nchannel, including after a direct RX.",
         meshtastic_service_get_long_name(), meshtastic_service_get_short_name(), meshtastic_service_get_node_id(),
         meshtastic_service_get_status(), meshtastic_service_get_primary_channel_name(), meshtastic_service_get_frequency_mhz(), peer);
     if (mesh_watch) {

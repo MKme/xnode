@@ -66,5 +66,28 @@ int main() {
     malformed.text[0] = 0;
     auto before = ring.revision();
     assert(ring.add(malformed) == 0 && ring.revision() == before);
+    MeshHistory acknowledgements;
+    auto sent=record(991,3,true);sent.from_node=42;sent.to_node=0xffffffffu;
+    auto seq=acknowledgements.add(sent);
+    assert(acknowledgements.set_status(seq,MESH_MESSAGE_TRANSMITTED));
+    assert(!acknowledgements.acknowledge(991,2,42,123));
+    assert(!acknowledgements.acknowledge(992,3,42,123));
+    assert(!acknowledgements.acknowledge(991,3,43,123));
+    assert(!acknowledgements.acknowledge(991,3,42,42));
+    assert(!acknowledgements.acknowledge(991,3,42,42,"wrong body"));
+    assert(acknowledgements.acknowledge(991,3,42,42,sent.text));
+    assert(acknowledgements.get(3,0,&got) && got.status==MESH_MESSAGE_ACKNOWLEDGED);
+    assert(!acknowledgements.set_status(seq,MESH_MESSAGE_FAILED));
+    sent.packet_id=992;seq=acknowledgements.add(sent);
+    assert(acknowledgements.set_status(seq,MESH_MESSAGE_FAILED));
+    assert(acknowledgements.acknowledge(992,3,42,123)); // Real ACK overrides a lost TX_DONE/timeout.
+    assert(!acknowledgements.set_status(seq,MESH_MESSAGE_FAILED));
+    assert(!acknowledgements.set_status(seq,MESH_MESSAGE_TRANSMITTED));
+    sent.packet_id=993;seq=acknowledgements.add(sent);
+    assert(acknowledgements.acknowledge(993,3,42,123)); // ACK may race local completion.
+    assert(!acknowledgements.set_status(seq,MESH_MESSAGE_TRANSMITTED));
+    assert(!acknowledgements.set_status(seq,MESH_MESSAGE_FAILED));
+    for(uint32_t id=1000;id<1024;++id) acknowledgements.add(record(id));
+    assert(!acknowledgements.acknowledge(991,3,42,123)); // Evicted receipt cannot mark another bubble.
     printf("Mesh history: bounded wrap, sparse channels, dedupe, metadata, TX outcomes, eviction and termination passed (%zu bytes).\n", sizeof(MeshHistory));
 }

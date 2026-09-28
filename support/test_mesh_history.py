@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory(prefix='xnode-mesh-history-', dir=ROOT / '.pio'
     snippets = []
     for name in ['meshtastic_write_varint', 'meshtastic_read_varint', 'meshtastic_skip_field',
                  'meshtastic_encode_data_message', 'meshtastic_decode_data_message', 'meshtastic_decode_text_message',
-                 'meshtastic_find_channel_slot_for_hash', 'meshtastic_handle_rx',
+                 'meshtastic_find_channel_slot_for_hash', 'meshtastic_routing_ack', 'meshtastic_handle_rx',
                  'meshtastic_configure_crc', 'meshtastic_service_send_payload_internal', 'meshtastic_service_send_text_internal',
                  'meshtastic_powermgm_event_cb', 'meshtastic_powermgm_loop_cb']:
         match = re.search(r'^\s*(?:static\s+)?(?:bool|size_t|int8_t)\s+' + name + r'\s*\([^;{}]*\)\s*\{', source, re.M)

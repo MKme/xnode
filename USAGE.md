@@ -29,7 +29,7 @@ On watches, the conversation, **WRITE**, and **RADIO** occupy separate horizonta
 1. Choose the intended channel from the dropdown (on **RADIO** on watches), then return to the conversation and tap **WRITE** on a watch.
 2. Tap **Message channel...** and compose up to **80 characters**. On T-Deck Plus, type on the physical keyboard. On a watch, the full-screen keyboard keeps the draft visible above large keys; switch **A-M**, **N-Z** and **123** pages as needed, then tap the checkmark to return to draft review. T-Deck Pro uses the portrait on-screen editor. Closing the on-screen editor with its X cancels those edits.
 3. Check the channel and text, then tap **SEND**. The draft clears only when the radio accepts the attempt. An immediate rejection keeps the draft so you can correct the problem.
-4. Read the outgoing message status. **QUEUED** means transmission is pending. **TX SENT (LOCAL)** means the local radio reported a completed transmission, not that another person received it. **TX UNCONFIRMED** requires checking the radio and receiver before retrying; do not assume a failed status proves that no RF transmission occurred.
+4. A checkmark beside an outgoing message means a matching radio acknowledgment was received (including a rebroadcast for channel messages). Otherwise no status suffix appears. A checkmark does not mean someone read the message or that every channel member received it.
 
 **SEND broadcasts to the selected channel.** A received message labelled **DIRECT** does not make the composer a private reply: your next send still goes to the channel. The channel, frequency, local node identity and last observed peer signal are on **RADIO**.
 
