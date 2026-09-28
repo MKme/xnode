@@ -8,14 +8,42 @@ Workspace paths:
 
 ## Watch screens
 
-These XNODE screens show the LilyGO T-Watch S3 firmware and the current T-Watch Ultra and T-Deck builds in daily use.
+The Field Chronometer home groups the clock and full date, battery and charging state, wireless status, and Messages shortcut into a tactical layout. Moon phase and illumination appear on supported boards; temperature and humidity appear when provided by a configured sensor. The Mission Teal dark background continues through apps, settings and the status bar; color screens also retain the light theme; the T-Deck Pro uses a monochrome layout.
+
+The T-Deck Plus home image is a screenshot from the physical device. Other home images are firmware screen renderings with illustrative readings. App and Setup menu images are firmware renderings with a representative selection of tools. Their status bar is not shown and page counts follow the tools included on the device. Mesh Chat and keyboard images are firmware screen captures with illustrative example messages; the global status bar is outside these captures. The remaining images are hardware photographs of the indicated app screens.
+
+### Navigation and tactical menus
+
+Swipe **left or right** through **Home > Apps > Setup > Notes**. Apps and Setup may have several occupied pages; their footers show the current page. Swipe back to return. Inside a tool, use left/right swipes for its pages and its existing Back or Exit control to leave. Lists and text still scroll normally, and maps retain panning. Tap the top status bar to open or close quick settings.
+
+Tap an icon card or its caption to open the tool. Tactical icon colors distinguish communications, navigation, power, alerts and system tools; they do not indicate connection or success. The T-Deck Pro keeps monochrome icons.
+
+### Mesh Chat on handhelds and watches
+
+Open **mesh** from **APPS** to read the selected channel's conversation immediately. **CHAT** and **RADIO** are neighboring left/right pages; conversation text scrolls vertically. The channel selector and 80-character composer stay on the chat page. T-Deck Plus uses its physical keyboard; watches use a full-screen editor with large letter/number pages and a checkmark to return to chat. T-Deck Pro keeps the monochrome portrait layout and on-screen editor.
+
+Mesh Chat opens directly into live traffic, with no example mode or preview button. Watches use separate conversation, WRITE/review, and RADIO pages with larger text and touch controls. Mesh Chat retains the latest 24 real text records across channels in RAM until restart. **TX SENT (LOCAL)** confirms only the local transmission. **SEND** broadcasts to the chosen channel even after a received **DIRECT** message. See [Mesh Chat instructions](USAGE.md#mesh-chat) for entry, status and recovery details.
+
+### Watch conversation and text entry
+
+The captures below document the earlier demonstration build. Production now opens directly into live chat without the Examples button.
+
+![Mesh Chat captured over USB from the flashed T-Deck Plus, with Examples ON](site/images/mesh-chat-2026-09-28/tdeck-plus-mesh-device.png)
+
+The image above is the actual T-Deck Plus screen after flashing, including its global status bar. The conversation is the bundled example mode; it is not evidence of a radio exchange.
+
+| T-Watch S3 chat | S3 full-screen editor | T-Watch Ultra chat | Ultra full-screen editor |
+| --- | --- | --- | --- |
+| <img src="site/images/mesh-chat-2026-09-28/watch-s3-dark-chat.png" alt="T-Watch S3 Mesh Chat firmware capture with examples" width="200"> | <img src="site/images/mesh-chat-2026-09-28/watch-s3-dark-compose.png" alt="T-Watch S3 full-screen text editor firmware capture" width="200"> | <img src="site/images/mesh-chat-2026-09-28/watch-ultra-dark-chat.png" alt="T-Watch Ultra Mesh Chat firmware capture with examples" width="200"> | <img src="site/images/mesh-chat-2026-09-28/watch-ultra-dark-compose.png" alt="T-Watch Ultra full-screen text editor firmware capture" width="200"> |
+
+These firmware screen captures show illustrative example messages and drafts. The watch editor gives text entry its own screen; accepting the draft returns to chat before sending.
 
 ### Current T-Watch Ultra build
 
 | Current clock | GPS diagnostics | Map with GPS position | Map overlay close-up |
 | --- | --- | --- | --- |
-| <img src="site/images/IMG_6786.jpg" alt="T-Watch Ultra running the current XNODE clock screen with message shortcut" width="200"> | <img src="site/images/IMG_6765.jpg" alt="T-Watch Ultra GPS diagnostics screen showing fix, UART, baud, NMEA, and satellite status" width="200"> | <img src="site/images/IMG_6772.jpg" alt="T-Watch Ultra tactical map showing GPS position and synced overlay markers" width="200"> | <img src="site/images/IMG_6740.jpg" alt="T-Watch Ultra tactical map close-up showing GPS no-fix banner and synced overlay markers" width="200"> |
-| Current watchface/clock view on the Ultra hardware. | GPS status page for hardware bring-up and live receiver checks. | Tactical map with current position and XTOC/XCOM overlay markers. | Close-up map/GPS state with synced overlay symbols on the installed basemap. |
+| <img src="site/images/home-tactical-2026-09-28/watch-ultra-dark.png" alt="XNODE Field Chronometer home for T-Watch Ultra" width="200"> | <img src="site/images/IMG_6765.jpg" alt="T-Watch Ultra GPS diagnostics screen showing fix, UART, baud, NMEA, and satellite status" width="200"> | <img src="site/images/IMG_6772.jpg" alt="T-Watch Ultra tactical map showing GPS position and synced overlay markers" width="200"> | <img src="site/images/IMG_6740.jpg" alt="T-Watch Ultra tactical map close-up showing GPS no-fix banner and synced overlay markers" width="200"> |
+| Field Chronometer home at the Ultra display resolution. | GPS status page for hardware bring-up and live receiver checks. | Tactical map with current position and XTOC/XCOM overlay markers. | Close-up map/GPS state with synced overlay symbols on the installed basemap. |
 
 ### Current T-Deck Plus build
 
@@ -23,13 +51,13 @@ The T-Deck Plus target carries the XNODE workflow onto a larger 320x240 screen w
 
 | Clock + moon | Launcher | Tactical map |
 | --- | --- | --- |
-| <img src="site/images/T-dec/IMG_6809.jpg" alt="T-Deck Plus running the XNODE clock screen with moon phase" width="200"> | <img src="site/images/T-dec/IMG_6810.jpg" alt="T-Deck Plus XNODE launcher showing messages, mesh, Tac Map, CheckIn, Alert Summary, and SOS" width="200"> | <img src="site/images/T-dec/IMG_6817.jpg" alt="T-Deck Plus XNODE tactical map showing synced XTOC and XCOM markers on the larger screen" width="200"> |
-| Larger clock face with the moon phase indicator. | Main XNODE actions on the larger T-Deck display. | Wide tactical map view with synced XTOC/XCOM markers and large-screen controls. |
+| <img src="site/images/home-tactical-2026-09-28/tdeck-plus-device.png" alt="XNODE Field Chronometer home for T-Deck Plus" width="200"> | <img src="site/images/home-tactical-2026-09-28/tdeck-plus-dark-apps.png" alt="T-Deck Plus XNODE launcher showing messages, mesh, Tac Map, CheckIn, Alert Summary, and SOS" width="200"> | <img src="site/images/T-dec/IMG_6817.jpg" alt="T-Deck Plus XNODE tactical map showing synced XTOC and XCOM markers on the larger screen" width="200"> |
+| Tactical home with clock, date, status and moon information. | Main XNODE actions on the larger T-Deck display. | Wide tactical map view with synced XTOC/XCOM markers and large-screen controls. |
 
-| Utilities | Mesh compose | CheckIn |
+| Setup | Mesh Chat | CheckIn |
 | --- | --- | --- |
-| <img src="site/images/T-dec/IMG_6811.jpg" alt="T-Deck Plus XNODE utilities launcher showing GPS status and other tools" width="200"> | <img src="site/images/T-dec/IMG_6812.jpg" alt="T-Deck Plus XNODE mesh compose screen using the hardware keyboard" width="200"> | <img src="site/images/T-dec/IMG_6813.jpg" alt="T-Deck Plus XNODE CheckIn screen" width="200"> |
-| GPS/status utilities available from the launcher. | Physical keyboard entry for mesh messages. | Fast CheckIn packet flow with current position. |
+| <img src="site/images/home-tactical-2026-09-28/tdeck-plus-dark-setup.png" alt="T-Deck Plus XNODE Setup menu with labeled tactical icons" width="200"> | <img src="site/images/mesh-chat-2026-09-28/tdeck-plus-dark-chat.png" alt="T-Deck Plus Mesh Chat firmware capture with example conversation" width="200"> | <img src="site/images/T-dec/IMG_6813.jpg" alt="T-Deck Plus XNODE CheckIn screen" width="200"> |
+| Display, Wi-Fi, Bluetooth, clock, battery and sound settings. | Channel conversation with the composer ready for physical keyboard entry. | Fast CheckIn packet flow with current position. |
 
 ### Current T-Deck Pro build
 
@@ -37,17 +65,21 @@ The T-Deck Pro target brings the XNODE handheld workflow to the LilyGO 240x320 e
 
 | Clock and device status | Main launcher | Meshtastic messaging |
 | --- | --- | --- |
-| <img src="site/images/tdeck%20pro/IMG_7371.jpg" alt="LilyGO T-Deck Pro running the XNODE clock screen with date, battery status, moon phase, and message shortcut" width="240"> | <img src="site/images/tdeck%20pro/IMG_7372.jpg" alt="LilyGO T-Deck Pro running the XNODE launcher with Messages, Mesh, Tac Map, CheckIn, Alert Summary, and SOS actions" width="240"> | <img src="site/images/tdeck%20pro/IMG_7373.jpg" alt="LilyGO T-Deck Pro running the XNODE Meshtastic message screen with LongFast channel, compose area, Send, and Inbox controls" width="240"> |
-| Live e-paper clock/status view on the working device. | Touch-friendly portrait launcher for the main XNODE field workflows. | Meshtastic compose and inbox interface with the built-in physical keyboard. |
+| <img src="site/images/home-tactical-2026-09-28/tdeck-pro-light.png" alt="XNODE monochrome Field Chronometer home for T-Deck Pro" width="240"> | <img src="site/images/home-tactical-2026-09-28/tdeck-pro-light-apps.png" alt="LilyGO T-Deck Pro running the XNODE launcher with Messages, Mesh, Tac Map, CheckIn, Alert Summary, and SOS actions" width="240"> | <img src="site/images/mesh-chat-2026-09-28/tdeck-pro-light-chat.png" alt="T-Deck Pro monochrome Mesh Chat firmware capture with example conversation" width="240"> |
+| Monochrome Field Chronometer layout for the portrait e-paper display. | Touch-friendly portrait launcher for the main XNODE field workflows. | Monochrome channel conversation with a portrait on-screen editor. |
 
 > **Known issue:** Tac Map is not working properly on T-Deck Pro and still needs separate debugging.
 
 ### T-Watch S3 reference screens
 
+![XNODE Field Chronometer home for T-Watch S3](site/images/home-tactical-2026-09-28/watch-s3-dark.png)
+
+The compact square home retains the clock, date, battery and wireless indicators with direct access to Messages.
+
 | Launcher | Tactical map | XNODE alerts |
 | --- | --- | --- |
-| <img src="images/xnode/IMG_6597.jpg" alt="XNODE launcher showing messages, mesh, Tac Map, media player, alert summary, and watchface manager apps" width="240"> | <img src="images/xnode/IMG_6590.jpg" alt="XNODE tactical map showing an installed basemap, synced markers, and map controls" width="240"> | <img src="images/xnode/IMG_6592.jpg" alt="XNODE alerts screen showing pushed XTOC news, check-ins, and operator alerts" width="240"> |
-| App launcher for messages, mesh, the tactical map, media controls, alert summary, and watchface management. | Tactical map view with the installed basemap, synced XTOC/XCOM markers, zoom controls, and map menu access. | Alert/news view for XTOC-pushed check-ins, operator alerts, and other watch-visible updates. |
+| <img src="site/images/home-tactical-2026-09-28/watch-s3-dark-apps.png" alt="T-Watch S3 XNODE Apps menu with tactical icon cards" width="240"> | <img src="images/xnode/IMG_6590.jpg" alt="XNODE tactical map showing an installed basemap, synced markers, and map controls" width="240"> | <img src="images/xnode/IMG_6592.jpg" alt="XNODE alerts screen showing pushed XTOC news, check-ins, and operator alerts" width="240"> |
+| Apps menu with tactical icon colors, readable captions and horizontal page navigation. | Tactical map view with the installed basemap, synced XTOC/XCOM markers, zoom controls, and map menu access. | Alert/news view for XTOC-pushed check-ins, operator alerts, and other watch-visible updates. |
 
 ## Buy the watch
 
@@ -382,6 +414,18 @@ After flashing, confirm the watch re-enumerates:
 pio device list
 ```
 
+## Developer USB screen capture (T-Deck Plus)
+
+With the Plus awake on the screen to capture, use its existing physical USB serial connection. Close any serial monitor using that port and choose a new output filename:
+
+```powershell
+python support/capture_usb_screen.py --port COM7 --output artifacts/home-screen-unique.png
+```
+
+Replace `COM7` with the device's current port. The helper requires the existing `pyserial` and Pillow environment and refuses to overwrite an existing output. It sends the exact line `XNODE SCREENSHOT` at 115200 baud, reads the current 320x240 display frame and writes the PNG on the computer. This diagnostic is supported only by T-Deck Plus firmware. It does not navigate the screen, write device settings or storage, or transmit over the radio.
+
+The screenshot contains whatever is visible, including any message or identifying data. Inspect the image before sharing it.
+
 ## Automated CI and regression testing
 
 The repo has a regression and firmware-build workflow at `.github/workflows/ci.yml`.
@@ -391,7 +435,7 @@ It runs on push, pull request, and manual dispatch. The workflow installs Platfo
 npm run build
 ```
 
-The current `npm test` command runs the watch overlay persistence check and the structural regression checks:
+The current `npm test` command runs the watch overlay persistence, structural regression and home documentation checks:
 
 ```powershell
 npm test
@@ -637,7 +681,7 @@ Setup for success:
 2. In `XTOC -> XNODE` or `XCOM -> XNODE`, connect the watch, choose `Watch Unit ID` from the roster, choose `SOS To`, and click `Save`.
 3. The watch stores this assignment in `/xnode.json` and reloads it after reboot. To clear it, reconnect from `XTOC`/`XCOM`, choose `Unassigned / clear saved watch ID`, and click `Save`.
 4. Set the watch location from the XNODE page with `Set watch GPS + time`, `Share current GPS once`, or the GPS relay before relying on Manual SOS. Future GPS-equipped watches can provide this directly. Host-set location is also stored so the last known lat/lon survives reboot.
-5. On the watch, open the `mesh` app and confirm the status is `Mesh ready` on the expected Meshtastic channel.
+5. On the watch, open the `mesh` app and confirm the expected channel. Open **RADIO** and check for `Mesh ready`.
 6. Send a short test mesh message and confirm the TOC mesh station can receive and auto-import XTOC packet text.
 
 Use in the field:
@@ -681,7 +725,7 @@ Setup is the same as Manual SOS:
 2. In `XTOC -> XNODE` or `XCOM -> XNODE`, connect the watch, choose `Watch Unit ID`, and click `Save`.
 3. The watch keeps the saved Unit ID across reboot until `XTOC`/`XCOM` explicitly saves `Unassigned / clear saved watch ID`.
 4. Set the watch location from the XNODE page or GPS relay before relying on CheckIn.
-5. On the watch, open the `mesh` app and confirm `Mesh ready` on the intended channel.
+5. On the watch, open the `mesh` app and confirm the intended channel. Open **RADIO** and check for `Mesh ready`.
 
 Use in the field:
 

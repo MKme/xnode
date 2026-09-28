@@ -101,6 +101,7 @@
      * @return  tile number
      */
     uint32_t setup_get_tile_num( void );
+    uint16_t setup_tile_get_used_pages(void);
     /**
      * @brief   get the an free setup icon stucture
      * 

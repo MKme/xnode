@@ -1,6 +1,8 @@
 #include "lvgl.h"
 #include "gui/gui.h"
 #include "gui/app.h"
+#include "gui/mainbar/mainbar.h"
+#include "gui/screenshot.h"
 
 #include "hardware/hardware.h"
 #include "hardware/powermgm.h"
@@ -32,6 +34,7 @@ void setup() {
      * apps autocall setup
      */
     app_autocall_all_setup_functions();
+    mainbar_finalize_menu_pages();
     /**
      * post hardware setup
      */
@@ -40,4 +43,7 @@ void setup() {
 
 void loop(){
     powermgm_loop();
+    #if (defined(LILYGO_T_DECK_PLUS) || defined(LILYGO_WATCH_ULTRA)) && !defined(NATIVE_64BIT)
+        screenshot_usb_poll();
+    #endif
 }

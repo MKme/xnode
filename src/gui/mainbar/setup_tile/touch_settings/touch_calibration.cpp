@@ -71,7 +71,7 @@ void touch_calibration_tile_setup( void ) {
     touch_calibration_tile = mainbar_get_tile_obj( touch_calibration_tile_num );
 
     lv_style_copy( &touch_calibration_style, ws_get_app_opa_style() );
-    lv_style_set_bg_color( &touch_calibration_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+    ws_bind_theme_surface(&touch_calibration_style);
     lv_obj_add_style( touch_calibration_tile, LV_OBJ_PART_MAIN, &touch_calibration_style );
 
     touch_location_done_arc = lv_arc_create( touch_calibration_tile, NULL);

@@ -58,7 +58,7 @@ static const char * const kb_map_am[] = {
     "e", "f", "g", "h", "\n",
     "i", "j", "k", "l", "\n",
     "m", "N-Z", "123", LV_SYMBOL_BACKSPACE, "\n",
-    LV_SYMBOL_CLOSE, "CAP", "space", LV_SYMBOL_OK, ""
+    LV_SYMBOL_CLOSE, "CAP", "SPC", LV_SYMBOL_OK, ""
 };
 
 static const char * const kb_map_nz[] = {
@@ -66,7 +66,7 @@ static const char * const kb_map_nz[] = {
     "r", "s", "t", "u", "\n",
     "v", "w", "x", "y", "\n",
     "z", "A-M", "123", LV_SYMBOL_BACKSPACE, "\n",
-    LV_SYMBOL_CLOSE, "CAP", "space", LV_SYMBOL_OK, ""
+    LV_SYMBOL_CLOSE, "CAP", "SPC", LV_SYMBOL_OK, ""
 };
 
 static const char * const kb_map_cap_am[] = {
@@ -74,7 +74,7 @@ static const char * const kb_map_cap_am[] = {
     "E", "F", "G", "H", "\n",
     "I", "J", "K", "L", "\n",
     "M", "N-Z", "123", LV_SYMBOL_BACKSPACE, "\n",
-    LV_SYMBOL_CLOSE, "low", "space", LV_SYMBOL_OK, ""
+    LV_SYMBOL_CLOSE, "low", "SPC", LV_SYMBOL_OK, ""
 };
 
 static const char * const kb_map_cap_nz[] = {
@@ -82,7 +82,7 @@ static const char * const kb_map_cap_nz[] = {
     "R", "S", "T", "U", "\n",
     "V", "W", "X", "Y", "\n",
     "Z", "A-M", "123", LV_SYMBOL_BACKSPACE, "\n",
-    LV_SYMBOL_CLOSE, "low", "space", LV_SYMBOL_OK, ""
+    LV_SYMBOL_CLOSE, "low", "SPC", LV_SYMBOL_OK, ""
 };
 
 static const char * const kb_map_symbol[] = {
@@ -90,7 +90,7 @@ static const char * const kb_map_symbol[] = {
     "5", "6", "7", "8", "\n",
     "9", "0", ".", ",", "\n",
     "?", "!", "-", LV_SYMBOL_BACKSPACE, "\n",
-    LV_SYMBOL_CLOSE, "A-M", "space", LV_SYMBOL_OK, ""
+    LV_SYMBOL_CLOSE, "A-M", "SPC", LV_SYMBOL_OK, ""
 };
 
 static const lv_btnmatrix_ctrl_t kb_ctrl_alpha[] = {
@@ -118,6 +118,7 @@ static void keyboard_focus_textarea( lv_obj_t *textarea );
 void keyboard_prelim( void ) {
     if( !kb_style_initialized ) {
         lv_style_copy( &kb_textarea_style, ws_get_button_style() );
+        ws_bind_theme_surface(&kb_textarea_style);
         lv_style_set_text_font( &kb_textarea_style, LV_STATE_DEFAULT, &lv_font_montserrat_22 );
         lv_style_set_pad_top( &kb_textarea_style, LV_STATE_DEFAULT, 3 );
         lv_style_set_pad_bottom( &kb_textarea_style, LV_STATE_DEFAULT, 3 );
@@ -125,6 +126,7 @@ void keyboard_prelim( void ) {
         lv_style_set_pad_right( &kb_textarea_style, LV_STATE_DEFAULT, 5 );
 
         lv_style_copy( &kb_button_style, ws_get_button_style() );
+        ws_bind_theme_surface(&kb_button_style);
         lv_style_set_text_font( &kb_button_style, LV_STATE_DEFAULT, &lv_font_montserrat_22 );
         lv_style_set_pad_inner( &kb_button_style, LV_STATE_DEFAULT, 0 );
         lv_style_set_pad_top( &kb_button_style, LV_STATE_DEFAULT, 1 );
@@ -211,6 +213,12 @@ static void kb_event_cb( lv_obj_t * ta, lv_event_t event ) {
         }
     }
 
+    // Apply/Cancel may arrive on press. Consume its release before revealing
+    // the underlying app, otherwise the same touch can activate Send below it.
+    if ( event == LV_EVENT_APPLY || event == LV_EVENT_CANCEL ) {
+        lv_indev_t *input = lv_indev_get_act();
+        if ( input != NULL ) lv_indev_wait_release( input );
+    }
     lv_keyboard_def_event_cb( ta, event );
     switch( event ) {
         case( LV_EVENT_CANCEL ):    keyboard_hide();
@@ -235,6 +243,8 @@ void keyboard_set_textarea( lv_obj_t *textarea ){
         return;
 
     kb_user_textarea = textarea;
+    lv_textarea_set_max_length( kb_textarea, lv_textarea_get_max_length( textarea ) );
+    lv_textarea_set_one_line( kb_textarea, lv_textarea_get_one_line( textarea ) );
     lv_textarea_set_text( kb_textarea, lv_textarea_get_text( textarea ) );
     lv_keyboard_set_textarea( kb, kb_textarea );
     keyboard_set_page( KB_PAGE_AM );
@@ -424,10 +434,12 @@ static bool keyboard_handle_text_key( lv_obj_t * keyboard, const char * txt ) {
         return( true );
     }
     if ( strcmp( txt, LV_SYMBOL_CLOSE ) == 0 ) {
+        if ( lv_indev_get_act() != NULL ) lv_indev_wait_release( lv_indev_get_act() );
         keyboard_hide();
         return( true );
     }
     if ( strcmp( txt, LV_SYMBOL_OK ) == 0 ) {
+        if ( lv_indev_get_act() != NULL ) lv_indev_wait_release( lv_indev_get_act() );
         if ( kb_user_textarea != NULL ) {
             lv_textarea_set_text( kb_user_textarea, lv_textarea_get_text( target ) );
         }

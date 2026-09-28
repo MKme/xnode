@@ -34,6 +34,11 @@
 #define STYLE_DARKMODE                      _BV(1)
 #define STYLE_LIGHTMODE                     _BV(2)
 
+// Shared Mission Teal surface, matching the native RGB565 home background.
+#define WS_TACTICAL_DARK_COLOR LV_COLOR_MAKE(8, 24, 16)
+// Keep legacy app-owned surface styles synchronized with theme changes.
+void ws_bind_theme_surface(lv_style_t *surface);
+
 #define ROLLER_TEXT_SPACE 8 //half of font size - good size for 4 lines roller on the small display
 
 bool styles_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const char *id );

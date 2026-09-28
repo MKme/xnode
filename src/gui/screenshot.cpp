@@ -26,6 +26,7 @@
 #include "utils/filepath_convert.h"
 #include "gui/png_decoder/lv_png.h"
 #include "hardware/motor.h"
+#include "gui/gui.h"
 
 #ifdef NATIVE_64BIT
     #include <iostream>
@@ -43,6 +44,59 @@ static raw_img_grey_t *raw_grey;
 static raw_img_rgb_t *raw_rgb;
 
 static void screenshot_disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p );
+
+#if (defined(LILYGO_T_DECK_PLUS) || defined(LILYGO_WATCH_ULTRA)) && !defined(NATIVE_64BIT)
+void screenshot_usb_poll( void ) {
+    // No network endpoint, navigation, storage writes or radio actions. An exact
+    // newline-terminated request is required; overflow discards the whole line.
+    static char command[32];
+    static size_t used = 0;
+    static bool overflow = false;
+    while (Serial.available()) {
+        const char c = (char)Serial.read();
+        if (c == '\r') continue;
+        if (c != '\n') {
+            if (used < sizeof(command) - 1 && !overflow) command[used++] = c;
+            else overflow = true;
+            continue;
+        }
+        command[used] = 0;
+        const bool capture = !overflow && strcmp(command, "XNODE SCREENSHOT") == 0;
+        used = 0;
+        overflow = false;
+        if (!capture) continue;
+        if (!gui_take()) return;
+        screenshot_take();
+        const int width = lv_disp_get_hor_res(NULL);
+        const int height = lv_disp_get_ver_res(NULL);
+        if (raw_rgb && width > 0 && width <= 362 && height > 0 && height <= 440) {
+            Serial.printf("\nXNODE_SCREEN_BEGIN %d %d RGB888\n", width, height);
+            static const char hex[] = "0123456789abcdef";
+            char row[362 * 6 + 1];
+            for (int y = 0; y < height; ++y) {
+                for (int x = 0; x < width; ++x) {
+                    const rgb_t &pixel = raw_rgb->data[y * width + x];
+                    const uint8_t channels[] = {pixel.r, pixel.g, pixel.b};
+                    for (int c = 0; c < 3; ++c) {
+                        row[x * 6 + c * 2] = hex[channels[c] >> 4];
+                        row[x * 6 + c * 2 + 1] = hex[channels[c] & 15];
+                    }
+                }
+                row[width * 6] = 0;
+                Serial.printf("XNODE_SCREEN_ROW %d %s\n", y, row);
+                delay(1);
+            }
+            Serial.println("XNODE_SCREEN_END");
+        } else {
+            Serial.println("XNODE_SCREEN_ERROR capture unavailable");
+        }
+        free(raw_rgb);
+        raw_rgb = NULL;
+        gui_give();
+        return;
+    }
+}
+#endif
 
 void screenshot_setup( void ) {
     raw_grey = NULL;

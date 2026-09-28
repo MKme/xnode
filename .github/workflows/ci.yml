@@ -1,0 +1,51 @@
+name: XNODE regression and firmware builds
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xnode-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  firmware:
+    name: Local regressions and all supported boards
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out requested revision
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref }}
+        run: |
+          git init .
+          git remote add origin "https://github.com/${REPO}.git"
+          AUTH=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.extraheader=AUTHORIZATION: basic ${AUTH}" fetch --depth=1 origin "$REF"
+          git checkout --detach FETCH_HEAD
+
+      - name: Install established PlatformIO version
+        run: python -m pip install platformio==6.1.19
+
+      - name: Test and compile Ultra, S3, T-Deck Plus and T-Deck Pro
+        run: npm run build
+
+      - name: Exercise native home layouts and retained controls
+        run: npm run test:home
+
+      - name: Exercise horizontal menu swipes and tactical icon targets
+        run: npm run test:menus
+
+      - name: Exercise actual Messages opening and unread acknowledgement
+        run: npm run test:messages
+
+      - name: Exercise Mesh Chat history and watch keyboard workflows
+        run: npm run test:mesh

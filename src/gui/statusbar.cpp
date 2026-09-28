@@ -993,6 +993,25 @@ bool statusbar_get_force_dark( void ) {
 
 
 void statusbar_set_dark( bool dark_mode ) {
+    #if defined(LILYGO_WATCH_ULTRA) || defined(LILYGO_WATCH_S3) || defined(LILYGO_T_DECK_PLUS)
+    // This is the single battery/power band, including the expanded controls.
+    // Follow the selected application surface instead of overlaying white.
+    lv_color_t bg = WS_TACTICAL_DARK_COLOR, ink = LV_COLOR_WHITE;
+    _lv_style_get_color(ws_get_mainbar_style(), LV_STYLE_BG_COLOR, &bg);
+    _lv_style_get_color(ws_get_mainbar_style(), LV_STYLE_TEXT_COLOR, &ink);
+    if (force_dark_mode) { bg = WS_TACTICAL_DARK_COLOR; ink = LV_COLOR_WHITE; }
+    lv_style_set_bg_color(&statusbarstyle[STATUSBAR_STYLE_NORMAL], LV_STATE_DEFAULT, bg);
+    lv_style_set_bg_opa(&statusbarstyle[STATUSBAR_STYLE_NORMAL], LV_STATE_DEFAULT, LV_OPA_COVER);
+    lv_style_set_text_color(&statusbarstyle[STATUSBAR_STYLE_NORMAL], LV_STATE_DEFAULT, ink);
+    lv_style_set_image_recolor(&statusbarstyle[STATUSBAR_STYLE_NORMAL], LV_STATE_DEFAULT, ink);
+    lv_style_set_text_color(&statusbarstyle[STATUSBAR_STYLE_WHITE], LV_STATE_DEFAULT, ink);
+    lv_style_set_image_recolor(&statusbarstyle[STATUSBAR_STYLE_WHITE], LV_STATE_DEFAULT, ink);
+    lv_obj_reset_style_list(statusbar, LV_OBJ_PART_MAIN);
+    lv_obj_add_style(statusbar, LV_OBJ_PART_MAIN, &statusbarstyle[STATUSBAR_STYLE_NORMAL]);
+    lv_obj_report_style_mod(&statusbarstyle[STATUSBAR_STYLE_NORMAL]);
+    lv_obj_report_style_mod(&statusbarstyle[STATUSBAR_STYLE_WHITE]);
+    return;
+    #endif
     if ( dark_mode || force_dark_mode ) {
         lv_style_set_bg_opa(&statusbarstyle[ STATUSBAR_STYLE_NORMAL ], LV_OBJ_PART_MAIN, LV_OPA_90);
         lv_obj_reset_style_list( statusbar, LV_OBJ_PART_MAIN );

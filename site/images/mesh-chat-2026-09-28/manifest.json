@@ -1,0 +1,126 @@
+{
+  "description": "Native LVGL captures with synthetic test traffic. Watch images show the revised reading/WRITE/RADIO layout; handheld images retain the earlier demonstration layout.",
+  "method": "native-lvgl",
+  "hardware_capture": false,
+  "synthetic_state": true,
+  "scope": "Actual firmware Mesh Chat, history and keyboard UI. Global statusbar excluded. Physical input/radio/NVS/clock replaced by deterministic fixtures.",
+  "source_sha256": {
+    "src/app/meshtastic/meshtastic_app.cpp": "24bbb564ba37e4708d7b2c9b786271b19d0d7825ae7af7d7812afac7c16035f0",
+    "src/app/meshtastic/mesh_history.cpp": "ff88252594aa475ece36dee5b05300a9efcb731efa894ff06ee3007f8b2833e7",
+    "src/app/meshtastic/mesh_history.h": "2d7237da8f2f8fdda20f62fc21015d6168dba9efda5a41f2e4f29284113d80c1",
+    "src/gui/keyboard.cpp": "3a5ad6c743908f55f73d24b39f8188914220da0d56a5366d93f1b7c7e1457cf2",
+    "support/home_capture/mesh.cpp": "89d7c49a88af76032dc6892c78b7319f74c14adffadb369cedb26e5cbfc9f25d",
+    "support/home_capture/capture.py": "94769b7dec8476147275d572bb4009dfe63404da26a15655013ef7f588c63fcc"
+  },
+  "screenshots": [
+    {
+      "file": "tdeck-plus-dark-chat.png",
+      "width": 320,
+      "height": 240,
+      "target": "tdeck-plus",
+      "theme": "dark",
+      "screen": "chat",
+      "state": "Bundled examples ON; no radio transmission",
+      "sha256": "e90547226cda5433ade5bc46d9c7e019e9e7469d34c4f30f0aa98df547abfb68"
+    },
+    {
+      "file": "tdeck-plus-light-chat.png",
+      "width": 320,
+      "height": 240,
+      "target": "tdeck-plus",
+      "theme": "light",
+      "screen": "chat",
+      "state": "Bundled examples ON; no radio transmission",
+      "sha256": "a5dc0d09991e05ff86e43603fb5d1b8bece531f465db1b73bc97d828b9035cf0"
+    },
+    {
+      "file": "watch-ultra-dark-chat.png",
+      "width": 362,
+      "height": 440,
+      "target": "watch-ultra",
+      "theme": "dark",
+      "screen": "chat",
+      "state": "Native service fixtures; production has no Examples mode",
+      "sha256": "fd12e500a6e745775c458fb9ffb859ad69a7c211e0b11e7bbc20db757d90fb50"
+    },
+    {
+      "file": "watch-ultra-light-chat.png",
+      "width": 362,
+      "height": 440,
+      "target": "watch-ultra",
+      "theme": "light",
+      "screen": "chat",
+      "state": "Native service fixtures; production has no Examples mode",
+      "sha256": "12e808311307269f860f4a38295ab5f8a724fae1f7b881488837f75b45fc93ee"
+    },
+    {
+      "file": "watch-s3-dark-chat.png",
+      "width": 240,
+      "height": 240,
+      "target": "watch-s3",
+      "theme": "dark",
+      "screen": "chat",
+      "state": "Native service fixtures; production has no Examples mode",
+      "sha256": "012a1c1809f39557547e8ed0656140f40d509426078577b94e5329e2a4805e50"
+    },
+    {
+      "file": "watch-s3-light-chat.png",
+      "width": 240,
+      "height": 240,
+      "target": "watch-s3",
+      "theme": "light",
+      "screen": "chat",
+      "state": "Native service fixtures; production has no Examples mode",
+      "sha256": "6d18834b3578301cbb6e7ef6e5b5b17e95aee6bb98314928d765c58ff0f7e915"
+    },
+    {
+      "file": "tdeck-pro-dark-chat.png",
+      "width": 240,
+      "height": 320,
+      "target": "tdeck-pro",
+      "theme": "dark",
+      "screen": "chat",
+      "state": "Bundled examples ON; no radio transmission",
+      "sha256": "bd312fc6adfcf25ac0f06b1a9bdf2489dd3a235428132e28dcb105fc30f2b62c"
+    },
+    {
+      "file": "tdeck-pro-light-chat.png",
+      "width": 240,
+      "height": 320,
+      "target": "tdeck-pro",
+      "theme": "light",
+      "screen": "chat",
+      "state": "Bundled examples ON; no radio transmission",
+      "sha256": "ce808d469ff97921a56559a284385da3ddd1e95e18da985fa6cb224603d1da72"
+    },
+    {
+      "file": "watch-s3-dark-compose.png",
+      "width": 240,
+      "height": 240,
+      "target": "watch-s3",
+      "theme": "dark",
+      "screen": "compose",
+      "state": "Native service fixtures; production has no Examples mode",
+      "sha256": "d9f654810eb22d8e4e5fa7a0a96e91d7bae1aa765117a8774a80eb8a562e6b56"
+    },
+    {
+      "file": "watch-ultra-dark-compose.png",
+      "width": 362,
+      "height": 440,
+      "target": "watch-ultra",
+      "theme": "dark",
+      "screen": "compose",
+      "state": "Native service fixtures; production has no Examples mode",
+      "sha256": "76bac70d56aae57424a1e7ef616ab175f3409a09848359c965b733c865b026be"
+    }
+  ],
+  "watch_source_sha256": {
+    "src/app/meshtastic/meshtastic_app.cpp": "3af9b21e56a772a32470956f51d535d4b45d20cc0ada82f2a2d02f900f1d1653",
+    "src/app/meshtastic/mesh_history.cpp": "ff88252594aa475ece36dee5b05300a9efcb731efa894ff06ee3007f8b2833e7",
+    "src/app/meshtastic/mesh_history.h": "2d7237da8f2f8fdda20f62fc21015d6168dba9efda5a41f2e4f29284113d80c1",
+    "src/gui/keyboard.cpp": "3a5ad6c743908f55f73d24b39f8188914220da0d56a5366d93f1b7c7e1457cf2",
+    "support/home_capture/mesh.cpp": "10090ec74a0b83292ffa482e2537ff606c887f63268ed01b99a67e8fb19f8084",
+    "support/home_capture/capture.py": "ddd588e9ca986a80177102a3133e5ea46ed51e9cf0ef4606360d498e4cef997a"
+  },
+  "source_sha256_scope": "Historical handheld captures; watch_source_sha256 records the revised watch captures."
+}

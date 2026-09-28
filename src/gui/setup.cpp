@@ -21,6 +21,7 @@
  */
 
 #include "config.h"
+#include "gui/tactical_icons.h"
 #include "gui/mainbar/mainbar.h"
 #include "gui/mainbar/setup_tile/setup_tile.h"
 #include "setup.h"
@@ -64,7 +65,8 @@ icon_t *setup_register( const char* setupname, const lv_img_dsc_t *icon, lv_even
     lv_obj_align( setup->icon_indicator, setup->icon_cont, LV_ALIGN_IN_TOP_RIGHT, 0, 0 );
     lv_obj_set_hidden( setup->icon_indicator, true );
     lv_obj_add_style( setup->icon_indicator, LV_OBJ_PART_MAIN, MAINBAR_STYLE );
-    mainbar_add_slide_element( setup->icon_img );
+    tactical_icon_bind(setup, setupname, event_cb);
+    mainbar_menu_registration_changed();
     
     lv_obj_invalidate( lv_scr_act() );
 
@@ -129,5 +131,6 @@ void setup_set_icon( icon_t *setup, lv_obj_t *icon ) {
     lv_imgbtn_set_src( setup->icon_img, LV_BTN_STATE_CHECKED_PRESSED, icon);
     lv_obj_reset_style_list( setup->icon_img, LV_OBJ_PART_MAIN );
     lv_obj_align( setup->icon_img , setup->icon_cont, LV_ALIGN_IN_TOP_LEFT, 0, 0 );
+    tactical_icon_refresh(setup);
     lv_obj_invalidate( lv_scr_act() );
 }

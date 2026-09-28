@@ -52,6 +52,7 @@
      */
     typedef struct {
         lv_obj_t *tile;                                         /** @brief pointer to the lv tile obj */
+        lv_obj_t *page_hint;                                    /** @brief optional root-menu page cue */
         int activate_cb_entry_count;
         int hibernate_cb_entry_count;
         int button_cb_entry_count;
@@ -67,6 +68,12 @@
      * @brief mainbar setup funktion
      */
     void mainbar_setup( void );
+    /** Call once after application registration, before the first UI frame. */
+    void mainbar_finalize_menu_pages(void);
+    /** Refresh occupied root pages after runtime registration; inert until boot finalization. */
+    void mainbar_menu_registration_changed(void);
+    /** Non-interactive footer showing horizontal menu paging. */
+    void mainbar_add_page_hint(lv_obj_t *parent, const char *section, uint16_t page, uint16_t count);
     /**
      * @brief jump to the given tile
      * 

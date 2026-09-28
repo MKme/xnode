@@ -1,0 +1,23 @@
+Use case: ui-mockup.
+Create XNODE main GUI concept 03: MISSION TEAL. The attached XTOC screenshot is the authentic palette and military instrument-language reference ONLY, not a layout to copy. User liked a previous large-typography premium interface but wants it significantly more military tactical and specifically the XTOC Mission Teal coloring. Produce an exceptional polished flagship field communications instrument design. No generic app icon grid, crayon outline icons, rounded glossy consumer blue buttons, fake radar, illegible HUD noise, or decorative invented telemetry.
+
+Exact source palette: base #08100f; panel #101a19; secondary #0a1413; text #dff6f0; muted #9dc8be; fine separators #2d5a50; primary accent #62edd8; amber #ffd37a; danger #ff4d4f. Mostly deep green-black and pale text with SELECTIVE solid teal focus. No cobalt, lime green or orange. Military character through authoritative condensed uppercase instrument typography, precisely aligned tabular numerals, squared/very slightly clipped corners, compact command/status bands, thicker purposeful accent bars, subtle machined panel depth. Refined 2px-equivalent corners. No surrounding beveled phone hardware. Fine grid only barely perceptible behind empty header space, never behind small text. Hierarchy and large typography dominate, not thin lines.
+
+Landscape design board 1536x1024 or larger. Title top left "XNODE" and "MISSION TEAL / FIELD INTERFACE". Small palette swatches with exact hex labels in header. Four large complete straight-on screen mockups across main row with exact aspect ratios:
+T-DECK PLUS 320x240 = 4:3
+T-WATCH S3 240x240 = 1:1
+T-WATCH ULTRA 362x440 = 362:440
+T-DECK PRO 240x320 = 3:4.
+Label device/resolution outside screens. Board background deep green-black, purposeful editorial spacing, realistic embedded screen density. Every in-screen label readable at small size. No imagery of weapons/soldiers or invented maps.
+
+All screens have compact XNODE header and battery icon 82%. Each has bold beautifully typeset 14:32, small "LOCAL", status "GPS FIX" / "BLE OFF". Main MAP and MESH actions are large solid rectangular command keys. The selected MAP key filled #62edd8 with near-black text, strong tiny right chevron; MESH is dark teal solid with pale bold text and a small teal vertical index strip. Not outlined boxes. No large amateur icons. Compact amber "ALERTS 2" lower in larger homes, APPS and SETUP navigation. Time and keys take most screen area.
+
+T-DECK PLUS home left 40% time LOCAL 14:32, two short status lines; right 60% stacked MAP and MESH command keys, above a thin label "QUICK ACCESS". Bottom full-width band ALERTS 2 / APPS / SETUP.
+S3 watch square has top header, dominant 14:32, single short GPS FIX / BLE OFF status line, two large side-by-side MAP and MESH filled keys, bottom APPS / SETUP. No additional tiny data.
+ULTRA portrait has header, huge 14:32 and LOCAL, MON 28 SEP, compact status band, wide MAP key then wide MESH key, bottom ALERTS 2 / APPS / SETUP. Balanced beautiful vertical rhythm.
+PRO portrait pure binary black on ivory white e-paper interpretation. Large time, black text GPS FIX BLE OFF, solid black MAP key with white text, MESH white with strong black left indicator and dark type, horizontal separator, bottom ALERTS 2 / APPS / SETUP. NO teal or grayscale on e-paper. Preserve military design without ornament.
+
+Lower row shows two enlarged square menu panels with COMPLETE UI navigation, not just isolated cards.
+APPS panel top "< BACK" left / "APPS" middle / "1/3" right. Three broad selectable full-width rows "MESSAGES", "ALERTS" with amber 2 count, "CHECK IN". First row subtle filled teal highlight and strong teal left selection bar, not thin stroke. Bottom "< PREV" / "HOME" / "NEXT >" broad targets. Additional apps (SOS, Map, Mesh, Media, Watchfaces) on later pages, do not cram into this image.
+SETUP panel same header < BACK / SETUP / 1/2; 3 full-width rows "CONNECTIONS", "DISPLAY & TOUCH", "SOUND & ALERTS"; footer < PREV / HOME / NEXT >.
+At lower right restrained editorial text "FIELD-READY HIERARCHY" then "MISSION TEAL" and "Touch • Keyboard • E-paper". Footer "CONCEPT 03 • ILLUSTRATIVE STATUS". Show polished serious military equipment GUI with premium typography and tactile command surfaces. All data is illustrative; don't claim real connection, mesh peer count or successful transmission. Absolutely no map or mesh interior redesign yet.

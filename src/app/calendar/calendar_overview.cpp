@@ -129,7 +129,7 @@ static void calendar_overview_build_ui( void ) {
     lv_style_copy( &calendar_overview_style, APP_STYLE );
     lv_style_set_radius( &calendar_overview_style, LV_OBJ_PART_MAIN, 0 );
     lv_style_set_border_width( &calendar_overview_style, LV_OBJ_PART_MAIN, 0 );
-    lv_style_set_bg_color( &calendar_overview_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+    ws_bind_theme_surface(&calendar_overview_style);
     lv_style_set_bg_opa( &calendar_overview_style, LV_OBJ_PART_MAIN, LV_OPA_80 );
     /**
      * create calendar object
@@ -143,9 +143,9 @@ static void calendar_overview_build_ui( void ) {
      * Make the date number smaller to be sure they fit into their area
      */
     lv_obj_set_style_local_text_font( calendar_overview, LV_CALENDAR_PART_HEADER, LV_STATE_DEFAULT, calandar_header_font );
-    lv_obj_set_style_local_text_color( calendar_overview, LV_CALENDAR_PART_HEADER, LV_STATE_DEFAULT, LV_COLOR_BLACK );
+    lv_obj_add_style(calendar_overview, LV_CALENDAR_PART_HEADER, ws_get_label_style());
     lv_obj_set_style_local_text_font( calendar_overview, LV_CALENDAR_PART_DATE, LV_STATE_DEFAULT, calandar_font );
-    lv_obj_set_style_local_text_color( calendar_overview, LV_CALENDAR_PART_DATE, LV_STATE_DEFAULT, LV_COLOR_BLACK );
+    lv_obj_add_style(calendar_overview, LV_CALENDAR_PART_DATE, ws_get_label_style());
     lv_obj_set_style_local_bg_color( calendar_overview, LV_CALENDAR_PART_DATE, LV_STATE_CHECKED, LV_COLOR_RED );
     lv_obj_set_style_local_bg_color( calendar_overview, LV_CALENDAR_PART_DATE, LV_STATE_FOCUSED, LV_COLOR_GREEN );
     /**

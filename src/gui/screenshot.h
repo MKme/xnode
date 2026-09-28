@@ -64,4 +64,9 @@
      */
     void screenshot_save( void );
 
+    #if (defined(LILYGO_T_DECK_PLUS) || defined(LILYGO_WATCH_ULTRA)) && !defined(NATIVE_64BIT)
+        // Explicit physical-USB diagnostic; captures the visible screen only.
+        void screenshot_usb_poll( void );
+    #endif
+
 #endif // _SCREENSHOT_H

@@ -15,19 +15,24 @@ Implemented service capabilities include:
 - User long name and short name get/set.
 - Node info broadcast scheduling.
 - Last peer/RSSI/SNR/message tracking.
+- The latest 24 text records across channels, held in RAM until restart.
 - Power-management callbacks for standby behavior.
 
 The T-Deck Plus target is treated as a Meshtastic `T_DECK` hardware model in the onboard radio and BLE user config paths.
 
-## Mesh UI
+## Mesh Chat
 
-The mesh UI supports:
+Open **mesh** from **APPS**, or select **MESH** on a home layout that offers it. **CHAT** opens the selected channel's conversation. Scroll messages vertically; swipe left/right or tap the footer to move between **CHAT** and **RADIO**. Use **NEW v** to return to the latest activity when reading earlier messages. The top-left arrow leaves the app.
 
-- Compose and send.
-- Hardware keyboard entry on T-Deck Plus.
-- Multi-bank on-screen keyboard behavior on watch devices.
-- Channel and destination behavior from the Meshtastic service.
-- Exit/close controls sized and placed for reliable touch on small screens.
+Mesh Chat opens directly into live traffic. Choose a channel and use **SEND** to transmit. Production firmware has no Examples button and ignores any example-mode preference saved by earlier firmware.
+
+On watches, the conversation, **WRITE**, and **RADIO** occupy separate horizontal pages. Tap **WRITE** to open the draft, tap its text box for the keyboard, confirm to return to the draft review, then tap the full-width **SEND** button. An accepted send returns to the conversation; rejection keeps the draft and shows the error. Choose the channel on **RADIO**. The arrow on WRITE returns to the conversation without discarding the draft.
+
+Choose a channel, tap the composer and enter up to **80 characters**. T-Deck Plus uses its physical keyboard. Watches use a full-screen editor: the draft stays above large keys, **A-M**, **N-Z** and **123** select key pages, and the checkmark returns the text to chat. T-Deck Pro uses the portrait on-screen editor. X closes the on-screen editor without applying its changes. Back in chat, review the channel and tap **SEND**.
+
+**SEND broadcasts to the selected channel**, including after a received message marked **DIRECT**. There is no automatic private-reply mode. An immediate send rejection keeps the draft. **QUEUED** means an accepted attempt is pending; **TX SENT (LOCAL)** means the local radio reported completion, not that the recipient received it. **TX UNCONFIRMED** means transmission failed or completion was not observed. Check **RADIO** and the receiver before retrying: an uncertain completion does not prove that no RF transmission occurred.
+
+**RADIO** shows local identity, channel/frequency, radio state and the last observed peer signal. Mesh Chat keeps the latest **24 real text records across all channels** and displays the selected channel's subset. New records replace the oldest. History and drafts clear on restart; this chat does not save message bodies to flash. Message times use the local clock, or **--:--** if the clock is unset. Host-pushed **Messages** remain a separate view.
 
 ## BLE XNODE bridge
 

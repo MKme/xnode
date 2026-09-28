@@ -3,6 +3,7 @@
 
     #include <stdbool.h>
     #include <stdint.h>
+    #include "mesh_history.h"
 
     #define MESHTASTIC_SERVICE_MAX_CHANNEL_NAME_LEN 16
     #define MESHTASTIC_SERVICE_MAX_PSK_LEN 32
@@ -44,6 +45,11 @@
     bool meshtastic_service_is_receiving( void );
     const char *meshtastic_service_get_status( void );
     uint8_t meshtastic_service_get_channel_count( void );
+    // UI dropdown indices are not channel slots when disabled slots are skipped.
+    int8_t meshtastic_service_get_channel_slot( uint8_t channel_index );
+    uint32_t meshtastic_service_get_history_revision( void );
+    size_t meshtastic_service_get_history_count( uint8_t channel_slot );
+    bool meshtastic_service_get_history_message( uint8_t channel_slot, size_t chronological_index, mesh_message_t *out );
     const char *meshtastic_service_get_channel_name( uint8_t channel_index );
     uint8_t meshtastic_service_get_active_channel( void );
     bool meshtastic_service_set_active_channel( uint8_t channel_index );

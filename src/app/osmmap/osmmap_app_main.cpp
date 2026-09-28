@@ -1669,6 +1669,7 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
     osmmap_app_main_tile = mainbar_get_tile_obj( tile_num );
 
     lv_style_copy( &osmmap_app_main_style, ws_get_mainbar_style() );
+    ws_bind_theme_surface(&osmmap_app_main_style);
     lv_obj_add_style( osmmap_app_main_tile, LV_OBJ_PART_MAIN, &osmmap_app_main_style );
 
     const lv_color_t osmmap_control_icon_color = LV_COLOR_MAKE( 0xff, 0xd2, 0x00 );
@@ -1678,7 +1679,7 @@ void osmmap_app_main_setup( uint32_t tile_num ) {
 
     lv_style_copy( &osmmap_app_nav_style, ws_get_mainbar_style() );
     lv_style_set_radius( &osmmap_app_nav_style, LV_OBJ_PART_MAIN, 0 );
-    lv_style_set_bg_color( &osmmap_app_nav_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+    ws_bind_theme_surface(&osmmap_app_nav_style);
 
     lv_style_copy( &osmmap_app_label_style, ws_get_mainbar_style() );
     lv_style_set_text_font( &osmmap_app_label_style, LV_OBJ_PART_MAIN, &Ubuntu_12px );

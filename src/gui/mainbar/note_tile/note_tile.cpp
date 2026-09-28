@@ -3,7 +3,7 @@
  *   Copyright  2020  Dirk Brosswick
  *   Email: dirk.brosswick@googlemail.com
  ****************************************************************************/
- 
+
 /*
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -58,26 +58,13 @@ void note_tile_setup( void ) {
         return;
     }
 
-    #if defined( M5PAPER )
-        note_tile_num = mainbar_add_tile( 0, 3, "note tile", ws_get_mainbar_style() );
-        note_cont = mainbar_get_tile_obj( note_tile_num );
-    #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 ) || defined( M5CORE2 ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
-        note_tile_num = mainbar_add_tile( 0, 1, "note tile", ws_get_mainbar_style() );
-        note_cont = mainbar_get_tile_obj( note_tile_num );
-    #elif defined( LILYGO_WATCH_ULTRA )
-        note_tile_num = mainbar_add_tile( 0, 1, "note tile", ws_get_mainbar_style() );
-        note_cont = mainbar_get_tile_obj( note_tile_num );
-    #elif defined( LILYGO_WATCH_2021 )
-        note_tile_num = mainbar_add_tile( 0, 1, "note tile", ws_get_mainbar_style() );
-        note_cont = mainbar_get_tile_obj( note_tile_num );
-    #else
-        note_tile_num = mainbar_add_tile( 0, 1, "note tile", ws_get_mainbar_style() );
-        note_cont = mainbar_get_tile_obj( note_tile_num );
-        #warning "no note tiles setup"  
-    #endif 
+    note_tile_num = mainbar_add_tile(1 + MAX_APPS_TILES + MAX_SETUP_TILES, 0, "note tile", ws_get_mainbar_style());
+    note_cont = mainbar_get_tile_obj(note_tile_num);
+
     style = ws_get_mainbar_style();
 
     lv_style_copy( &notestyle, style);
+    ws_bind_theme_surface(&notestyle);
     lv_style_set_text_opa( &notestyle, LV_OBJ_PART_MAIN, LV_OPA_30);
     lv_style_set_text_font( &notestyle, LV_STATE_DEFAULT, &Ubuntu_72px);
 

@@ -102,7 +102,7 @@ pio run -e tdeck-pro
 Role:
 
 - Portrait 240x320 e-paper XNODE handheld target.
-- Built-in hardware keyboard for message entry.
+- Full-screen on-screen editor for message entry in the portrait layout.
 - Touch and swipe navigation on the Pro e-paper UI.
 - Same core launcher, messages, mesh, tactical map, GPS status, Alert Summary, SOS, and CheckIn workflows.
 - Produces a firmware binary suitable for manual install or bmorcelli Launcher testing.
@@ -135,8 +135,14 @@ Important T-Deck Pro behavior:
 - Status bar and main page styling are adjusted for black-on-white e-paper contrast.
 - E-paper refresh can briefly invert during full refreshes and is slower than LCD/AMOLED targets.
 
+### Menu navigation
+
+Swipe **left or right** through **Home > Apps > Setup > Notes**. Apps and Setup may have several occupied pages; their footers show the current page. Swipe back to return. Inside a tool, use left/right swipes for its pages and its existing Back or Exit control to leave. Lists and text still scroll normally, and maps retain panning. Tap the top status bar to open or close quick settings.
+
+The Pro presents the same labeled icon cards in monochrome.
+
 ### T-Deck Pro running XNODE
 
 | Clock and status | Main launcher | Meshtastic messaging |
 | --- | --- | --- |
-| ![T-Deck Pro running the XNODE clock and device status screen](https://raw.githubusercontent.com/MKme/xnode/main/site/images/tdeck%20pro/IMG_7371.jpg) | ![T-Deck Pro running the XNODE main launcher](https://raw.githubusercontent.com/MKme/xnode/main/site/images/tdeck%20pro/IMG_7372.jpg) | ![T-Deck Pro running the XNODE Meshtastic message screen](https://raw.githubusercontent.com/MKme/xnode/main/site/images/tdeck%20pro/IMG_7373.jpg) |
+| ![T-Deck Pro Field Chronometer firmware rendering with illustrative readings](https://raw.githubusercontent.com/MKme/xnode/main/site/images/home-tactical-2026-09-28/tdeck-pro-light.png) | ![T-Deck Pro monochrome XNODE Apps menu rendering](https://raw.githubusercontent.com/MKme/xnode/main/site/images/home-tactical-2026-09-28/tdeck-pro-light-apps.png) | ![T-Deck Pro running the XNODE Meshtastic message screen](https://raw.githubusercontent.com/MKme/xnode/main/site/images/tdeck%20pro/IMG_7373.jpg) |

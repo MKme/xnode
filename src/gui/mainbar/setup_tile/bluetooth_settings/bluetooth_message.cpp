@@ -376,7 +376,8 @@ void bluetooth_message_open( void ) {
 
 static bool bluetooth_message_open_latest( void ) {
     if ( msg_chain_get_entrys( bluetooth_msg_chain ) > 0 ) {
-        bluetooth_message_mark_read();
+        // Opening is not acknowledgement: activation marks read only after the
+        // message tile is reached. show_msg handles an already active tile.
         bluetooth_message_show_msg( msg_chain_get_entrys( bluetooth_msg_chain ) - 1 );
         mainbar_jump_to_tilenumber( bluetooth_message_tile_num, LV_ANIM_OFF, true );
         return( true );

@@ -63,22 +63,10 @@ void setup_tile_setup( void ) {
     setup_entry = (icon_t*)MALLOC_ASSERT( sizeof( icon_t ) * MAX_SETUP_ICON, "error while setup_entry alloc" );
 
     for ( int tiles = 0 ; tiles < MAX_SETUP_TILES ; tiles++ ) {
-    #if defined( M5PAPER )
-        setup_tile_num[ tiles ] = mainbar_add_tile( 0, 2 + tiles, "setup tile", ws_get_mainbar_style() );
-    #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 ) || defined( M5CORE2 ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
-        setup_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles , 1, "setup tile", ws_get_mainbar_style() );
-    #elif defined( LILYGO_WATCH_ULTRA )
-        setup_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles , 1, "setup tile", ws_get_mainbar_style() );
-    #elif defined( LILYGO_WATCH_2021 )
-        setup_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles , 1, "setup tile", ws_get_mainbar_style() );
-    #elif defined( WT32_SC01 )
-        setup_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles , 1, "setup tile", ws_get_mainbar_style() );
-    #else
-        setup_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles , 1, "setup tile", ws_get_mainbar_style() );
-        #warning "no setup tiles set"
-    #endif
+        setup_tile_num[ tiles ] = mainbar_add_tile( 1 + MAX_APPS_TILES + tiles, 0, "setup tile", ws_get_mainbar_style() );
         setup_cont[ tiles ] = mainbar_get_tile_obj( setup_tile_num[ tiles ] );
         mainbar_add_tile_button_cb( setup_tile_num[ tiles ], setup_tile_button_event_cb );
+        mainbar_add_page_hint(setup_cont[tiles], "SETUP", tiles + 1, MAX_SETUP_TILES);
     }
 
     lv_style_copy( &setup_style, ws_get_mainbar_style() );
@@ -87,6 +75,8 @@ void setup_tile_setup( void ) {
         // set x, y and mark it as inactive
         setup_entry[ setup ].x = SETUP_FIRST_X_POS + ( ( setup % MAX_SETUP_ICON_HORZ ) * ( SETUP_ICON_X_SIZE + SETUP_ICON_X_CLEARENCE ) ) + SETUP_ICON_X_OFFSET;
         setup_entry[ setup ].y = SETUP_FIRST_Y_POS + ( ( ( setup % ( MAX_SETUP_ICON_VERT * MAX_SETUP_ICON_HORZ ) ) / MAX_SETUP_ICON_HORZ ) * ( SETUP_ICON_Y_SIZE + SETUP_ICON_Y_CLEARENCE ) ) + SETUP_ICON_Y_OFFSET;
+        if (lv_disp_get_ver_res(NULL) <= 240)
+            setup_entry[setup].y = 28 + ((setup % (MAX_SETUP_ICON_VERT * MAX_SETUP_ICON_HORZ)) / MAX_SETUP_ICON_HORZ) * 98;
         setup_entry[ setup ].active = false;
         // create app icon container
         setup_entry[ setup ].icon_cont = mainbar_obj_create( setup_cont[ setup / ( MAX_SETUP_ICON_HORZ * MAX_SETUP_ICON_VERT ) ] );
@@ -160,6 +150,12 @@ icon_t *setup_tile_get_free_setup_icon( void ) {
     }
     log_e("no space for an setup icon");
     return( NULL );
+}
+
+uint16_t setup_tile_get_used_pages(void) {
+    for (int i = MAX_SETUP_ICON - 1; i >= 0; --i)
+        if (setup_entry[i].active) return i / (MAX_SETUP_ICON_HORZ * MAX_SETUP_ICON_VERT) + 1;
+    return 1;
 }
 
 uint32_t setup_get_tile_num( void ) {

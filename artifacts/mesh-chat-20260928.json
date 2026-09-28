@@ -1,0 +1,40 @@
+{
+  "date": "2026-09-28",
+  "targets": [
+    {
+      "target": "tdeck-plus",
+      "file": "artifacts/xnode-tdeck-plus-field-chronometer-20260928.bin",
+      "sha256": "ad5cadfc1577fdb01663fdf9eb820a04123a688e0cde3b3ff5b7082832258e54",
+      "bytes": 3972784,
+      "log": "production-live-build.log",
+      "type": "application image; not merged full-flash installer"
+    },
+    {
+      "target": "t-watch2020-v3-s3",
+      "file": "artifacts/xnode-t-watch2020-v3-s3-field-chronometer-20260928.bin",
+      "sha256": "159a3278365626b235b84f1cf03596b6e3ae2f0472566defa033d78eb29005ab",
+      "bytes": 3873616,
+      "log": "watch-readable-s3-final-build.log",
+      "type": "application image; not merged full-flash installer",
+      "watch_layout": "separate conversation, WRITE/review and RADIO"
+    },
+    {
+      "target": "t-watch-ultra",
+      "file": "artifacts/xnode-t-watch-ultra-field-chronometer-20260928.bin",
+      "sha256": "23af48d86802b6365d06413708da43058e0e42a13469a1e2b77f917e4c03e817",
+      "bytes": 4322896,
+      "log": "watch-readable-build.log",
+      "type": "application image; not merged full-flash installer",
+      "watch_layout": "separate conversation, WRITE/review and RADIO"
+    },
+    {
+      "target": "tdeck-pro",
+      "file": "artifacts/xnode-tdeck-pro-field-chronometer-20260928.bin",
+      "sha256": "f5acff8888993f45f550137d1031af1eab2deeea2dd88ca714277e7cd9e9f9dd",
+      "bytes": 3888048,
+      "log": "production-live-build.log",
+      "type": "application image; not merged full-flash installer"
+    }
+  ],
+  "description": "Production live Mesh Chat. Watch builds updated with larger text and separate reading, WRITE/review and RADIO pages. Handheld binaries remain previous validated production-live version. Application images require matching existing bootloader/partition layout."
+}

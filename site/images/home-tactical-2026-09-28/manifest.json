@@ -1,0 +1,133 @@
+{
+  "description": "XNODE home and menu screenshots; image descriptions distinguish physical captures from native firmware renders.",
+  "screenshots": [
+    {
+      "file": "tdeck-plus-dark.png",
+      "width": 320,
+      "height": 240,
+      "theme": "dark",
+      "target": "LILYGO_T_DECK_PLUS"
+    },
+    {
+      "file": "tdeck-plus-light.png",
+      "width": 320,
+      "height": 240,
+      "theme": "light",
+      "target": "LILYGO_T_DECK_PLUS"
+    },
+    {
+      "file": "watch-ultra-dark.png",
+      "width": 362,
+      "height": 440,
+      "theme": "dark",
+      "target": "LILYGO_WATCH_ULTRA"
+    },
+    {
+      "file": "watch-ultra-light.png",
+      "width": 362,
+      "height": 440,
+      "theme": "light",
+      "target": "LILYGO_WATCH_ULTRA"
+    },
+    {
+      "file": "watch-s3-dark.png",
+      "width": 240,
+      "height": 240,
+      "theme": "dark",
+      "target": "LILYGO_WATCH_S3"
+    },
+    {
+      "file": "watch-s3-light.png",
+      "width": 240,
+      "height": 240,
+      "theme": "light",
+      "target": "LILYGO_WATCH_S3"
+    },
+    {
+      "file": "tdeck-pro-dark.png",
+      "width": 240,
+      "height": 320,
+      "theme": "dark",
+      "target": "LILYGO_T_DECK_PRO"
+    },
+    {
+      "file": "tdeck-pro-light.png",
+      "width": 240,
+      "height": 320,
+      "theme": "light",
+      "target": "LILYGO_T_DECK_PRO"
+    },
+    {
+      "file": "tdeck-plus-device.png",
+      "width": 320,
+      "height": 240,
+      "target": "LILYGO_T_DECK_PLUS",
+      "theme": "dark",
+      "description": "Screenshot captured from a physical T-Deck Plus display"
+    },
+    {
+      "file": "tdeck-plus-dark-apps.png",
+      "width": 320,
+      "height": 240,
+      "theme": "dark",
+      "target": "LILYGO_T_DECK_PLUS",
+      "description": "Actual LVGL menu renderer with selected bundled app registrations; global status bar and hardware services are outside this capture."
+    },
+    {
+      "file": "tdeck-plus-dark-setup.png",
+      "width": 320,
+      "height": 240,
+      "theme": "dark",
+      "target": "LILYGO_T_DECK_PLUS",
+      "description": "Actual LVGL menu renderer with selected bundled app registrations; global status bar and hardware services are outside this capture."
+    },
+    {
+      "file": "watch-ultra-dark-apps.png",
+      "width": 362,
+      "height": 440,
+      "theme": "dark",
+      "target": "LILYGO_WATCH_ULTRA",
+      "description": "Actual LVGL menu renderer with selected bundled app registrations; global status bar and hardware services are outside this capture."
+    },
+    {
+      "file": "watch-ultra-dark-setup.png",
+      "width": 362,
+      "height": 440,
+      "theme": "dark",
+      "target": "LILYGO_WATCH_ULTRA",
+      "description": "Actual LVGL menu renderer with selected bundled app registrations; global status bar and hardware services are outside this capture."
+    },
+    {
+      "file": "watch-s3-dark-apps.png",
+      "width": 240,
+      "height": 240,
+      "theme": "dark",
+      "target": "LILYGO_WATCH_S3",
+      "description": "Actual LVGL menu renderer with selected bundled app registrations; global status bar and hardware services are outside this capture."
+    },
+    {
+      "file": "watch-s3-dark-setup.png",
+      "width": 240,
+      "height": 240,
+      "theme": "dark",
+      "target": "LILYGO_WATCH_S3",
+      "description": "Actual LVGL menu renderer with selected bundled app registrations; global status bar and hardware services are outside this capture."
+    },
+    {
+      "file": "tdeck-pro-light-apps.png",
+      "width": 240,
+      "height": 320,
+      "theme": "light",
+      "target": "LILYGO_T_DECK_PRO",
+      "description": "Actual LVGL menu renderer with selected bundled app registrations; global status bar and hardware services are outside this capture."
+    },
+    {
+      "file": "tdeck-pro-light-setup.png",
+      "width": 240,
+      "height": 320,
+      "theme": "light",
+      "target": "LILYGO_T_DECK_PRO",
+      "description": "Actual LVGL menu renderer with selected bundled app registrations; global status bar and hardware services are outside this capture."
+    }
+  ]
+}

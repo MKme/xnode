@@ -113,6 +113,7 @@ void widget_set_indicator( icon_t *widget, icon_indicator_t indicator ) {
     }
     lv_obj_align( widget->icon_indicator, widget->icon_cont, LV_ALIGN_IN_TOP_RIGHT, 0, 0 );
     lv_obj_set_hidden( widget->icon_indicator, false );
+    main_tile_align_widgets();
     lv_obj_invalidate( lv_scr_act() );
 }
 
@@ -126,6 +127,7 @@ void widget_hide_indicator( icon_t *widget ) {
     }
 
     lv_obj_set_hidden( widget->icon_indicator, true );
+    main_tile_align_widgets();
     lv_obj_invalidate( lv_scr_act() );
 }
 
@@ -144,6 +146,7 @@ void widget_set_icon( icon_t *widget, lv_obj_t *icon ) {
     lv_imgbtn_set_src( widget->icon_img, LV_BTN_STATE_CHECKED_PRESSED, icon);
     lv_obj_reset_style_list( widget->icon_img, LV_OBJ_PART_MAIN );
     lv_obj_align( widget->icon_img , widget->icon_cont, LV_ALIGN_IN_TOP_LEFT, 0, 0 );
+    main_tile_align_widgets();
     lv_obj_invalidate( lv_scr_act() );
 }
 
@@ -159,6 +162,7 @@ void widget_set_label( icon_t *widget, const char* text ) {
     lv_label_set_text( widget->label, text );
     lv_obj_align( widget->label , widget->icon_cont, LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
     lv_label_set_align( widget->label, LV_LABEL_ALIGN_CENTER );
+    main_tile_align_widgets();
     lv_obj_invalidate( lv_scr_act() );
 }
 
@@ -174,5 +178,6 @@ void widget_set_extended_label( icon_t *widget, const char* text ) {
     lv_label_set_text( widget->ext_label, text );
     lv_obj_align( widget->ext_label , widget->label, LV_ALIGN_OUT_TOP_MID, 0, 0 );
     lv_label_set_align( widget->ext_label, LV_LABEL_ALIGN_CENTER );
+    main_tile_align_widgets();
     lv_obj_invalidate( lv_scr_act() );
 }

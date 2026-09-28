@@ -115,6 +115,7 @@
      * @return  zero or the numbers of active apps
      */
     int32_t app_tile_get_active_app_entrys( void );
+    uint16_t app_tile_get_used_pages(void);
     const char *app_get_appentrys_name( int32_t appentry );
 
 #endif // _APP_TILE_H

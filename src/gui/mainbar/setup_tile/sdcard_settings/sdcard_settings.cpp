@@ -55,6 +55,7 @@ void sdcard_settings_tile_setup(void)
     sdcard_settings_tile_num = mainbar_add_setup_tile(1, 1, "SD card setup");
     sdcard_settings_tile = mainbar_get_tile_obj(sdcard_settings_tile_num);
     lv_style_copy(&sdcard_settings_style, ws_get_setup_tile_style());
+    ws_bind_theme_surface(&sdcard_settings_style);
     lv_obj_add_style(sdcard_settings_tile, LV_OBJ_PART_MAIN, &sdcard_settings_style);
 
     icon_t *utilities_setup_icon = setup_register("SD card", &sdcard_settings_64px, enter_sdcard_settings_event_cb);

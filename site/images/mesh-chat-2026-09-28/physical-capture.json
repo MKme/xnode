@@ -1,0 +1,11 @@
+{
+  "date": "2026-09-28",
+  "board": "tdeck-plus",
+  "method": "Read-only USB framebuffer, all 240 rows validated; user opened MESH",
+  "firmware_sha256": "38cb4f9955156a40415e7e996ea2279fa4d9f75ec59adf27ee864b07aa545f7e",
+  "image_sha256": "ac25521be84e83b9af86daded131a8e675cbfbd34a4c85024594f529500b5217",
+  "mode": "Examples ON; illustrative conversation on physical hardware",
+  "verified": "Boot and actual displayed Mesh Chat after successful esptool upload/hash verification",
+  "limits": "No physical keyboard entry or RF recipient delivery claim; physical watches not attached",
+  "file": "tdeck-plus-mesh-device.png"
+}

@@ -56,20 +56,10 @@ void app_tile_setup( void ) {
      * add tiles to to main tile
      */
     for ( int tiles = 0 ; tiles < MAX_APPS_TILES ; tiles++ ) {
-    #if defined( M5PAPER )
-        app_tile_num[ tiles ] = mainbar_add_tile( 0, 1 + tiles, "app tile", ws_get_mainbar_style() );
-    #elif defined( LILYGO_WATCH_2020_V1 ) || defined( LILYGO_WATCH_2020_V2 ) || defined( LILYGO_WATCH_2020_V3 ) || defined( M5CORE2 ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
         app_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles, 0, "app tile", ws_get_mainbar_style() );
-    #elif defined( LILYGO_WATCH_ULTRA )
-        app_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles, 0, "app tile", ws_get_mainbar_style() );
-    #elif defined( LILYGO_WATCH_2021 )
-        app_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles, 0, "app tile", ws_get_mainbar_style() );
-    #else
-        app_tile_num[ tiles ] = mainbar_add_tile( 1 + tiles, 0, "app tile", ws_get_mainbar_style() );
-        #warning "not app tile setup"
-    #endif
         app_cont[ tiles ] = mainbar_get_tile_obj( app_tile_num[ tiles ] );
         mainbar_add_tile_button_cb( app_tile_num[ tiles ], app_tile_button_event_cb );
+        mainbar_add_page_hint(app_cont[tiles], "APPS", tiles + 1, MAX_APPS_TILES);
     }
     /**
      * init all app icons
@@ -79,7 +69,9 @@ void app_tile_setup( void ) {
          * set x, y and mark it as inactive
          */
         app_entry[ app ].x = APP_FIRST_X_POS + ( ( app % MAX_APPS_ICON_HORZ ) * ( APP_ICON_X_SIZE + APP_ICON_X_CLEARENCE ) ) + APP_ICON_X_OFFSET;
-        app_entry[ app ].y = APP_FIRST_Y_POS + ( ( ( app % ( MAX_APPS_ICON_VERT * MAX_APPS_ICON_HORZ  ) ) / MAX_APPS_ICON_HORZ ) * ( APP_ICON_Y_SIZE + APP_ICON_Y_CLEARENCE ) ) + APP_ICON_Y_OFFSET;
+        app_entry[ app ].y = APP_FIRST_Y_POS + ( ( ( app % ( MAX_APPS_ICON_VERT * MAX_APPS_ICON_HORZ  ) ) / MAX_APPS_ICON_HORZ ) * ( APP_ICON_Y_SIZE + APP_ICON_Y_CLEARENCE ) ) + APP_ICON_Y_OFFSET - (lv_disp_get_ver_res(NULL) <= 240 ? 4 : 0);
+        if (lv_disp_get_ver_res(NULL) <= 240)
+            app_entry[app].y = 28 + ((app % (MAX_APPS_ICON_VERT * MAX_APPS_ICON_HORZ)) / MAX_APPS_ICON_HORZ) * 98;
         app_entry[ app ].active = false;
         /*
          * create app icon container
@@ -88,7 +80,7 @@ void app_tile_setup( void ) {
         mainbar_add_slide_element( app_entry[ app ].icon_cont);
         lv_obj_reset_style_list( app_entry[ app ].icon_cont, LV_OBJ_PART_MAIN );
         lv_obj_add_style( app_entry[ app ].icon_cont, LV_OBJ_PART_MAIN, APP_ICON_STYLE );
-        lv_obj_set_size( app_entry[ app ].icon_cont, APP_ICON_X_SIZE, APP_ICON_Y_SIZE );
+        lv_obj_set_size( app_entry[ app ].icon_cont, APP_ICON_X_SIZE, lv_disp_get_ver_res(NULL) <= 240 ? 66 : APP_ICON_Y_SIZE );
         lv_obj_align( app_entry[ app ].icon_cont , app_cont[ app / ( MAX_APPS_ICON_HORZ * MAX_APPS_ICON_VERT ) ], LV_ALIGN_IN_TOP_LEFT, app_entry[ app ].x, app_entry[ app ].y );
         /*
          * create app label
@@ -177,6 +169,12 @@ uint32_t app_tile_get_tile_num( void ) {
     }
 
     return( app_tile_num[ 0 ] );
+}
+
+uint16_t app_tile_get_used_pages(void) {
+    for (int i = MAX_APPS_ICON - 1; i >= 0; --i)
+        if (app_entry[i].active) return i / (MAX_APPS_ICON_HORZ * MAX_APPS_ICON_VERT) + 1;
+    return 1;
 }
 
 int32_t app_tile_get_active_app_entrys( void ) {

@@ -4,6 +4,46 @@
 #include "meshtastic_user_config.h"
 
 #include <string.h>
+#include <time.h>
+
+#if !defined(NATIVE_64BIT)
+    #include <freertos/FreeRTOS.h>
+    #include <freertos/semphr.h>
+    namespace {
+        portMUX_TYPE mesh_history_mux = portMUX_INITIALIZER_UNLOCKED;
+        struct MeshHistoryLock {
+            MeshHistoryLock() { portENTER_CRITICAL(&mesh_history_mux); }
+            ~MeshHistoryLock() { portEXIT_CRITICAL(&mesh_history_mux); }
+        };
+    }
+#else
+    namespace { struct MeshHistoryLock {}; }
+#endif
+
+namespace {
+    MeshHistory mesh_history;
+    uint32_t mesh_history_add(const mesh_message_t &message) {
+        MeshHistoryLock lock;
+        return mesh_history.add(message);
+    }
+    void mesh_history_status(uint32_t sequence, mesh_message_status_t status) {
+        MeshHistoryLock lock;
+        mesh_history.set_status(sequence, status);
+    }
+}
+
+uint32_t meshtastic_service_get_history_revision(void) {
+    MeshHistoryLock lock;
+    return mesh_history.revision();
+}
+size_t meshtastic_service_get_history_count(uint8_t channel_slot) {
+    MeshHistoryLock lock;
+    return mesh_history.count(channel_slot);
+}
+bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, mesh_message_t *out) {
+    MeshHistoryLock lock;
+    return mesh_history.get(channel_slot, index, out);
+}
 
 #if defined( USING_TWATCH_S3 ) || defined( USING_TWATCH_ULTRA ) || defined( USING_TDECK_PLUS ) || defined( USING_TDECK_PRO )
 
@@ -133,6 +173,24 @@
         bool meshtastic_radio_ready = false;
         bool meshtastic_radio_receiving = false;
         bool meshtastic_tx_active = false;
+        uint32_t meshtastic_pending_sequence = 0;
+        uint32_t meshtastic_tx_started_ms = 0;
+        // BLE onWrite is a separate task; serialize radio operations with the
+        // power loop. Never hold the short history spinlock across radio I/O.
+        #if !defined(NATIVE_64BIT)
+            StaticSemaphore_t meshtastic_radio_mutex_storage;
+            SemaphoreHandle_t meshtastic_radio_mutex = NULL;
+            struct MeshtasticRadioLock {
+                MeshtasticRadioLock() {
+                    if (meshtastic_radio_mutex) xSemaphoreTakeRecursive(meshtastic_radio_mutex, portMAX_DELAY);
+                }
+                ~MeshtasticRadioLock() {
+                    if (meshtastic_radio_mutex) xSemaphoreGiveRecursive(meshtastic_radio_mutex);
+                }
+            };
+        #else
+            struct MeshtasticRadioLock {};
+        #endif
 
         uint32_t meshtastic_node_id = 0;
         uint32_t meshtastic_last_peer = 0;
@@ -161,6 +219,23 @@
         bool meshtastic_user_loaded = false;
         bool meshtastic_nodeinfo_due = false;
         uint32_t meshtastic_nodeinfo_due_ms = 0;
+
+        mesh_message_t meshtastic_history_record(const char *sender, const char *text,
+            uint32_t from, uint32_t to, uint8_t slot, uint32_t packet_id, bool outgoing) {
+            mesh_message_t message = {};
+            message.from_node = from;
+            message.to_node = to;
+            message.channel_slot = slot;
+            message.packet_id = packet_id;
+            message.outgoing = outgoing;
+            message.status = outgoing ? MESH_MESSAGE_QUEUED : MESH_MESSAGE_RECEIVED;
+            const time_t now = time(NULL);
+            message.timestamp = now >= 1577836800 ? (uint32_t)now : 0;
+            message.uptime_ms = millis();
+            strlcpy(message.sender, sender ? sender : "", sizeof(message.sender));
+            strlcpy(message.text, text ? text : "", sizeof(message.text));
+            return message;
+        }
 
         uint8_t meshtastic_xor_hash( const uint8_t *data, size_t len ) {
             uint8_t hash = 0;
@@ -1084,7 +1159,8 @@
                 return( false );
             }
 
-            if ( data.dest != 0 && data.dest != MESHTASTIC_BROADCAST && data.dest != meshtastic_node_id ) {
+            const uint32_t destination = data.dest ? data.dest : header->to;
+            if ( destination != MESHTASTIC_BROADCAST && destination != meshtastic_node_id ) {
                 return( false );
             }
 
@@ -1106,6 +1182,9 @@
             }
 
             if ( meshtastic_decode_text_message( data, decoded ) ) {
+                mesh_history_add(meshtastic_history_record(sender, decoded.text,
+                    header->from, data.dest ? data.dest : header->to,
+                    (uint8_t)channel_slot, header->id, false));
                 meshtastic_store_last_message( sender, decoded.text );
                 meshtastic_queue_notification( sender, decoded.text );
                 xnode_send_meshtastic_rx( sender, decoded.text );
@@ -1149,9 +1228,18 @@
         }
 
         bool meshtastic_powermgm_event_cb( EventBits_t event, void *arg ) {
+            MeshtasticRadioLock radio_lock;
             switch( event ) {
                 case POWERMGM_STANDBY:
                     if ( meshtastic_radio_ready ) {
+                        if (meshtastic_tx_active) {
+                            mesh_history_status(meshtastic_pending_sequence, MESH_MESSAGE_FAILED);
+                            meshtastic_pending_sequence = 0;
+                            meshtastic_pending_text[0] = '\0';
+                            meshtastic_pending_channel_name[0] = '\0';
+                            meshtastic_tx_active = false;
+                            meshtastic_radio_irq = false;
+                        }
                         meshtastic_radio.sleep();
                         meshtastic_radio_receiving = false;
                         meshtastic_update_status( "Meshtastic sleeping" );
@@ -1170,7 +1258,21 @@
         }
 
         bool meshtastic_powermgm_loop_cb( EventBits_t event, void *arg ) {
+            MeshtasticRadioLock radio_lock;
             const uint32_t now = millis();
+
+            // Recover even if the TX_DONE interrupt was missed. At this fixed
+            // modem preset a 255-byte packet is far below this 30-second bound.
+            if (meshtastic_tx_active && (uint32_t)(now - meshtastic_tx_started_ms) >= 30000) {
+                meshtastic_radio.finishTransmit();
+                mesh_history_status(meshtastic_pending_sequence, MESH_MESSAGE_FAILED);
+                meshtastic_pending_sequence = 0;
+                meshtastic_pending_text[0] = '\0';
+                meshtastic_pending_channel_name[0] = '\0';
+                meshtastic_radio_irq = false;
+                meshtastic_start_receive();
+                meshtastic_update_status("TX timed out; delivery unknown");
+            }
 
             if ( meshtastic_radio_ready && meshtastic_nodeinfo_due && meshtastic_time_due( now, meshtastic_nodeinfo_due_ms ) ) {
                 if ( meshtastic_service_broadcast_node_info() ) {
@@ -1189,15 +1291,27 @@
             meshtastic_radio_irq = false;
 
             if ( meshtastic_tx_active ) {
-                meshtastic_radio.finishTransmit();
+                // The watch/Plus bundle uses RadioLib 7; Pro retains 6.4.
+                // Both accessors return the raw SX126x IRQ bitmask.
+                #if RADIOLIB_VERSION_MAJOR >= 7
+                    const uint32_t irq = meshtastic_radio.getIrqFlags();
+                #else
+                    const uint16_t irq = meshtastic_radio.getIrqStatus();
+                #endif
+                const int finish_state = meshtastic_radio.finishTransmit();
+                const bool transmitted = (irq & RADIOLIB_SX126X_IRQ_TX_DONE) &&
+                    !(irq & RADIOLIB_SX126X_IRQ_TIMEOUT) && finish_state == RADIOLIB_ERR_NONE;
                 meshtastic_tx_active = false;
-                meshtastic_update_status( "TX sent %s", meshtastic_pending_channel_name[ 0 ] ? meshtastic_pending_channel_name : "mesh" );
+                mesh_history_status(meshtastic_pending_sequence,
+                    transmitted ? MESH_MESSAGE_TRANSMITTED : MESH_MESSAGE_FAILED);
+                meshtastic_pending_sequence = 0;
+                meshtastic_update_status( transmitted ? "TX sent %s" : "TX failed %s", meshtastic_pending_channel_name[ 0 ] ? meshtastic_pending_channel_name : "mesh" );
 
-                if ( meshtastic_pending_text[ 0 ] ) {
+                if ( transmitted && meshtastic_pending_text[ 0 ] ) {
                     meshtastic_store_last_message( "Me", meshtastic_pending_text );
                     meshtastic_queue_notification( "Me", meshtastic_pending_text );
-                    meshtastic_pending_text[ 0 ] = '\0';
                 }
+                meshtastic_pending_text[ 0 ] = '\0';
                 meshtastic_pending_channel_name[ 0 ] = '\0';
                 meshtastic_start_receive();
             }
@@ -1215,6 +1329,9 @@
             return;
         }
 
+        #if !defined(NATIVE_64BIT)
+            meshtastic_radio_mutex = xSemaphoreCreateRecursiveMutexStatic(&meshtastic_radio_mutex_storage);
+        #endif
         meshtastic_service_started = true;
         meshtastic_load_channels();
         meshtastic_node_id = (uint32_t)( ESP.getEfuseMac() & 0xFFFFFFFFULL );
@@ -1271,8 +1388,10 @@
         size_t app_payload_len,
         uint32_t dest,
         uint8_t channel_slot,
-        const char *pending_text
+        const char *pending_text,
+        mesh_message_t *history_record = NULL
     ) {
+        MeshtasticRadioLock radio_lock;
         uint8_t payload[ MESHTASTIC_MAX_PACKET_LEN ] = { 0 };
         uint8_t packet[ MESHTASTIC_MAX_PACKET_LEN ] = { 0 };
         meshtastic_packet_header_t *header = (meshtastic_packet_header_t *)packet;
@@ -1332,21 +1451,36 @@
         }
         strlcpy( meshtastic_pending_channel_name, tx_channel->name, sizeof( meshtastic_pending_channel_name ) );
 
+        meshtastic_pending_sequence = 0;
+        if (history_record) {
+            history_record->packet_id = header->id;
+            history_record->sequence = mesh_history_add(*history_record);
+            meshtastic_pending_sequence = history_record->sequence;
+        }
+
+        // startTransmit clears the hardware IRQ flags; discard a previous RX
+        // notification before starting the new transmission as well.
+        meshtastic_radio_irq = false;
         const int state = meshtastic_radio.startTransmit( packet, sizeof( meshtastic_packet_header_t ) + payload_len );
         if ( state != RADIOLIB_ERR_NONE ) {
+            mesh_history_status(meshtastic_pending_sequence, MESH_MESSAGE_FAILED);
+            meshtastic_pending_sequence = 0;
             meshtastic_pending_text[ 0 ] = '\0';
             meshtastic_pending_channel_name[ 0 ] = '\0';
+            meshtastic_start_receive();
             meshtastic_update_status( "TX start failed %d", state );
             return( false );
         }
 
         meshtastic_tx_active = true;
+        meshtastic_tx_started_ms = millis();
         meshtastic_radio_receiving = false;
         meshtastic_update_status( "Sending %s...", tx_channel->name );
         return( true );
     }
 
     static bool meshtastic_service_send_text_internal( const char *text, uint32_t dest, uint8_t channel_slot ) {
+        MeshtasticRadioLock radio_lock;
         const size_t text_len = text ? strlen( text ) : 0;
 
         if ( text_len == 0 || text_len > MESHTASTIC_MAX_TEXT_LEN ) {
@@ -1354,14 +1488,22 @@
             return( false );
         }
 
-        return( meshtastic_service_send_payload_internal(
+        mesh_message_t record = meshtastic_history_record("Me", text,
+            meshtastic_node_id, dest, channel_slot, 0, true);
+        const bool queued = meshtastic_service_send_payload_internal(
             MESHTASTIC_TEXT_MESSAGE_APP,
             (const uint8_t *)text,
             text_len,
             dest,
             channel_slot,
-            text
-        ) );
+            text,
+            &record
+        );
+        if (!queued && !record.sequence) {
+            record.status = MESH_MESSAGE_FAILED;
+            mesh_history_add(record);
+        }
+        return queued;
     }
 
     bool meshtastic_service_send_text( const char *text ) {
@@ -1421,6 +1563,10 @@
         return( meshtastic_channels[ slot ].name );
     }
 
+    int8_t meshtastic_service_get_channel_slot(uint8_t channel_index) {
+        return meshtastic_slot_for_list_index(channel_index);
+    }
+
     uint8_t meshtastic_service_get_active_channel( void ) {
         const int8_t channel_index = meshtastic_list_index_for_slot( meshtastic_active_channel_slot );
 
@@ -1428,6 +1574,7 @@
     }
 
     bool meshtastic_service_set_active_channel( uint8_t channel_index ) {
+        MeshtasticRadioLock radio_lock;
         const int8_t slot = meshtastic_slot_for_list_index( channel_index );
 
         if ( slot < 0 ) {
@@ -1553,6 +1700,7 @@
     }
 
     bool meshtastic_service_set_channel_info( uint8_t channel_slot, const meshtastic_service_channel_info_t *info ) {
+        MeshtasticRadioLock radio_lock;
         const float old_frequency = meshtastic_frequency();
         bool changed = false;
 
@@ -1617,6 +1765,11 @@
     }
 
 #else
+
+    int8_t meshtastic_service_get_channel_slot(uint8_t channel_index) {
+        (void)channel_index;
+        return -1;
+    }
 
     void meshtastic_service_setup( void ) {
     }

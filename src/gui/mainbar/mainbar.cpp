@@ -57,6 +57,103 @@ static uint32_t tile_entrys = 0;
 static uint32_t app_tile_x_pos = MAINBAR_APP_TILE_X_START;
 static uint32_t app_tile_y_pos = MAINBAR_APP_TILE_Y_START;
 static volatile bool mainbar_alarm_occurred = false;
+static bool mainbar_menus_finalized = false;
+static uint16_t mainbar_used_app_pages = 0;
+static uint16_t mainbar_used_setup_pages = 0;
+#if defined(LILYGO_T_DECK_PRO)
+static uint32_t mainbar_tdeck_pro_active_tile = 0;
+#endif
+#if !defined(LILYGO_T_DECK_PRO)
+static uint32_t mainbar_last_active_tile = 0;
+static bool mainbar_programmatic_navigation = false;
+static void mainbar_swipe_event(lv_obj_t *obj, lv_event_t event);
+#endif
+LV_FONT_DECLARE(Ubuntu_12px);
+
+static int32_t mainbar_find_tile_at(lv_coord_t x, lv_coord_t y) {
+    for (uint32_t i = 0; i < tile_entrys; ++i)
+        if (tile_pos_table[i].x == x && tile_pos_table[i].y == y) return (int32_t)i;
+    return -1;
+}
+
+void mainbar_add_page_hint(lv_obj_t *parent, const char *section, uint16_t page, uint16_t count) {
+    lv_obj_t *hint = lv_label_create(parent, NULL);
+    lv_obj_reset_style_list(hint, LV_OBJ_PART_MAIN);
+    lv_obj_add_style(hint, LV_OBJ_PART_MAIN, ws_get_label_style());
+    lv_obj_set_style_local_text_font(hint, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, &Ubuntu_12px);
+    char text[40];
+    snprintf(text, sizeof(text), "<  %s %u/%u  >", section, page, count);
+    lv_label_set_text(hint, text);
+    lv_obj_set_click(hint, false);
+    lv_obj_align(hint, parent, LV_ALIGN_IN_BOTTOM_MID, 0, 0);
+    for (uint32_t i = 0; i < tile_entrys; ++i)
+        if (tile[i].tile == parent) { tile[i].page_hint = hint; break; }
+}
+
+static void mainbar_reposition_menu(uint32_t number, uint16_t x, uint16_t y,
+                                  const char *section, uint16_t page, uint16_t count) {
+    tile_pos_table[number] = {(lv_coord_t)x, (lv_coord_t)y};
+    tile[number].x = x;
+    tile[number].y = y;
+#if !defined(LILYGO_T_DECK_PRO)
+    lv_obj_set_pos(tile[number].tile, x * lv_disp_get_hor_res(NULL), y * LV_VER_RES);
+#endif
+    if (tile[number].page_hint) {
+        char text[40];
+        snprintf(text, sizeof(text), "<  %s %u/%u  >", section, page, count);
+        lv_label_set_text(tile[number].page_hint, text);
+        lv_obj_align(tile[number].page_hint, tile[number].tile, LV_ALIGN_IN_BOTTOM_MID, 0, 0);
+    }
+}
+
+static void mainbar_reflow_menu_pages(void) {
+    // Preserve destinations by ID while root coordinates move around newly filled pages.
+    const uint16_t apps = app_tile_get_used_pages();
+    const uint16_t setups = setup_tile_get_used_pages();
+    if (apps == mainbar_used_app_pages && setups == mainbar_used_setup_pages) return;
+    int32_t history_ids[MAINBAR_MAX_HISTORY];
+    for (uint32_t i = 0; i <= mainbar_history->entrys; ++i)
+        history_ids[i] = mainbar_find_tile_at(mainbar_history->tile[i].x, mainbar_history->tile[i].y);
+#if defined(LILYGO_T_DECK_PRO)
+    const int32_t active = (int32_t)mainbar_tdeck_pro_active_tile;
+#else
+    lv_coord_t active_x, active_y;
+    lv_tileview_get_tile_act(mainbar, &active_x, &active_y);
+    const int32_t active = mainbar_find_tile_at(active_x, active_y);
+    mainbar_programmatic_navigation = true;
+#endif
+    const uint32_t first_app = app_tile_get_tile_num();
+    const uint32_t first_setup = setup_get_tile_num();
+    for (uint16_t i = 0; i < MAX_APPS_TILES; ++i)
+        mainbar_reposition_menu(first_app + i, i < apps ? 1 + i : i,
+                                i < apps ? 0 : MAINBAR_APP_TILE_Y_START, "APPS", i + 1, apps);
+    for (uint16_t i = 0; i < MAX_SETUP_TILES; ++i)
+        mainbar_reposition_menu(first_setup + i, i < setups ? 1 + apps + i : MAX_APPS_TILES + i,
+                                i < setups ? 0 : MAINBAR_APP_TILE_Y_START, "SETUP", i + 1, setups);
+    mainbar_reposition_menu(note_tile_get_tile_num(), 1 + apps + setups, 0, "NOTES", 1, 1);
+    for (uint32_t i = 0; i <= mainbar_history->entrys; ++i)
+        if (history_ids[i] >= 0) mainbar_history->tile[i] = tile_pos_table[history_ids[i]];
+#if !defined(LILYGO_T_DECK_PRO)
+    lv_tileview_set_valid_positions(mainbar, tile_pos_table, tile_entrys);
+    if (active >= 0) {
+        lv_tileview_set_tile_act(mainbar, tile_pos_table[active].x, tile_pos_table[active].y, LV_ANIM_OFF);
+        mainbar_last_active_tile = (uint32_t)active;
+    }
+    mainbar_programmatic_navigation = false;
+#endif
+    mainbar_used_app_pages = apps;
+    mainbar_used_setup_pages = setups;
+}
+
+void mainbar_finalize_menu_pages(void) {
+    mainbar_reflow_menu_pages();
+    mainbar_menus_finalized = true;
+}
+
+void mainbar_menu_registration_changed(void) {
+    // App constructors register before the root menu is complete; defer those to finalize.
+    if (mainbar_menus_finalized) mainbar_reflow_menu_pages();
+}
 
 bool mainbar_button_event_cb( EventBits_t event, void *arg );
 bool mainbar_powermgm_event_cb( EventBits_t event, void *arg );
@@ -68,7 +165,6 @@ static bool mainbar_tdeck_pro_jump_relative( lv_coord_t x_delta, lv_coord_t y_de
 static void mainbar_tdeck_pro_get_tile_act( lv_coord_t *x, lv_coord_t *y );
 static bool mainbar_tdeck_pro_set_tile_act( uint32_t tile_number );
 static void mainbar_tdeck_pro_event_cb( lv_obj_t *obj, lv_event_t event );
-static uint32_t mainbar_tdeck_pro_active_tile = 0;
 #endif
 
 void mainbar_setup( void ) {
@@ -93,6 +189,7 @@ void mainbar_setup( void ) {
 #else
     mainbar = lv_tileview_create( lv_scr_act(), NULL);
     lv_tileview_set_edge_flash( mainbar, false);
+    lv_obj_set_event_cb(mainbar, mainbar_swipe_event);
 #endif
     lv_obj_add_style( mainbar, LV_OBJ_PART_MAIN, ws_get_mainbar_style() );
 #if !defined( LILYGO_T_DECK_PRO )
@@ -129,6 +226,15 @@ bool mainbar_button_event_cb( EventBits_t event, void *arg ) {
     /**
      * call button callback for the current tile if exist
      */
+    if (y == 0 && (event == BUTTON_LEFT || event == BUTTON_RIGHT)) {
+        const int32_t next = mainbar_find_tile_at(x + (event == BUTTON_RIGHT ? 1 : -1), 0);
+        if (next >= 0) {
+            mainbar_jump_to_tilenumber((uint32_t)next, LV_ANIM_OFF);
+            mainbar_clear_history();
+        }
+        display_note_activity();
+        return true;
+    }
     if ( current_tile != -1 ) {
         if ( tile[ current_tile ].button_cb != NULL ) {
             MAINBAR_INFO_LOG("call button cb for tile: %d", current_tile );
@@ -138,6 +244,10 @@ bool mainbar_button_event_cb( EventBits_t event, void *arg ) {
             MAINBAR_INFO_LOG("no button cb for current tile: %d", current_tile );
             if ( event == BUTTON_EXIT ) {
                 mainbar_jump_back();
+            }
+            else if (event == BUTTON_LEFT || event == BUTTON_RIGHT) {
+                const int32_t next = mainbar_find_tile_at(x + (event == BUTTON_RIGHT ? 1 : -1), y);
+                if (next >= 0) mainbar_jump_to_tilenumber((uint32_t)next, LV_ANIM_OFF);
             }
         }
     }
@@ -149,34 +259,55 @@ bool mainbar_button_event_cb( EventBits_t event, void *arg ) {
     return( true );
 }
 
-void mainbar_add_current_tile_to_history( lv_anim_enable_t anim ) {
-    /*
-     * check if mainbar already initialized
-     */
-    ASSERT( mainbar, "main not initialized" );
-
-    if ( mainbar_history->entrys < MAINBAR_MAX_HISTORY ) {
-        /**
-         * get current tile
-         */
-        lv_coord_t x,y;
-#if defined( LILYGO_T_DECK_PRO )
-        mainbar_tdeck_pro_get_tile_act( &x, &y );
-#else
-        lv_tileview_get_tile_act( mainbar, &x, &y );
-#endif
-        /**
-         * store tile pos in history
-         */
-        mainbar_history->entrys++;
-        mainbar_history->tile[ mainbar_history->entrys ].x = x;
-        mainbar_history->tile[ mainbar_history->entrys ].y = y;
-        mainbar_history->statusbar[ mainbar_history->entrys ] = statusbar_get_hidden_state();
-        mainbar_history->anim[ mainbar_history->entrys ] = anim;
-        mainbar_history->powermgm_state[ mainbar_history->entrys ] = powermgm_get_event( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP );
-        MAINBAR_INFO_LOG("store tile to history: %d, %d, %d, %x, %d", x, y, statusbar_get_hidden_state(), powermgm_get_event( POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP ), anim );
+static void mainbar_store_history(lv_coord_t x, lv_coord_t y, lv_anim_enable_t anim) {
+    // Slot zero is the home sentinel. Keep the most recent fifteen entries;
+    // the former increment-before-write overflowed at MAINBAR_MAX_HISTORY.
+    if (mainbar_history->entrys >= MAINBAR_MAX_HISTORY - 1) {
+        for (uint32_t i = 1; i < MAINBAR_MAX_HISTORY - 1; ++i) {
+            mainbar_history->tile[i] = mainbar_history->tile[i + 1];
+            mainbar_history->statusbar[i] = mainbar_history->statusbar[i + 1];
+            mainbar_history->anim[i] = mainbar_history->anim[i + 1];
+            mainbar_history->powermgm_state[i] = mainbar_history->powermgm_state[i + 1];
+        }
+        mainbar_history->entrys = MAINBAR_MAX_HISTORY - 2;
     }
+    const uint32_t entry = ++mainbar_history->entrys;
+    mainbar_history->tile[entry] = {x, y};
+    mainbar_history->statusbar[entry] = statusbar_get_hidden_state();
+    mainbar_history->anim[entry] = anim;
+    mainbar_history->powermgm_state[entry] = powermgm_get_event(POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY | POWERMGM_WAKEUP);
 }
+
+void mainbar_add_current_tile_to_history(lv_anim_enable_t anim) {
+    ASSERT(mainbar, "main not initialized");
+    lv_coord_t x, y;
+#if defined(LILYGO_T_DECK_PRO)
+    mainbar_tdeck_pro_get_tile_act(&x, &y);
+#else
+    lv_tileview_get_tile_act(mainbar, &x, &y);
+#endif
+    mainbar_store_history(x, y, anim);
+}
+
+#if !defined(LILYGO_T_DECK_PRO)
+static void mainbar_swipe_event(lv_obj_t *obj, lv_event_t event) {
+    if (event != LV_EVENT_VALUE_CHANGED || mainbar_programmatic_navigation || !tile_entrys) return;
+    lv_coord_t x, y;
+    lv_tileview_get_tile_act(obj, &x, &y);
+    const int32_t next = mainbar_find_tile_at(x, y);
+    if (next < 0 || (uint32_t)next == mainbar_last_active_tile) return;
+    const uint32_t previous = mainbar_last_active_tile;
+    mainbar_last_active_tile = (uint32_t)next;
+    if (y == 0) mainbar_clear_history();
+    else mainbar_store_history(tile_pos_table[previous].x, tile_pos_table[previous].y, LV_ANIM_OFF);
+    // Drag navigation must run the same lifecycle hooks as an explicit jump.
+    for (int i = 0; i < tile[previous].hibernate_cb_entry_count; ++i)
+        if (tile[previous].hibernate_cb[i]) tile[previous].hibernate_cb[i]();
+    for (int i = 0; i < tile[next].activate_cb_entry_count; ++i)
+        if (tile[next].activate_cb[i]) tile[next].activate_cb[i]();
+    display_note_activity();
+}
+#endif
 
 void mainbar_clear_history( void ) {
     /*
@@ -218,7 +349,10 @@ void mainbar_jump_back( void ) {
             mainbar_tdeck_pro_set_tile_act( (uint32_t)back_tile_number );
         }
 #else
+        mainbar_programmatic_navigation = true;
         lv_tileview_set_tile_act( mainbar, mainbar_history->tile[ mainbar_history->entrys ].x, mainbar_history->tile[ mainbar_history->entrys ].y, mainbar_history->anim[ mainbar_history->entrys ] );
+        mainbar_last_active_tile = mainbar_find_tile_at(mainbar_history->tile[mainbar_history->entrys].x, mainbar_history->tile[mainbar_history->entrys].y);
+        mainbar_programmatic_navigation = false;
 #endif
         statusbar_hide( mainbar_history->statusbar[ mainbar_history->entrys ] );
         gui_force_redraw( true );
@@ -333,6 +467,7 @@ uint32_t mainbar_add_tile( uint16_t x, uint16_t y, const char *id, lv_style_t *s
 
     lv_obj_t *my_tile = lv_cont_create( mainbar, NULL);  
     tile[ tile_entrys - 1 ].tile = my_tile;
+    tile[ tile_entrys - 1 ].page_hint = NULL;
     tile[ tile_entrys - 1 ].activate_cb_entry_count = 0;
     tile[ tile_entrys - 1 ].activate_cb = NULL;
     tile[ tile_entrys - 1 ].hibernate_cb_entry_count = 0;
@@ -428,66 +563,38 @@ bool mainbar_add_tile_button_cb( uint32_t tile_number, CALLBACK_FUNC button_cb )
     return( retval );
 }
 
-uint32_t mainbar_add_app_tile( uint16_t x, uint16_t y, const char *id ) {
-    uint32_t retval = -1;
-    /*
-     * check if mainbar already initialized
-     */
-    ASSERT( mainbar, "main not initialized" );
-    /*
-     * prevent tile x pos goes out of range ( uint16_t )
-     */
-    if( ( app_tile_x_pos + x ) * lv_disp_get_hor_res( NULL ) > 32000 ) {
-        MAINBAR_INFO_LOG("max horz resolution, jump next vert line");
+// Private application/setup groups are horizontal strips. Preserve the former
+// hor-then-ver tile-ID order; an empty column separates unrelated groups.
+static uint32_t mainbar_add_horizontal_group(uint16_t x, uint16_t y, const char *id, lv_style_t *style) {
+    ASSERT(mainbar, "main not initialized");
+    const uint32_t count = (uint32_t)x * y;
+    const uint32_t width = lv_disp_get_hor_res(NULL);
+    if (!count || count > 32000 / width) {
+        MAINBAR_ERROR_LOG("invalid horizontal tile group: %u x %u", x, y);
+        return (uint32_t)-1;
+    }
+    if ((app_tile_x_pos + count) * width > 32000) {
         app_tile_x_pos = 0;
-        app_tile_y_pos = app_tile_y_pos + MAINBAR_APP_TILE_Y_START;
+        app_tile_y_pos += MAINBAR_APP_TILE_Y_START;
     }
-    /**
-     * crawl tiles
-     */
-    for ( int hor = 0 ; hor < x ; hor++ ) {
-        for ( int ver = 0 ; ver < y ; ver++ ) {
-            if ( retval == -1 )
-                retval = mainbar_add_tile( hor + app_tile_x_pos, app_tile_y_pos + ver + MAINBAR_APP_TILE_Y_START, id, ws_get_app_style() );
-            else
-                mainbar_add_tile( hor + app_tile_x_pos, app_tile_y_pos + ver + MAINBAR_APP_TILE_Y_START, id, ws_get_app_style() );
-        }
+    if ((app_tile_y_pos + MAINBAR_APP_TILE_Y_START + 1) * (uint32_t)LV_VER_RES > 32000) {
+        MAINBAR_ERROR_LOG("horizontal tile rows exceed LVGL coordinate range");
+        return (uint32_t)-1;
     }
-
-    app_tile_x_pos = app_tile_x_pos + x + 1;
-
-    return( retval );
+    const uint32_t first = tile_entrys;
+    for (uint32_t page = 0; page < count; ++page) {
+        mainbar_add_tile(app_tile_x_pos + page, app_tile_y_pos + MAINBAR_APP_TILE_Y_START, id, style);
+    }
+    app_tile_x_pos += count + 1;
+    return first;
 }
 
-uint32_t mainbar_add_setup_tile( uint16_t x, uint16_t y, const char *id ) {
-    uint32_t retval = -1;
-    /*
-     * check if mainbar already initialized
-     */
-    ASSERT( mainbar, "main not initialized" );
-    /*
-     * prevent tile x pos goes out of range ( uint16_t )
-     */
-    if( ( app_tile_x_pos + x ) * lv_disp_get_hor_res( NULL ) > 32000 ) {
-        MAINBAR_INFO_LOG("max horz resolution, jump next vert line");
-        app_tile_x_pos = 0;
-        app_tile_y_pos = app_tile_y_pos + MAINBAR_APP_TILE_Y_START;
-    }
-    /**
-     * crawl tiles
-     */
-    for ( int hor = 0 ; hor < x ; hor++ ) {
-        for ( int ver = 0 ; ver < y ; ver++ ) {
-            if ( retval == -1 )
-                retval = mainbar_add_tile( hor + app_tile_x_pos, app_tile_y_pos + ver + MAINBAR_APP_TILE_Y_START, id, ws_get_setup_tile_style() );
-            else
-                mainbar_add_tile( hor + app_tile_x_pos, app_tile_y_pos + ver + MAINBAR_APP_TILE_Y_START, id, ws_get_setup_tile_style() );
-        }
-    }
+uint32_t mainbar_add_app_tile(uint16_t x, uint16_t y, const char *id) {
+    return mainbar_add_horizontal_group(x, y, id, ws_get_app_style());
+}
 
-    app_tile_x_pos = app_tile_x_pos + x + 1;
-
-    return( retval );
+uint32_t mainbar_add_setup_tile(uint16_t x, uint16_t y, const char *id) {
+    return mainbar_add_horizontal_group(x, y, id, ws_get_setup_tile_style());
 }
 
 lv_obj_t *mainbar_get_tile_obj( uint32_t tile_number ) {
@@ -557,15 +664,8 @@ void mainbar_jump_to_tilenumber( uint32_t tile_number, lv_anim_enable_t anim, bo
         }
     }
 #endif
-    /**
-     * check if tile alread in mainbar history to prevent loops
-     */
-    for ( int i = 0 ; i < mainbar_history->entrys; i++ ) {
-        if ( mainbar_history->tile[ i ].x == x && mainbar_history->tile[ i ].y == y ) {
-            MAINBAR_INFO_LOG("current tile already in mainbar_history");
-            return;
-        }
-    }
+    // Revisiting a prior page is valid navigation; bounded history handles
+    // loops without suppressing the next click or swipe.
     /**
      * jump
      */
@@ -582,7 +682,10 @@ void mainbar_jump_to_tilenumber( uint32_t tile_number, lv_anim_enable_t anim, bo
 #if defined( LILYGO_T_DECK_PRO )
         mainbar_tdeck_pro_set_tile_act( tile_number );
 #else
+        mainbar_programmatic_navigation = true;
         lv_tileview_set_tile_act( mainbar, tile_pos_table[ tile_number ].x, tile_pos_table[ tile_number ].y, anim );
+        mainbar_last_active_tile = tile_number;
+        mainbar_programmatic_navigation = false;
 #endif
         gui_force_redraw( true );
         /**
@@ -718,6 +821,8 @@ static int32_t mainbar_find_tile_number( lv_coord_t x, lv_coord_t y ) {
 }
 
 static bool mainbar_tdeck_pro_jump_relative( lv_coord_t x_delta, lv_coord_t y_delta ) {
+    // Menu groups are horizontal, including multi-page application menus.
+    if (y_delta != 0) return false;
     if ( mainbar == NULL || tile_entrys == 0 ) {
         return( false );
     }
@@ -742,7 +847,7 @@ static bool mainbar_tdeck_pro_jump_relative( lv_coord_t x_delta, lv_coord_t y_de
     MAINBAR_INFO_LOG( "T-Deck PRO gesture jump: %d,%d -> %d,%d", x, y, x + x_delta, y + y_delta );
     Serial.printf( "T-Deck PRO gesture jump: %d,%d -> %d,%d\r\n", x, y, x + x_delta, y + y_delta );
     mainbar_jump_to_tilenumber( (uint32_t)tile_number, LV_ANIM_OFF );
-    mainbar_clear_history();
+    if (y == 0) mainbar_clear_history();
     lv_indev_reset( NULL, NULL );
     gui_force_redraw( true );
     lv_obj_invalidate( lv_scr_act() );
@@ -766,6 +871,7 @@ bool mainbar_poll_tdeck_pro_gesture( void ) {
             Serial.printf( "T-Deck PRO touch swipe: %d,%d\r\n", x_delta, y_delta );
         }
         lv_indev_reset( NULL, NULL );
+            for (lv_indev_t *input = lv_indev_get_next(NULL); input; input = lv_indev_get_next(input)) lv_indev_wait_release(input);
         gui_force_redraw( true );
         return( true );
     }
@@ -795,12 +901,14 @@ bool mainbar_poll_tdeck_pro_gesture( void ) {
         if ( abs_x >= swipe_threshold && abs_x > abs_y ) {
             mainbar_tdeck_pro_jump_relative( dx < 0 ? 1 : -1, 0 );
             lv_indev_reset( NULL, NULL );
+            for (lv_indev_t *input = lv_indev_get_next(NULL); input; input = lv_indev_get_next(input)) lv_indev_wait_release(input);
             return( true );
         }
 
         if ( abs_y >= swipe_threshold && abs_y > abs_x ) {
             mainbar_tdeck_pro_jump_relative( 0, dy < 0 ? 1 : -1 );
             lv_indev_reset( NULL, NULL );
+            for (lv_indev_t *input = lv_indev_get_next(NULL); input; input = lv_indev_get_next(input)) lv_indev_wait_release(input);
             return( true );
         }
 

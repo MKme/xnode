@@ -66,6 +66,7 @@ void sound_settings_tile_setup( void ) {
     sound_settings_tile = mainbar_get_tile_obj( sound_tile_num );
 
     lv_style_copy( &sound_settings_style, ws_get_setup_tile_style() );
+    ws_bind_theme_surface(&sound_settings_style);
     lv_obj_add_style( sound_settings_tile, LV_OBJ_PART_MAIN, &sound_settings_style );
 
     sound_setup_icon = setup_register( "sound", &sound_64px, enter_sound_setup_event_cb );

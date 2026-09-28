@@ -1,29 +1,51 @@
 # Main screen
 
-![screenshot](images/screen1.png)
+![XNODE Field Chronometer home for T-Deck Plus](site/images/home-tactical-2026-09-28/tdeck-plus-device.png)
 
-On startup you see the main screen (time tile). It shows the time and widgets.
+The **Field Chronometer** is the default home screen. Read the large clock and full date, then check battery and charging in the top status bar and wireless status below the XNODE heading. Use **Messages** when the unread-message shortcut is shown; viewed messages remain available from the messages menu under **APPS**. The status indicators describe the local device and its connections; they do not confirm that a remote radio received a message.
 
-Widgets are:
+**SET CLOCK** means the device still needs a valid clock setting. **WI-FI** and **BLE** show **OFF** when disabled, **IDLE** when enabled without a connection, and **LINK** when connected.
 
-* the current weather (if correctly configured).
-* the next alarm.
-* the notifications.
+Moon phase and illumination appear on the T-Watch Ultra, T-Deck Plus and T-Deck Pro. Temperature and humidity appear when supplied by a configured sensor. The Mission Teal dark background continues through apps, settings and the status bar; color displays also retain the light theme; the T-Deck Pro keeps a high-contrast monochrome layout. The screenshot is captured from a physical T-Deck Plus display.
+
+Use **APPS** and **SETUP** at the bottom to open the app launcher and settings. Larger layouts also provide direct **MAP** and **MESH** shortcuts; on the compact S3 screen, open these tools through **APPS**.
 
 # Screen Navigation
 
- You can swipe with you fingers up, down, left and right between the four main screens. The four screens are organized in time, apps, note and setup tile.
+Swipe **left or right** to move through **Home > Apps > Setup > Notes**. Apps and Setup can each have several pages; the footer shows the current page. Swipe the opposite direction to return. Menus do not require an up/down swipe.
+
+Inside a tool, swipe left/right between its pages when more than one is available. Use its exit/back button to return. Lists, text and maps keep their normal scrolling or panning controls. Tap either an icon card or its caption to open that tool.
+
+The tactical icon colors group communications, navigation, power, alerts and system tools. Read each caption for the action; color is not a connection or success indicator. The e-paper model uses monochrome icons.
+
+# Mesh Chat
+
+Open **mesh** from **APPS**, or use the home **MESH** shortcut where shown. The **CHAT** page opens the conversation for the selected channel. Scroll the conversation vertically to read older messages; use **NEW v** to return to the latest activity. Handhelds use horizontal **CHAT** and **RADIO** pages. Watches use conversation, **WRITE**, and **RADIO** pages. The conversation’s top-left arrow leaves Mesh Chat.
+
+Mesh Chat opens directly into live traffic. Choose a channel and use **SEND** to transmit. Production firmware has no Examples button and ignores any example-mode preference saved by earlier firmware.
+
+On watches, the conversation, **WRITE**, and **RADIO** occupy separate horizontal pages. Tap **WRITE** to open the draft, tap its text box for the keyboard, confirm to return to the draft review, then tap the full-width **SEND** button. An accepted send returns to the conversation; rejection keeps the draft and shows the error. Choose the channel on **RADIO**. The arrow on WRITE returns to the conversation without discarding the draft.
+
+1. Choose the intended channel from the dropdown (on **RADIO** on watches), then return to the conversation and tap **WRITE** on a watch.
+2. Tap **Message channel...** and compose up to **80 characters**. On T-Deck Plus, type on the physical keyboard. On a watch, the full-screen keyboard keeps the draft visible above large keys; switch **A-M**, **N-Z** and **123** pages as needed, then tap the checkmark to return to draft review. T-Deck Pro uses the portrait on-screen editor. Closing the on-screen editor with its X cancels those edits.
+3. Check the channel and text, then tap **SEND**. The draft clears only when the radio accepts the attempt. An immediate rejection keeps the draft so you can correct the problem.
+4. Read the outgoing message status. **QUEUED** means transmission is pending. **TX SENT (LOCAL)** means the local radio reported a completed transmission, not that another person received it. **TX UNCONFIRMED** requires checking the radio and receiver before retrying; do not assume a failed status proves that no RF transmission occurred.
+
+**SEND broadcasts to the selected channel.** A received message labelled **DIRECT** does not make the composer a private reply: your next send still goes to the channel. The channel, frequency, local node identity and last observed peer signal are on **RADIO**.
+
+Mesh Chat keeps the latest **24 real text records across all channels in RAM** and filters the view by channel. Older records are replaced as new ones arrive. History and drafts clear on restart; message bodies are not saved to flash by Mesh Chat. Times use the local device clock and show **--:--** while it is unset. Host-pushed notifications remain available separately in **Messages**.
 
 # Quick Settings
 
 ![screenshot](images/screen2.png)
 
-A subset of settings can be accessed via a swipe from the top of the screen.
+Tap the top status bar to expand the quick settings. Tap it again to close them.
 
 # Settings
 
-![screenshot](images/screen3.png)
-![screenshot](images/screen4.png)
+![T-Deck Plus tactical Setup menu](site/images/home-tactical-2026-09-28/tdeck-plus-dark-setup.png)
+
+Menu images are firmware renderings with a representative selection of tools. The status bar is outside these menu captures; the available pages follow the tools included on the device.
 
 Once a setting is selected, you can leave the form with the exit button.
 

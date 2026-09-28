@@ -38,6 +38,7 @@
   .xnode-photo-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:18px}
   .xnode-photo-card{overflow:hidden;border:1px solid var(--line);border-radius:8px;background:#fff}
   .xnode-photo-card img{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;background:#0f1719}
+  .xnode-photo-card a img{aspect-ratio:auto;height:auto;object-fit:contain}
   .xnode-photo-card div{padding:12px 13px}
   .xnode-photo-card strong{display:block;margin-bottom:4px;color:#14262a}
   .xnode-photo-card p{margin:0;color:#41575b}
@@ -108,12 +109,21 @@
     </section>
 
     <section class="xnode-section">
-      <h2>Current T-Watch Ultra photos</h2>
-      <p class="xnode-lead">The latest hardware photos show the Ultra build running the current clock, GPS diagnostics, and tactical map/GPS overlay screens on the watch.</p>
+      <h2>Your field status at a glance</h2>
+      <p class="xnode-lead">The Field Chronometer puts the clock and full date front and center, with battery, charging and wireless status close by. Open Messages directly from home when its unread-message shortcut appears. Moon information appears on supported devices, and configured sensors can provide temperature and humidity.</p>
+      <p>The Mission Teal dark background continues through apps, settings and the status bar; color screens also retain the light theme; T-Deck Pro uses a high-contrast monochrome layout. The T-Deck Plus home image is captured from the physical device. Ultra and Pro home images are firmware screen renderings with illustrative readings.</p>
+      <p>Swipe left or right through Home, Apps, Setup and Notes. Page indicators show occupied menu pages; tap an icon card or its caption to open a tool. Tool pages also move left/right, while lists and maps retain their normal scrolling and panning. Tap the top status bar for quick settings.</p>
+      <p>Icon colors group communications, navigation, power, alerts and system tools; they do not indicate connection or delivery status. Menu images are native firmware renderings with representative tool selections, without the global status bar. Page counts depend on installed tools. Other tool images are hardware photographs.</p>
+    </section>
+
+    <section class="xnode-section" id="mesh-chat"><h2>Mesh Chat on handhelds and watches</h2><p class="xnode-lead">Read incoming and outgoing channel messages, keep a draft for each channel, and compose from the conversation. Swipe left or right between CHAT and RADIO; scroll vertically through messages.</p><p>T-Deck Plus uses its physical keyboard. Both watches and the monochrome Pro use a separate full-screen text editor. The composer accepts up to 80 characters. The most recent 24 texts across channels stay in RAM until restart. SEND broadcasts to the selected channel; local TX completion is not proof of recipient delivery.</p><p class="xnode-note">These are renderings of the actual firmware interface with illustrative example messages, without the global status bar. Production opens directly into live chat with no Examples button. Earlier captures below show the previous demonstration interface. Native interaction tests cover all four layouts; physical watch operation and over-the-air delivery are separate checks.</p><div class="xnode-photo-grid"><div class="xnode-photo-card"><a href="https://store.mkme.org/wp-content/uploads/2026/09/watch-s3-dark-chat.png"><img src="https://store.mkme.org/wp-content/uploads/2026/09/watch-s3-dark-chat.png" alt="T-Watch S3 chat actual firmware rendering with illustrative data" width="240" height="240" loading="lazy" decoding="async" /></a><div><strong>T-Watch S3 chat</strong><p>Compact channel conversation with incoming and outgoing messages.</p></div></div><div class="xnode-photo-card"><a href="https://store.mkme.org/wp-content/uploads/2026/09/watch-ultra-dark-chat.png"><img src="https://store.mkme.org/wp-content/uploads/2026/09/watch-ultra-dark-chat.png" alt="T-Watch Ultra chat actual firmware rendering with illustrative data" width="362" height="440" loading="lazy" decoding="async" /></a><div><strong>T-Watch Ultra chat</strong><p>The taller display shows more of the same conversation.</p></div></div><div class="xnode-photo-card"><a href="https://store.mkme.org/wp-content/uploads/2026/09/watch-s3-dark-compose.png"><img src="https://store.mkme.org/wp-content/uploads/2026/09/watch-s3-dark-compose.png" alt="Watch text entry actual firmware rendering with illustrative data" width="240" height="240" loading="lazy" decoding="async" /></a><div><strong>Watch text entry</strong><p>A full-screen keyboard keeps touch keys readable. Confirm returns the draft to chat; SEND is a separate action.</p></div></div></div></section>
+<section class="xnode-section">
+      <h2>T-Watch Ultra screens</h2>
+      <p class="xnode-lead">The Field Chronometer home presents time, full date, power and wireless status at a glance. The GPS and map photos show the related watch tools.</p>
       <div class="xnode-photo-grid">
         <div class="xnode-photo-card">
-          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/IMG_6786.jpg" alt="T-Watch Ultra running the current XNODE clock screen with message shortcut" width="1062" height="1416" loading="lazy" decoding="async" />
-          <div><strong>Current clock</strong><p>Live Ultra clock screen with status bar and message shortcut.</p></div>
+          <a href="https://store.mkme.org/wp-content/uploads/2026/09/watch-ultra-dark-1.png" aria-label="View full-size XNODE Field Chronometer home for T-Watch Ultra"><img src="https://store.mkme.org/wp-content/uploads/2026/09/watch-ultra-dark-1.png" alt="XNODE Field Chronometer home for T-Watch Ultra" width="362" height="440" loading="lazy" decoding="async" /></a>
+          <div><strong>Field Chronometer</strong><p>Clock, date, battery, wireless status and moon information in the tactical home layout.</p></div>
         </div>
         <div class="xnode-photo-card">
           <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/IMG_6765.jpg" alt="T-Watch Ultra GPS diagnostics screen showing fix, UART, baud, NMEA, and satellite status" width="1062" height="1416" loading="lazy" decoding="async" />
@@ -132,14 +142,14 @@
 
     <section class="xnode-section">
       <h2>XNODE on T-Deck Plus</h2>
-      <p class="xnode-lead">These current hardware photos show the T-Deck Plus build on its larger 320x240 display. The physical keyboard and wider screen keep the core map, mesh, alert, GPS, SOS, and CheckIn workflows while making message entry, diagnostics, and the live tactical picture easier to use in the field.</p>
+      <p class="xnode-lead">The T-Deck Plus brings the Field Chronometer and XNODE tools to a larger 320x240 display. The physical keyboard and wider screen keep the core map, mesh, alert, GPS, SOS, and CheckIn workflows while making message entry, diagnostics, and the live tactical picture easier to use in the field.</p>
       <div class="xnode-photo-grid">
         <div class="xnode-photo-card">
-          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6809.jpg" alt="T-Deck Plus running the XNODE clock screen with moon phase" width="1062" height="1416" loading="lazy" decoding="async" />
-          <div><strong>Clock + moon</strong><p>Larger clock screen with the generated moon phase visual and text.</p></div>
+          <a href="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-plus-device-1.png" aria-label="View full-size XNODE Field Chronometer home for T-Deck Plus"><img src="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-plus-device-1.png" alt="XNODE Field Chronometer home for T-Deck Plus" width="320" height="240" loading="lazy" decoding="async" /></a>
+          <div><strong>Field Chronometer</strong><p>Time and full date, power and wireless status, moon information and Messages on the wide display.</p></div>
         </div>
         <div class="xnode-photo-card">
-          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6810.jpg" alt="T-Deck Plus XNODE launcher showing messages, mesh, Tac Map, CheckIn, Alert Summary, and SOS" width="1062" height="1416" loading="lazy" decoding="async" />
+          <a href="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-plus-dark-apps.png" aria-label="View full-size T-Deck Plus tactical Apps menu firmware rendering"><img src="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-plus-dark-apps.png" alt="T-Deck Plus tactical Apps menu firmware rendering" width="320" height="240" loading="lazy" decoding="async" /></a>
           <div><strong>Main launcher</strong><p>Messages, mesh, Tac Map, CheckIn, Alert Summary, and SOS on the larger display.</p></div>
         </div>
         <div class="xnode-photo-card">
@@ -147,12 +157,12 @@
           <div><strong>Wide tactical map</strong><p>The T-Deck map now fills the larger workflow: synced XTOC/XCOM markers, readable controls, and a much better field view than the watch screen.</p></div>
         </div>
         <div class="xnode-photo-card">
-          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6811.jpg" alt="T-Deck Plus XNODE utilities launcher showing GPS status and other tools" width="1062" height="1416" loading="lazy" decoding="async" />
-          <div><strong>Status tools</strong><p>Readable GPS/status utilities and support screens from the launcher.</p></div>
+          <a href="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-plus-dark-setup.png" aria-label="View full-size T-Deck Plus tactical Setup menu firmware rendering"><img src="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-plus-dark-setup.png" alt="T-Deck Plus tactical Setup menu firmware rendering" width="320" height="240" loading="lazy" decoding="async" /></a>
+          <div><strong>Setup menu</strong><p>Colored controls for display, Wi-Fi, Bluetooth, time, battery and sound, with a page indicator.</p></div>
         </div>
         <div class="xnode-photo-card">
-          <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6812.jpg" alt="T-Deck Plus XNODE mesh compose screen using the hardware keyboard" width="1062" height="1416" loading="lazy" decoding="async" />
-          <div><strong>Hardware keyboard</strong><p>Physical keys make mesh compose usable without a cramped on-screen keyboard.</p></div>
+          <a href="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-plus-mesh-device.png"><img src="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-plus-mesh-device.png" alt="T-Deck Plus Mesh Chat captured from the flashed device over USB with Examples ON" width="320" height="240" loading="lazy" decoding="async" /></a>
+          <div><strong>Mesh Chat with physical keys</strong><p>Actual Mesh Chat screen captured over USB from the flashed T-Deck Plus. Examples ON supplies the illustrative conversation; this is not a radio-delivery claim.</p></div>
         </div>
         <div class="xnode-photo-card">
           <img src="https://raw.githubusercontent.com/MKme/xnode/main/site/images/T-dec/IMG_6813.jpg" alt="T-Deck Plus XNODE CheckIn screen" width="1062" height="1416" loading="lazy" decoding="async" />
@@ -163,19 +173,19 @@
 
     <section class="xnode-section">
       <h2>XNODE running on T-Deck Pro</h2>
-      <p class="xnode-lead">These photos show the current XNODE build running on real LilyGO T-Deck Pro hardware. The portrait e-paper display and physical keyboard provide a clear clock/status view, fast access to the main field actions, and practical Meshtastic message entry.</p>
+      <p class="xnode-lead">The T-Deck Pro pairs the monochrome Field Chronometer with XNODE tools on its portrait e-paper display. The home, Apps and Mesh Chat images are firmware renderings. Mesh composing uses the full-screen on-screen editor.</p>
       <div class="xnode-photo-grid">
         <div class="xnode-photo-card">
-          <img src="https://store.mkme.org/wp-content/uploads/2026/07/xnode-tdeck-pro-clock.jpg" alt="LilyGO T-Deck Pro running the XNODE clock screen with date, battery status, moon phase, and message shortcut" loading="lazy" decoding="async" />
-          <div><strong>Clock and device status</strong><p>Live e-paper clock view with date, battery state, moon phase, and the message shortcut.</p></div>
+          <a href="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-pro-light-1.png" aria-label="View full-size XNODE monochrome Field Chronometer home for T-Deck Pro"><img src="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-pro-light-1.png" alt="XNODE monochrome Field Chronometer home for T-Deck Pro" width="240" height="320" loading="lazy" decoding="async" /></a>
+          <div><strong>Monochrome Field Chronometer</strong><p>Portrait home with time, date, power, wireless status, moon information and Messages.</p></div>
         </div>
         <div class="xnode-photo-card">
-          <img src="https://store.mkme.org/wp-content/uploads/2026/07/xnode-tdeck-pro-launcher.jpg" alt="LilyGO T-Deck Pro running the XNODE launcher with Messages, Mesh, Tac Map, CheckIn, Alert Summary, and SOS actions" loading="lazy" decoding="async" />
+          <a href="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-pro-light-apps.png" aria-label="View full-size T-Deck Pro monochrome Apps menu firmware rendering"><img src="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-pro-light-apps.png" alt="T-Deck Pro monochrome Apps menu firmware rendering" width="240" height="320" loading="lazy" decoding="async" /></a>
           <div><strong>Main field launcher</strong><p>Messages, Mesh, Tac Map, CheckIn, Alert Summary, and SOS are presented in a readable portrait layout.</p></div>
         </div>
         <div class="xnode-photo-card">
-          <img src="https://store.mkme.org/wp-content/uploads/2026/07/xnode-tdeck-pro-messaging.jpg" alt="LilyGO T-Deck Pro running the XNODE Meshtastic message screen with LongFast channel, compose area, Send, and Inbox controls" loading="lazy" decoding="async" />
-          <div><strong>Meshtastic messaging</strong><p>The LongFast compose and inbox workflow is ready for text entry from the built-in physical keyboard.</p></div>
+          <a href="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-pro-light-chat.png"><img src="https://store.mkme.org/wp-content/uploads/2026/09/tdeck-pro-light-chat.png" alt="T-Deck Pro monochrome Mesh Chat firmware rendering with illustrative messages" width="240" height="320" loading="lazy" decoding="async" /></a>
+          <div><strong>Meshtastic messaging</strong><p>Portrait channel conversation with an on-screen editor for text entry. Actual firmware rendering with illustrative messages.</p></div>
         </div>
       </div>
     </section>

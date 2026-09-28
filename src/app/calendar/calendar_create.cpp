@@ -130,7 +130,7 @@ void calendar_create_build_ui( void ) {
     lv_style_copy( &calendar_create_date_select_style, APP_STYLE );
     lv_style_set_radius( &calendar_create_date_select_style, LV_OBJ_PART_MAIN, 0 );
     lv_style_set_border_width( &calendar_create_date_select_style, LV_OBJ_PART_MAIN, 0 );
-    lv_style_set_bg_color( &calendar_create_date_select_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
+    ws_bind_theme_surface(&calendar_create_date_select_style);
     lv_style_set_bg_opa( &calendar_create_date_select_style, LV_OBJ_PART_MAIN, LV_OPA_80 );
     /**
      * 
@@ -141,9 +141,9 @@ void calendar_create_build_ui( void ) {
     lv_obj_set_event_cb( calendar_create_date_select, calendar_create_date_selected_event_cb );
     lv_obj_add_style( calendar_create_date_select, LV_OBJ_PART_MAIN, &calendar_create_date_select_style );
     lv_obj_set_style_local_text_font( calendar_create_date_select, LV_CALENDAR_PART_HEADER, LV_STATE_DEFAULT, date_create_font );
-    lv_obj_set_style_local_text_color( calendar_create_date_select, LV_CALENDAR_PART_HEADER, LV_STATE_DEFAULT, LV_COLOR_BLACK );
+    lv_obj_add_style(calendar_create_date_select, LV_CALENDAR_PART_HEADER, ws_get_label_style());
     lv_obj_set_style_local_text_font( calendar_create_date_select, LV_CALENDAR_PART_DATE, LV_STATE_DEFAULT, date_create_font );
-    lv_obj_set_style_local_text_color( calendar_create_date_select, LV_CALENDAR_PART_DATE, LV_STATE_DEFAULT, LV_COLOR_BLACK );
+    lv_obj_add_style(calendar_create_date_select, LV_CALENDAR_PART_DATE, ws_get_label_style());
     lv_obj_set_style_local_bg_color( calendar_create_date_select, LV_CALENDAR_PART_DATE, LV_STATE_CHECKED, LV_COLOR_RED );
     lv_obj_set_style_local_bg_color( calendar_create_date_select, LV_CALENDAR_PART_DATE, LV_STATE_FOCUSED, LV_COLOR_BLUE );
     /**

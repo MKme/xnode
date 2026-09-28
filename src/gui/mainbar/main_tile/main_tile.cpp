@@ -54,6 +54,10 @@
 
 static bool maintile_init = false;
 
+#if defined(LILYGO_WATCH_ULTRA) || defined(LILYGO_WATCH_S3) || defined(LILYGO_T_DECK_PLUS) || defined(LILYGO_T_DECK_PRO)
+#define MAIN_TILE_TACTICAL 1
+#endif
+
 #if defined( LILYGO_WATCH_ULTRA ) || defined( LILYGO_T_DECK_PLUS ) || defined( LILYGO_T_DECK_PRO )
     #define MAIN_TILE_HAS_MOON 1
 #endif
@@ -91,6 +95,7 @@ LV_FONT_DECLARE(Ubuntu_72px);
 LV_FONT_DECLARE(Ubuntu_48px);
 LV_FONT_DECLARE(Ubuntu_32px);
 LV_FONT_DECLARE(Ubuntu_16px);
+LV_FONT_DECLARE(Ubuntu_12px);
 
 #if defined( M5PAPER )
     lv_font_t *time_font = &Ubuntu_144px;
@@ -128,6 +133,13 @@ static bool main_tile_ultra_time_is_valid( const tm &info );
 static void main_tile_ultra_get_display_time( tm *info, time_t *epoch );
 static void main_tile_ultra_align_clock( void );
 static void main_tile_ultra_update_moon( const tm *info );
+#endif
+
+#if defined(MAIN_TILE_TACTICAL)
+#include "home_tactical.h"
+    #if defined(MAIN_TILE_HAS_MOON) && !defined(LILYGO_T_DECK_PRO)
+        #include "home_moon_texture.h"
+    #endif
 #endif
 
 void main_tile_setup( void ) {
@@ -335,6 +347,10 @@ void main_tile_setup( void ) {
     #endif
 
     maintile_init = true;
+    #if defined(MAIN_TILE_TACTICAL)
+        home_tactical_setup();
+        main_tile_update_time(true);
+    #endif
 }
 
 static bool mainbar_pmu_event_cb( EventBits_t event, void *arg ) {
@@ -352,14 +368,14 @@ static bool mainbar_pmu_event_cb( EventBits_t event, void *arg ) {
                     lv_obj_set_style_local_image_recolor( batteryicon, LV_IMG_PART_MAIN, LV_STATE_DEFAULT, LV_COLOR_WHITE );
                     if ( percent >= 75 ) { 
                         lv_img_set_src( batteryicon, LV_SYMBOL_BATTERY_FULL );
-                    } else if( percent >=50 && percent < 74) {
+                    } else if( percent >=50 ) {
                         lv_img_set_src( batteryicon, LV_SYMBOL_BATTERY_3 );
-                    } else if( percent >=35 && percent < 49) {
+                    } else if( percent >=35 ) {
                         lv_img_set_src( batteryicon, LV_SYMBOL_BATTERY_2 );
-                    } else if( percent >=15 && percent < 34) {
+                    } else if( percent >=15 ) {
                         lv_img_set_src( batteryicon, LV_SYMBOL_BATTERY_1 );
                         lv_obj_set_style_local_image_recolor( batteryicon, LV_IMG_PART_MAIN, LV_STATE_DEFAULT, LV_COLOR_YELLOW );
-                    } else if( percent >=0 && percent < 14) {
+                    } else if( percent >=0 ) {
                         lv_img_set_src( batteryicon, LV_SYMBOL_BATTERY_EMPTY );
                         lv_obj_set_style_local_image_recolor( batteryicon, LV_IMG_PART_MAIN, LV_STATE_DEFAULT, LV_COLOR_RED );
                     }
@@ -372,6 +388,9 @@ static bool mainbar_pmu_event_cb( EventBits_t event, void *arg ) {
 }
 
 static bool mainbar_blectl_event_cb( EventBits_t event, void *arg ) {
+    #if defined(MAIN_TILE_TACTICAL)
+        home_tactical_link_event(false, event);
+    #endif
     static bool blectl_state = false;
     
     switch( event ) {
@@ -399,6 +418,9 @@ static bool mainbar_blectl_event_cb( EventBits_t event, void *arg ) {
 }
 
 static bool mainbar_wifictl_event_cb( EventBits_t event, void *arg ) {
+    #if defined(MAIN_TILE_TACTICAL)
+        home_tactical_link_event(true, event);
+    #endif
     static bool wifictl_state = false;
     
     switch( event ) {
@@ -426,7 +448,11 @@ static bool mainbar_wifictl_event_cb( EventBits_t event, void *arg ) {
 }
 
 #if defined( MAIN_TILE_HAS_MOON )
+#if defined(LILYGO_WATCH_ULTRA)
+static const uint8_t MAIN_TILE_MOON_CANVAS_SIZE = 64;
+#else
 static const uint8_t MAIN_TILE_MOON_CANVAS_SIZE = 34;
+#endif
 static lv_color_t main_tile_moon_canvas_buf[ MAIN_TILE_MOON_CANVAS_SIZE * MAIN_TILE_MOON_CANVAS_SIZE ];
 
 static const char *main_tile_ultra_moon_phase_name( uint8_t phase_index ) {
@@ -478,9 +504,15 @@ static void main_tile_ultra_draw_moon( double phase_fraction ) {
     const double center = ( (double)MAIN_TILE_MOON_CANVAS_SIZE - 1.0 ) * 0.5;
     const double radius = center - 1.0;
     const double radius_sq = radius * radius;
+    #if defined(MAIN_TILE_TACTICAL)
+    const lv_color_t lit = home_ink;
+    const lv_color_t shadow = home_bg;
+    const lv_color_t edge = home_accent;
+    #else
     const lv_color_t lit = LV_COLOR_MAKE( 238, 242, 248 );
     const lv_color_t shadow = LV_COLOR_MAKE( 24, 30, 38 );
     const lv_color_t edge = LV_COLOR_MAKE( 110, 122, 140 );
+    #endif
 
     lv_canvas_fill_bg( moon_canvas, LV_COLOR_TRANSP, LV_OPA_COVER );
 
@@ -501,7 +533,16 @@ static void main_tile_ultra_draw_moon( double phase_fraction ) {
 
             const double nx = dx / radius;
             const double nz = sqrt( 1.0 - ( dist_sq / radius_sq ) );
-            lv_canvas_set_px( moon_canvas, x, y, ( nx * sun_x + nz * sun_z ) >= 0.0 ? lit : shadow );
+            const bool illuminated = ( nx * sun_x + nz * sun_z ) >= 0.0;
+            #if defined(MAIN_TILE_TACTICAL) && !defined(LILYGO_T_DECK_PRO)
+                const unsigned tx = (unsigned)x * 64 / MAIN_TILE_MOON_CANVAS_SIZE;
+                const unsigned ty = (unsigned)y * 64 / MAIN_TILE_MOON_CANVAS_SIZE;
+                const uint8_t albedo = home_moon_albedo[ty * 64 + tx];
+                const uint8_t shade = illuminated ? albedo : (uint8_t)(albedo / 8 + 6);
+                lv_canvas_set_px(moon_canvas, x, y, LV_COLOR_MAKE(shade, shade, shade));
+            #else
+                lv_canvas_set_px( moon_canvas, x, y, illuminated ? lit : shadow );
+            #endif
         }
     }
 }
@@ -532,10 +573,13 @@ static void main_tile_ultra_update_moon( const tm *info ) {
     snprintf(
         moon_text,
         sizeof( moon_text ),
-        "Moon: %s %d%%",
+        "%s\n%d%% ILLUMINATED",
         main_tile_ultra_moon_phase_name( phase_index ),
         (int)( illumination * 100.0 + 0.5 )
     );
+    #if defined(MAIN_TILE_TACTICAL)
+    for (char *p = moon_text; *p; ++p) if (*p >= 'a' && *p <= 'z') *p -= 'a' - 'A';
+    #endif
     lv_label_set_text( moonlabel, moon_text );
     main_tile_ultra_align_clock();
 }
@@ -565,6 +609,10 @@ static void main_tile_ultra_get_display_time( tm *info, time_t *epoch ) {
 }
 
 static void main_tile_ultra_align_clock( void ) {
+    #if defined(MAIN_TILE_TACTICAL)
+        home_tactical_layout();
+        return;
+    #endif
     if ( clock_cont == NULL || timelabel == NULL || datelabel == NULL || infolabel == NULL ) {
         return;
     }
@@ -611,6 +659,11 @@ static bool main_tile_style_event_cb( EventBits_t event, void *arg ){
                                 #if defined( MAIN_TILE_HAS_MOON )
                                     main_tile_ultra_align_clock();
                                 #endif
+                                #if defined(MAIN_TILE_TACTICAL)
+                                    home_tactical_style();
+                                    home_tactical_layout();
+                                    main_tile_update_time(true);
+                                #endif
                                 break;
     }
     return( true );
@@ -631,6 +684,11 @@ static bool main_tile_sensor_event_cb( EventBits_t event, void *arg ) {
     snprintf( sensor_str, sizeof( sensor_str ), "temp/humidity: %0.1f°C/%.0f%%", temp, humidity );
     lv_label_set_text( templabel, sensor_str );
     lv_obj_align( templabel, infolabel, LV_ALIGN_OUT_TOP_MID, 0, 0 );
+    #if defined(MAIN_TILE_TACTICAL)
+        snprintf(sensor_str, sizeof(sensor_str), "%.1f°C   /   RH %.0f%%", temp, humidity);
+        lv_label_set_text(templabel, sensor_str);
+        home_tactical_layout();
+    #endif
 
     return( true );
 }
@@ -716,6 +774,10 @@ icon_t *main_tile_get_free_widget_icon( void ) {
 }
 
 void main_tile_align_widgets( void ) {
+    #if defined(MAIN_TILE_TACTICAL)
+        home_tactical_layout();
+        return;
+    #endif
     /*
      * check if maintile alread initialized
      */
@@ -876,6 +938,10 @@ void main_tile_update_time( bool force ) {
          * Save for next loop
          */
         last = now;
+        #if defined(MAIN_TILE_TACTICAL)
+            home_tactical_update_clock(info);
+            home_tactical_layout();
+        #endif
     }
 }
 

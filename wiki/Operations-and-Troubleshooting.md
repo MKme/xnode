@@ -126,6 +126,15 @@ If Windows chimes repeatedly or the device appears stuck after flashing:
 - Try a different cable/port if the serial link drops mid-upload.
 - For T-Deck Plus, keep DIO flash mode; QIO caused boot loops on the attached unit.
 
+## Mesh Chat shows samples or no conversation
+
+- Mesh Chat opens directly into live traffic. Confirm the intended channel and check **RADIO** for radio status.
+- Check the selected channel. Mesh Chat shows that channel's records from the latest 24 texts across all channels; older records and the history from before a restart are unavailable.
+- Swipe to **RADIO** to inspect the local radio status, channel/frequency and last observed peer. A ready radio or **TX SENT (LOCAL)** does not confirm recipient delivery.
+- Compose up to 80 characters. On watches and T-Deck Pro, use the on-screen editor's checkmark to return the draft to chat, then tap **SEND**. On T-Deck Plus, tap the composer before typing on the physical keyboard.
+- Read the channel before sending: even after a **DIRECT** received message, **SEND** broadcasts to the selected channel.
+- If a send fails or times out, inspect the receiver before retrying. Uncertain completion can mean the message was transmitted but local completion was not observed.
+
 ## Field operating notes
 
 - Cache or install maps before offline use.

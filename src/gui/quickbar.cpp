@@ -158,6 +158,8 @@ void quickbar_setup( void ){
         lv_obj_align( quickbar, lv_scr_act(), LV_ALIGN_IN_BOTTOM_MID, 0, 0 );
     #endif
 
+    ws_bind_theme_surface(&quickbarstyle[QUICKBAR_STYLE_NORMAL]);
+    ws_bind_theme_surface(&quickbarstyle[QUICKBAR_STYLE_DARK]);
     quickbar_time_label = lv_label_create( quickbar , NULL);
     lv_label_set_text( quickbar_time_label, "00:00");
     lv_obj_reset_style_list( quickbar_time_label, LV_OBJ_PART_MAIN );

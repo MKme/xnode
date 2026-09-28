@@ -79,7 +79,7 @@ void calc_app_main_setup( uint32_t tile_num ) {
     // result label
     lv_style_copy(&result_style, ws_get_label_style());
     lv_style_set_text_color(&result_style, LV_STATE_DEFAULT, LV_COLOR_BLACK);
-    lv_style_set_bg_color(&result_style, LV_STATE_DEFAULT, LV_COLOR_WHITE);
+    ws_bind_theme_surface(&result_style);
     lv_style_set_bg_opa(&result_style, LV_STATE_DEFAULT, LV_OPA_80);
     lv_style_set_text_font(&result_style, LV_STATE_DEFAULT, &Ubuntu_32px);
 	lv_style_set_pad_top(&result_style, LV_STATE_DEFAULT, 10);
@@ -101,7 +101,7 @@ void calc_app_main_setup( uint32_t tile_num ) {
     // history label
     lv_style_copy(&history_style, ws_get_label_style());
     lv_style_set_text_color(&history_style, LV_STATE_DEFAULT, LV_COLOR_BLACK);
-    lv_style_set_bg_color(&history_style, LV_STATE_DEFAULT, LV_COLOR_WHITE);
+    ws_bind_theme_surface(&history_style);
     lv_style_set_bg_opa(&history_style, LV_STATE_DEFAULT, LV_OPA_TRANSP);
     lv_style_set_text_opa(&history_style, LV_STATE_DEFAULT, LV_OPA_50);
     lv_style_set_text_font(&history_style, LV_STATE_DEFAULT, &Ubuntu_12px);

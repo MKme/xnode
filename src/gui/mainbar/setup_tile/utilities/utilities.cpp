@@ -238,6 +238,9 @@ static void format_SPIFFS_utilities_event_cb( lv_obj_t * obj, lv_event_t event )
 #endif
                                     
                                     SpiffsWarningBox = lv_msgbox_create(obj, NULL);
+                                    lv_obj_add_style(SpiffsWarningBox, LV_MSGBOX_PART_BG, ws_get_popup_style());
+                                    lv_obj_add_style(SpiffsWarningBox, LV_MSGBOX_PART_BTN_BG, ws_get_popup_style());
+                                    lv_obj_add_style(SpiffsWarningBox, LV_MSGBOX_PART_BTN, ws_get_button_style());
                                     lv_msgbox_set_text(SpiffsWarningBox, temp);
                                     lv_msgbox_add_btns(SpiffsWarningBox, btns);
                                     lv_obj_set_width(SpiffsWarningBox, 240);

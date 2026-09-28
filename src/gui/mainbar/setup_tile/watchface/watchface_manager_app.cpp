@@ -150,7 +150,7 @@ void watchface_manager_app_setup( uint32_t tile_num ) {
      */
     lv_style_copy( &watchface_manager_style, ws_get_app_opa_style() );
     lv_style_set_text_font( &watchface_manager_style, LV_STATE_DEFAULT, &Ubuntu_12px);
-    lv_style_set_bg_color( &watchface_manager_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
+    ws_bind_theme_surface(&watchface_manager_style);
     lv_obj_add_style( watchface_manager_app_tile, LV_OBJ_PART_MAIN, &watchface_manager_style );
 
     lv_style_copy( &watchface_manager_trans_button_style, ws_get_mainbar_style() );
@@ -158,6 +158,7 @@ void watchface_manager_app_setup( uint32_t tile_num ) {
     lv_style_set_bg_color( &watchface_manager_trans_button_style, LV_OBJ_PART_MAIN, LV_COLOR_BLACK );
     lv_style_set_image_recolor( &watchface_manager_trans_button_style, LV_OBJ_PART_MAIN, LV_COLOR_WHITE );
     lv_style_set_image_recolor_opa( &watchface_manager_trans_button_style, LV_OBJ_PART_MAIN, LV_OPA_100 );
+    ws_bind_theme_surface(&watchface_manager_trans_button_style);
     /**
      * create global watchface manager container
      */

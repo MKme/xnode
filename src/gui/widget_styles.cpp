@@ -57,6 +57,62 @@ static lv_style_t slider_style;
 static lv_style_t arc_bg_style;
 static lv_style_t arc_style;
 
+static lv_style_t *theme_surfaces[24] = {};
+static size_t theme_surface_count = 0;
+
+static void sync_theme_surface(lv_style_t *surface) {
+    lv_color_t bg = LV_COLOR_BLACK, ink = LV_COLOR_WHITE, border = LV_COLOR_GRAY;
+    _lv_style_get_color(&mainbar_style, LV_STYLE_BG_COLOR, &bg);
+    _lv_style_get_color(&mainbar_style, LV_STYLE_TEXT_COLOR, &ink);
+    _lv_style_get_color(&button_style, LV_STYLE_BORDER_COLOR, &border);
+    lv_style_set_bg_color(surface, LV_STATE_DEFAULT, bg);
+    lv_style_set_text_color(surface, LV_STATE_DEFAULT, ink);
+    lv_style_set_image_recolor(surface, LV_STATE_DEFAULT, ink);
+    lv_style_set_border_color(surface, LV_STATE_DEFAULT, border);
+    lv_obj_report_style_mod(surface);
+}
+
+void ws_bind_theme_surface(lv_style_t *surface) {
+    if (!surface) return;
+    for (size_t i = 0; i < theme_surface_count; ++i) {
+        if (theme_surfaces[i] == surface) { sync_theme_surface(surface); return; }
+    }
+    // Current legacy surfaces fit within this registry. Keep the bound
+    // explicit and fail visibly if later additions outgrow this registry.
+    if (theme_surface_count >= sizeof(theme_surfaces) / sizeof(theme_surfaces[0])) {
+        LV_LOG_ERROR("XNODE theme surface registry full");
+        return;
+    }
+    theme_surfaces[theme_surface_count++] = surface;
+    sync_theme_surface(surface);
+}
+
+static void apply_tactical_surfaces() {
+#if defined(LILYGO_WATCH_ULTRA) || defined(LILYGO_WATCH_S3) || defined(LILYGO_T_DECK_PLUS)
+    lv_color_t bg = LV_COLOR_WHITE;
+    _lv_style_get_color(&mainbar_style, LV_STYLE_BG_COLOR, &bg);
+    const bool dark = lv_color_brightness(bg) < 128;
+    const lv_color_t ink = dark ? LV_COLOR_MAKE(221, 251, 243) : LV_COLOR_BLACK;
+    if (dark) {
+        lv_style_t *surfaces[] = {&background_style, &mainbar_style, &app_style, &app_opa_style,
+            &setup_tile_style, &setup_header_tile_style, &button_style, &mainbar_dropdown_style,
+            &app_dropdown_style, &setup_dropdown_style};
+        for (lv_style_t *surface : surfaces) {
+            lv_style_set_bg_color(surface, LV_STATE_DEFAULT, WS_TACTICAL_DARK_COLOR);
+            lv_style_set_text_color(surface, LV_STATE_DEFAULT, ink);
+        }
+        lv_style_set_border_color(&button_style, LV_STATE_DEFAULT, LV_COLOR_MAKE(91,213,186));
+        lv_style_set_border_color(&setup_dropdown_style, LV_STATE_DEFAULT, LV_COLOR_MAKE(91,213,186));
+    }
+    // These styles lack per-theme overrides in the legacy switch. Set both
+    // directions so a dark-to-light change cannot leave a stale dark panel.
+    lv_style_set_bg_color(&popup_style, LV_STATE_DEFAULT, dark ? WS_TACTICAL_DARK_COLOR : bg);
+    lv_style_set_text_color(&popup_style, LV_STATE_DEFAULT, ink);
+    lv_style_set_bg_color(&roller_bg_style, LV_STATE_DEFAULT, dark ? WS_TACTICAL_DARK_COLOR : bg);
+    lv_style_set_text_color(&roller_bg_style, LV_STATE_DEFAULT, ink);
+#endif
+}
+
 LV_FONT_DECLARE(Ubuntu_12px);
 LV_FONT_DECLARE(Ubuntu_16px);
 LV_FONT_DECLARE(Ubuntu_48px);
@@ -94,7 +150,13 @@ bool styles_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const c
 }
 
 bool styles_send_event_cb( EventBits_t event, void *arg ) {
-    return( callback_send( styles_callback, event, arg ) );
+    if (event == STYLE_CHANGE) apply_tactical_surfaces();
+    bool result = callback_send( styles_callback, event, arg );
+    if (event == STYLE_CHANGE) {
+        for (size_t i = 0; i < theme_surface_count; ++i) sync_theme_surface(theme_surfaces[i]);
+        lv_obj_report_style_mod(NULL);
+    }
+    return result;
 }
 
 void widget_style_theme_set( int theme ) {
