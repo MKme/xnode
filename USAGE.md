@@ -33,6 +33,10 @@ On watches, the conversation, **WRITE**, and **RADIO** occupy separate horizonta
 
 **SEND broadcasts to the selected channel.** A received message labelled **DIRECT** does not make the composer a private reply: your next send still goes to the channel. The channel, frequency, local node identity and last observed peer signal are on **RADIO**.
 
+The radio keeps listening when the screen sleeps. Screen-off listening uses more battery than putting the radio and processor to sleep. The existing notification wake setting controls whether an incoming message wakes the screen. Devices must still use matching region/frequency, LongFast settings and channel key to exchange messages.
+
+The separate **Messages** notification inbox keeps the latest 32 notifications in memory. Older notifications are removed as new ones arrive; this does not remove text records from Mesh Chat's separate history.
+
 Mesh Chat keeps the latest **24 real text records across all channels in RAM** and filters the view by channel. Older records are replaced as new ones arrive. History and drafts clear on restart; message bodies are not saved to flash by Mesh Chat. Times use the local device clock and show **--:--** while it is unset. Host-pushed notifications remain available separately in **Messages**.
 
 # Quick Settings

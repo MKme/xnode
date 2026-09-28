@@ -8,9 +8,11 @@
 #include <assert.h>
 #include <mutex>
 #include <thread>
+#include <cmath>
 
 using EventBits_t = uint32_t;
 constexpr int RADIOLIB_ERR_NONE = 0;
+constexpr uint8_t RADIOLIB_SX126X_LORA_CRC_ON = 1;
 constexpr uint16_t RADIOLIB_SX126X_IRQ_TX_DONE = 1, RADIOLIB_SX126X_IRQ_TIMEOUT = 512;
 constexpr uint32_t POWERMGM_STANDBY = 1, POWERMGM_WAKEUP = 2, POWERMGM_SILENCE_WAKEUP = 4;
 constexpr size_t MESHTASTIC_MAX_PACKET_LEN = 255, MESHTASTIC_MAX_TEXT_LEN = 200;
@@ -18,14 +20,28 @@ constexpr uint8_t MESHTASTIC_CHANNEL_COUNT = 8, MESHTASTIC_HOP_RELIABLE = 3;
 constexpr uint8_t MESHTASTIC_FLAG_HOP_START_SHIFT = 5, MESHTASTIC_FLAG_HOP_START_MASK = 0xe0;
 constexpr uint32_t MESHTASTIC_TEXT_MESSAGE_APP = 1, MESHTASTIC_NODEINFO_INTERVAL_MS = 900000;
 constexpr uint32_t MESHTASTIC_NODEINFO_RETRY_DELAY_MS = 5000;
+constexpr uint32_t MESHTASTIC_BROADCAST=0xffffffff,MESHTASTIC_NODEINFO_APP=4,MESHTASTIC_POSITION_APP=3;
+struct meshtastic_decoded_data_t {bool valid=false;uint32_t portnum=0,dest=0,source=0;size_t payload_len=0;uint8_t payload[255]={};};
+struct meshtastic_decoded_text_t {bool valid=false;uint32_t portnum=0,dest=0,source=0;size_t text_len=0;char text[201]={};};
+struct meshtastic_decoded_position_t {bool valid=false,has_altitude=false;int32_t latitude_i=0,longitude_i=0,altitude=0;};
+struct meshtastic_User {};
 struct meshtastic_packet_header_t { uint32_t to, from, id; uint8_t flags, channel, next_hop, relay_node; };
 struct meshtastic_runtime_channel_t { bool enabled; char name[16]; uint8_t hash, psk[32]; size_t psk_len; };
 meshtastic_runtime_channel_t meshtastic_channels[8] = {};
+uint8_t meshtastic_enabled_channel_slots[8]={0,3},meshtastic_enabled_channel_count=2;
+unsigned rx_reads=0;
 struct Radio {
     int start_result = 0, finish_result = 0, starts = 0;
+    int crc_result = 0, crc_value = -1;
     uint16_t irq = 0;
+    uint8_t rx_packet[255]={};size_t rx_len=0;int read_result=0;
+    size_t getPacketLength() {return rx_len;}
+    int readData(uint8_t *out,size_t n) {++rx_reads;memcpy(out,rx_packet,n);return read_result;}
+    float getRSSI() {return -75;}
+    float getSNR() {return 8;}
     int startTransmit(uint8_t *, size_t) { ++starts; return start_result; }
     int finishTransmit() { return finish_result; }
+    int setCRC(uint8_t value) {crc_value=value;return crc_result;}
     #if RADIOLIB_VERSION_MAJOR >= 7
         uint32_t getIrqFlags() { return irq; }
     #else
@@ -35,12 +51,24 @@ struct Radio {
     void standby() {}
 } meshtastic_radio;
 std::recursive_mutex radio_mutex;
-struct MeshtasticRadioLock { MeshtasticRadioLock() {radio_mutex.lock();} ~MeshtasticRadioLock() {radio_mutex.unlock();} };
+thread_local unsigned radio_lock_depth=0;
+struct MeshtasticRadioLock { MeshtasticRadioLock() {radio_mutex.lock();++radio_lock_depth;} ~MeshtasticRadioLock() {--radio_lock_depth;radio_mutex.unlock();} };
+using rx_cb = void (*)(uint32_t,uint32_t,uint8_t,uint32_t,int32_t,float,const char*);
+rx_cb meshtastic_text_rx_callback=nullptr;
+struct meshtastic_delivery_t {
+    bool notify=false,text_rx=false,position=false;
+    char sender[24]={},text[201]={};
+    uint32_t from=0,to=0,packet_id=0;
+    uint8_t channel_slot=0;
+    int32_t rssi=0;float snr=0;double lat=0,lon=0;
+    rx_cb callback=nullptr;
+};
 MeshHistory history;
 bool meshtastic_radio_ready = true, meshtastic_tx_active = false, meshtastic_radio_receiving = true;
 bool meshtastic_radio_irq = false, meshtastic_nodeinfo_due = false;
 uint32_t meshtastic_pending_sequence = 0, meshtastic_tx_started_ms = 0, meshtastic_nodeinfo_due_ms = 0;
 uint32_t meshtastic_node_id = 42, fake_now = 100;
+uint32_t meshtastic_last_peer=0;int32_t meshtastic_last_rssi=0;float meshtastic_last_snr=0;
 char meshtastic_pending_text[201] = {}, meshtastic_pending_channel_name[16] = {}, service_status[96] = {};
 unsigned notifications = 0;
 uint32_t millis() {return fake_now;}
@@ -53,15 +81,23 @@ mesh_message_t meshtastic_history_record(const char *sender,const char *text,uin
     strlcpy(r.sender,sender,sizeof(r.sender));strlcpy(r.text,text,sizeof(r.text));return r;
 }
 void meshtastic_update_status(const char *format,...) {va_list args;va_start(args,format);vsnprintf(service_status,sizeof(service_status),format,args);va_end(args);}
-size_t meshtastic_encode_data_message(uint8_t*,size_t,uint32_t,const uint8_t*,size_t n,uint32_t,uint32_t) {return n;}
+// Only encryption/radio I/O are fixtures; the real protobuf decoder, receive
+// handler, history, lifecycle and deferred delivery bodies run below.
 void meshtastic_crypt_payload(uint32_t,uint32_t,uint8_t*,size_t,const uint8_t*,size_t) {}
+void meshtastic_format_node_label(uint32_t,char *out,size_t n) {strlcpy(out,"FIELD-1",n);}
+bool meshtastic_decode_user_payload(const uint8_t*,size_t,meshtastic_User&) {return false;}
+void meshtastic_store_peer_user(uint32_t,const meshtastic_User&) {}
+bool meshtastic_decode_position_message(const uint8_t*,size_t,meshtastic_decoded_position_t&) {return false;}
 uint32_t meshtastic_generate_packet_id() {static uint32_t id=500;return ++id;}
 bool meshtastic_time_due(uint32_t now,uint32_t due) {return (int32_t)(now-due)>=0;}
 bool meshtastic_service_broadcast_node_info() {return false;}
 bool meshtastic_start_receive() {meshtastic_tx_active=false;meshtastic_radio_receiving=true;return true;}
 void meshtastic_store_last_message(const char*,const char*) {}
-void meshtastic_queue_notification(const char*,const char*) {++notifications;}
-void meshtastic_handle_rx() {}
+unsigned rx_delivery=0;
+void meshtastic_queue_notification(const char*,const char*) {assert(radio_lock_depth==0 && meshtastic_radio_receiving);++notifications;}
+void xnode_send_meshtastic_rx(const char*,const char*) {assert(radio_lock_depth==0 && meshtastic_radio_receiving);++rx_delivery;}
+void osmmap_set_external_marker(double,double,const char*) {assert(radio_lock_depth==0);}
+void xnode_send_location_update(double,double,const char*) {assert(radio_lock_depth==0);}
 
 #include "mesh_service_actual.inc"
 
@@ -72,8 +108,43 @@ static void complete(uint16_t irq,int finish=0) {
     meshtastic_radio.irq=irq;meshtastic_radio.finish_result=finish;meshtastic_radio_irq=true;
     meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
 }
+static void incoming(uint32_t id,uint32_t destination=MESHTASTIC_BROADCAST,uint8_t hash=8) {
+    const meshtastic_packet_header_t header={destination,123,id,3,hash,0,0};
+    memcpy(meshtastic_radio.rx_packet,&header,sizeof(header));
+    // Independent canonical protobuf Data: portnum=TEXT(1), payload="hello".
+    const uint8_t body[]={0x08,0x01,0x12,0x05,'h','e','l','l','o'};
+    memcpy(meshtastic_radio.rx_packet+sizeof(header),body,sizeof(body));
+    meshtastic_radio.rx_len=sizeof(header)+sizeof(body);meshtastic_radio_irq=true;
+}
+static void malformed_protobuf_tests() {
+    const uint8_t max32[]={0xff,0xff,0xff,0xff,0x0f};
+    size_t offset=0;uint32_t value=0;
+    assert(meshtastic_read_varint(max32,sizeof(max32),offset,value) && value==0xffffffffu);
+    const uint8_t overflow[]={0xff,0xff,0xff,0xff,0x10};
+    offset=0;assert(!meshtastic_read_varint(overflow,sizeof(overflow),offset,value));
+    const uint8_t continued[]={0xff,0xff,0xff,0xff,0x80,0};
+    offset=0;assert(!meshtastic_read_varint(continued,sizeof(continued),offset,value));
+    const uint8_t truncated[]={0x80};
+    offset=0;assert(!meshtastic_read_varint(truncated,sizeof(truncated),offset,value));
+    // These lengths wrap offset+length on the embedded 32-bit size_t target.
+    const uint8_t huge_payload[]={0x08,1,0x12,0xff,0xff,0xff,0xff,0x0f};
+    const uint8_t huge_unknown[]={0x08,1,0x32,0xff,0xff,0xff,0xff,0x0f};
+    const uint8_t overflow_payload[]={0x08,1,0x12,0xff,0xff,0xff,0xff,0x10};
+    const uint8_t short_fixed[]={0x08,1,0x25,0};
+    meshtastic_decoded_data_t decoded={};
+    assert(!meshtastic_decode_data_message(huge_payload,sizeof(huge_payload),decoded));
+    assert(!meshtastic_decode_data_message(huge_unknown,sizeof(huge_unknown),decoded));
+    assert(!meshtastic_decode_data_message(overflow_payload,sizeof(overflow_payload),decoded));
+    assert(!meshtastic_decode_data_message(short_fixed,sizeof(short_fixed),decoded));
+    offset=2;assert(!meshtastic_skip_field(truncated,sizeof(truncated),offset,1));
+    offset=0;assert(!meshtastic_skip_field(truncated,sizeof(truncated),offset,5));
+}
 int main() {
+    malformed_protobuf_tests();
+    assert(meshtastic_configure_crc() && meshtastic_radio.crc_value==RADIOLIB_SX126X_LORA_CRC_ON);
+    meshtastic_radio.crc_result=-1;assert(!meshtastic_configure_crc());meshtastic_radio.crc_result=0;
     meshtastic_channels[3].enabled=true;strcpy(meshtastic_channels[3].name,"Field");
+    meshtastic_channels[0].enabled=true;meshtastic_channels[0].hash=8;strcpy(meshtastic_channels[0].name,"LongFast");
     assert(!meshtastic_service_send_text_internal("",0xffffffff,3));
     char too_long[202];memset(too_long,'x',201);too_long[201]=0;
     assert(!meshtastic_service_send_text_internal(too_long,0xffffffff,3));
@@ -103,12 +174,30 @@ int main() {
     fake_now+=30000;meshtastic_powermgm_loop_cb(POWERMGM_WAKEUP,nullptr);
     assert(latest()==MESH_MESSAGE_FAILED && !meshtastic_tx_active);
     assert(meshtastic_service_send_text_internal("Sleep",0xffffffff,3));
-    meshtastic_powermgm_event_cb(POWERMGM_STANDBY,nullptr);assert(latest()==MESH_MESSAGE_FAILED);
+    assert(!meshtastic_powermgm_event_cb(POWERMGM_STANDBY,nullptr));
+    assert(latest()==MESH_MESSAGE_QUEUED && meshtastic_tx_active);
+    complete(RADIOLIB_SX126X_IRQ_TX_DONE);assert(latest()==MESH_MESSAGE_TRANSMITTED);
+    assert(!meshtastic_powermgm_event_cb(POWERMGM_STANDBY,nullptr) && meshtastic_radio_receiving);
+    incoming(100);
+    meshtastic_powermgm_event_cb(POWERMGM_WAKEUP,nullptr);
+    assert(meshtastic_radio_irq); // Screen wake must not erase pending radio data.
+    meshtastic_powermgm_loop_cb(POWERMGM_STANDBY,nullptr);
+    assert(rx_reads==1 && rx_delivery==1 && meshtastic_radio_receiving);
+    assert(history.count(0)==1 && history.get(0,0,&out));
+    assert(!strcmp(out.text,"hello") && out.from_node==123 && out.channel_slot==0 && out.packet_id==100);
+    incoming(100);meshtastic_powermgm_loop_cb(POWERMGM_STANDBY,nullptr);assert(history.count(0)==1);
+    const auto delivered=rx_delivery;
+    incoming(101,999);meshtastic_powermgm_loop_cb(POWERMGM_STANDBY,nullptr);assert(history.count(0)==1 && rx_delivery==delivered);
+    incoming(102,MESHTASTIC_BROADCAST,99);meshtastic_powermgm_loop_cb(POWERMGM_STANDBY,nullptr);assert(rx_delivery==delivered);
+    incoming(103);meshtastic_radio.read_result=-7;meshtastic_powermgm_loop_cb(POWERMGM_STANDBY,nullptr);assert(rx_delivery==delivered);meshtastic_radio.read_result=0;
+    incoming(104);meshtastic_radio.rx_packet[sizeof(meshtastic_packet_header_t)+3]=200;
+    meshtastic_powermgm_loop_cb(POWERMGM_STANDBY,nullptr);assert(rx_delivery==delivered && meshtastic_radio_receiving);
+    incoming(105,42);meshtastic_powermgm_loop_cb(POWERMGM_STANDBY,nullptr);assert(history.count(0)==2 && rx_delivery==delivered+1);
     bool first=false,second=false;
     std::thread a([&]{first=meshtastic_service_send_text_internal("Concurrent A",0xffffffff,3);});
     std::thread b([&]{second=meshtastic_service_send_text_internal("Concurrent B",0xffffffff,3);});
     a.join();b.join();assert(first!=second);
     complete(RADIOLIB_SX126X_IRQ_TX_DONE);
     assert(!meshtastic_tx_active);
-    puts("Production mesh TX bodies: invalid, offline, start failure, busy, concurrent send, TX_DONE, timeout, cleanup error, lost IRQ and sleep cancellation passed.");
+    puts("Production mesh bodies: protobuf RX/header channel and destination routing, corrupt/CRC-rejected RX, dedupe, CRC config/failure, TX concurrency, standby RX/TX and delivery after RX restart/mutex release passed. Radio/crypto are fixtures; no RF claim.");
 }

@@ -148,6 +148,22 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
             int32_t altitude = 0;
         };
 
+        // One completed radio event is copied while the radio is locked, then
+        // delivered only after RX is running and the mutex has been released.
+        struct meshtastic_delivery_t {
+            bool notify = false;
+            bool text_rx = false;
+            bool position = false;
+            char sender[24] = {};
+            char text[MESHTASTIC_MAX_TEXT_LEN + 1] = {};
+            uint32_t from = 0, to = 0, packet_id = 0;
+            uint8_t channel_slot = 0;
+            int32_t rssi = 0;
+            float snr = 0;
+            double lat = 0, lon = 0;
+            meshtastic_service_text_rx_cb_t callback = NULL;
+        };
+
         struct meshtastic_peer_user_t {
             bool valid = false;
             uint32_t node_id = 0;
@@ -792,6 +808,10 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
 
             while ( offset < len && shift < 35 ) {
                 const uint8_t byte = buffer[ offset++ ];
+                // A uint32 varint has at most four payload bits in its fifth byte.
+                if ( shift == 28 && ( byte & 0xF0 ) != 0 ) {
+                    return( false );
+                }
                 result |= (uint32_t)( byte & 0x7F ) << shift;
                 if ( ( byte & 0x80 ) == 0 ) {
                     value = result;
@@ -805,11 +825,14 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
         bool meshtastic_skip_field( const uint8_t *buffer, size_t len, size_t &offset, uint8_t wire_type ) {
             uint32_t field_len = 0;
 
+            if ( offset > len ) {
+                return( false );
+            }
             switch( wire_type ) {
                 case 0:
                     return( meshtastic_read_varint( buffer, len, offset, field_len ) );
                 case 1:
-                    if ( offset + 8 > len ) {
+                    if ( 8 > len - offset ) {
                         return( false );
                     }
                     offset += 8;
@@ -818,13 +841,13 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
                     if ( !meshtastic_read_varint( buffer, len, offset, field_len ) ) {
                         return( false );
                     }
-                    if ( offset + field_len > len ) {
+                    if ( field_len > len - offset ) {
                         return( false );
                     }
                     offset += field_len;
                     return( true );
                 case 5:
-                    if ( offset + 4 > len ) {
+                    if ( 4 > len - offset ) {
                         return( false );
                     }
                     offset += 4;
@@ -961,7 +984,7 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
                         if ( wire_type != 2 || !meshtastic_read_varint( buffer, len, offset, payload_len ) ) {
                             return( false );
                         }
-                        if ( offset + payload_len > len ) {
+                        if ( payload_len > len - offset ) {
                             return( false );
                         }
                         decoded.payload_len = payload_len < sizeof( decoded.payload ) ? payload_len : sizeof( decoded.payload );
@@ -970,14 +993,14 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
                         break;
                     }
                     case 4:
-                        if ( wire_type != 5 || offset + sizeof( decoded.dest ) > len ) {
+                        if ( wire_type != 5 || sizeof( decoded.dest ) > len - offset ) {
                             return( false );
                         }
                         memcpy( &decoded.dest, &buffer[ offset ], sizeof( decoded.dest ) );
                         offset += sizeof( decoded.dest );
                         break;
                     case 5:
-                        if ( wire_type != 5 || offset + sizeof( decoded.source ) > len ) {
+                        if ( wire_type != 5 || sizeof( decoded.source ) > len - offset ) {
                             return( false );
                         }
                         memcpy( &decoded.source, &buffer[ offset ], sizeof( decoded.source ) );
@@ -1025,14 +1048,14 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
 
                 switch( field_num ) {
                     case 1:
-                        if ( wire_type != 5 || offset + sizeof( decoded.latitude_i ) > len ) {
+                        if ( wire_type != 5 || sizeof( decoded.latitude_i ) > len - offset ) {
                             return( false );
                         }
                         memcpy( &decoded.latitude_i, &buffer[ offset ], sizeof( decoded.latitude_i ) );
                         offset += sizeof( decoded.latitude_i );
                         break;
                     case 2:
-                        if ( wire_type != 5 || offset + sizeof( decoded.longitude_i ) > len ) {
+                        if ( wire_type != 5 || sizeof( decoded.longitude_i ) > len - offset ) {
                             return( false );
                         }
                         memcpy( &decoded.longitude_i, &buffer[ offset ], sizeof( decoded.longitude_i ) );
@@ -1115,11 +1138,18 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
             return( meshtastic_radio_receiving );
         }
 
-        void IRAM_ATTR meshtastic_radio_isr( void ) {
-            meshtastic_radio_irq = true;
+        bool meshtastic_configure_crc(void) {
+            const int state = meshtastic_radio.setCRC(RADIOLIB_SX126X_LORA_CRC_ON);
+            if (state != RADIOLIB_ERR_NONE) meshtastic_update_status("Radio CRC config failed %d", state);
+            return state == RADIOLIB_ERR_NONE;
         }
 
-        bool meshtastic_handle_rx( void ) {
+        void IRAM_ATTR meshtastic_radio_isr( void ) {
+            meshtastic_radio_irq = true;
+            powermgm_resume_from_ISR();
+        }
+
+        bool meshtastic_handle_rx( meshtastic_delivery_t &delivery ) {
             uint8_t packet[ MESHTASTIC_MAX_PACKET_LEN ] = { 0 };
             meshtastic_decoded_data_t data;
             meshtastic_decoded_text_t decoded;
@@ -1186,19 +1216,16 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
                     header->from, data.dest ? data.dest : header->to,
                     (uint8_t)channel_slot, header->id, false));
                 meshtastic_store_last_message( sender, decoded.text );
-                meshtastic_queue_notification( sender, decoded.text );
-                xnode_send_meshtastic_rx( sender, decoded.text );
-                if ( meshtastic_text_rx_callback ) {
-                    meshtastic_text_rx_callback(
-                        header->from,
-                        data.dest ? data.dest : header->to,
-                        (uint8_t)channel_slot,
-                        header->id,
-                        meshtastic_last_rssi,
-                        meshtastic_last_snr,
-                        decoded.text
-                    );
-                }
+                delivery.notify = delivery.text_rx = true;
+                strlcpy(delivery.sender, sender, sizeof(delivery.sender));
+                strlcpy(delivery.text, decoded.text, sizeof(delivery.text));
+                delivery.from = header->from;
+                delivery.to = destination;
+                delivery.channel_slot = channel_slot;
+                delivery.packet_id = header->id;
+                delivery.rssi = meshtastic_last_rssi;
+                delivery.snr = meshtastic_last_snr;
+                delivery.callback = meshtastic_text_rx_callback;
                 meshtastic_update_status( "RX %s %s", rx_channel->name, sender );
                 return( true );
             }
@@ -1209,8 +1236,6 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
                 const double lat = position.latitude_i * 1e-7;
                 const double lon = position.longitude_i * 1e-7;
 
-                osmmap_set_external_marker( lon, lat, sender );
-                xnode_send_location_update( lat, lon, sender );
                 if ( position.has_altitude ) {
                     snprintf( body, sizeof( body ), "Pos %.5f %.5f alt %dm", lat, lon, (int)position.altitude );
                 }
@@ -1218,7 +1243,11 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
                     snprintf( body, sizeof( body ), "Pos %.5f %.5f", lat, lon );
                 }
                 meshtastic_store_last_message( sender, body );
-                meshtastic_queue_notification( sender, body );
+                delivery.notify = delivery.position = true;
+                strlcpy(delivery.sender, sender, sizeof(delivery.sender));
+                strlcpy(delivery.text, body, sizeof(delivery.text));
+                delivery.lat = lat;
+                delivery.lon = lon;
                 meshtastic_update_status( "RX %s %s", rx_channel->name, sender );
                 return( true );
             }
@@ -1232,22 +1261,18 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
             switch( event ) {
                 case POWERMGM_STANDBY:
                     if ( meshtastic_radio_ready ) {
-                        if (meshtastic_tx_active) {
-                            mesh_history_status(meshtastic_pending_sequence, MESH_MESSAGE_FAILED);
-                            meshtastic_pending_sequence = 0;
-                            meshtastic_pending_text[0] = '\0';
-                            meshtastic_pending_channel_name[0] = '\0';
-                            meshtastic_tx_active = false;
-                            meshtastic_radio_irq = false;
-                        }
-                        meshtastic_radio.sleep();
-                        meshtastic_radio_receiving = false;
-                        meshtastic_update_status( "Meshtastic sleeping" );
+                        // Standby is display-off, not radio-off. Preserve an
+                        // in-flight TX and any pending RX IRQ. The ISR resumes
+                        // the loop; its existing periodic ticker is a fallback.
+                        if (!meshtastic_tx_active && !meshtastic_radio_receiving && !meshtastic_radio_irq)
+                            meshtastic_start_receive();
+                        return false; // Keep the MCU available to service radio IRQs.
                     }
                     break;
                 case POWERMGM_WAKEUP:
                 case POWERMGM_SILENCE_WAKEUP:
-                    if ( meshtastic_radio_ready && !meshtastic_tx_active ) {
+                    if ( meshtastic_radio_ready && !meshtastic_tx_active &&
+                         !meshtastic_radio_receiving && !meshtastic_radio_irq ) {
                         meshtastic_radio.standby();
                         meshtastic_start_receive();
                         meshtastic_update_status( "Mesh ready" );
@@ -1258,6 +1283,8 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
         }
 
         bool meshtastic_powermgm_loop_cb( EventBits_t event, void *arg ) {
+            meshtastic_delivery_t delivery;
+            {
             MeshtasticRadioLock radio_lock;
             const uint32_t now = millis();
 
@@ -1274,7 +1301,7 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
                 meshtastic_update_status("TX timed out; delivery unknown");
             }
 
-            if ( meshtastic_radio_ready && meshtastic_nodeinfo_due && meshtastic_time_due( now, meshtastic_nodeinfo_due_ms ) ) {
+            if ( meshtastic_radio_ready && !meshtastic_radio_irq && meshtastic_nodeinfo_due && meshtastic_time_due( now, meshtastic_nodeinfo_due_ms ) ) {
                 if ( meshtastic_service_broadcast_node_info() ) {
                     meshtastic_nodeinfo_due = true;
                     meshtastic_nodeinfo_due_ms = now + MESHTASTIC_NODEINFO_INTERVAL_MS;
@@ -1309,15 +1336,31 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
 
                 if ( transmitted && meshtastic_pending_text[ 0 ] ) {
                     meshtastic_store_last_message( "Me", meshtastic_pending_text );
-                    meshtastic_queue_notification( "Me", meshtastic_pending_text );
+                    delivery.notify = true;
+                    strlcpy(delivery.sender, "Me", sizeof(delivery.sender));
+                    strlcpy(delivery.text, meshtastic_pending_text, sizeof(delivery.text));
                 }
                 meshtastic_pending_text[ 0 ] = '\0';
                 meshtastic_pending_channel_name[ 0 ] = '\0';
                 meshtastic_start_receive();
             }
             else {
-                meshtastic_handle_rx();
+                meshtastic_handle_rx(delivery);
                 meshtastic_start_receive();
+            }
+            }
+
+            // BLE callbacks and notification rendering may take time or acquire
+            // their own locks. Do not block the radio mutex or leave RX stopped.
+            if (delivery.notify) meshtastic_queue_notification(delivery.sender, delivery.text);
+            if (delivery.text_rx) {
+                xnode_send_meshtastic_rx(delivery.sender, delivery.text);
+                if (delivery.callback) delivery.callback(delivery.from, delivery.to, delivery.channel_slot,
+                    delivery.packet_id, delivery.rssi, delivery.snr, delivery.text);
+            }
+            if (delivery.position) {
+                osmmap_set_external_marker(delivery.lon, delivery.lat, delivery.sender);
+                xnode_send_location_update(delivery.lat, delivery.lon, delivery.sender);
             }
 
             return( true );
@@ -1362,12 +1405,15 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
         else {
             meshtastic_radio_ready = true;
             meshtastic_radio.setCurrentLimit( 140.0f );
-            meshtastic_radio.setCRC( false );
+            // Meshtastic's SX126x transport enables LoRa payload CRC. Do not
+            // silently declare the radio ready if that configuration fails.
+            meshtastic_radio_ready = meshtastic_configure_crc();
             meshtastic_radio.setDio2AsRfSwitch( true );
             meshtastic_radio.setDio1Action( meshtastic_radio_isr );
-            meshtastic_start_receive();
-            meshtastic_update_status( "Mesh ready" );
-            meshtastic_service_schedule_node_info_broadcast( MESHTASTIC_NODEINFO_START_DELAY_MS );
+            if (meshtastic_radio_ready && meshtastic_start_receive()) {
+                meshtastic_update_status( "Mesh ready" );
+                meshtastic_service_schedule_node_info_broadcast( MESHTASTIC_NODEINFO_START_DELAY_MS );
+            }
         }
 
         powermgm_register_cb(
@@ -1376,7 +1422,7 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
             "meshtastic event"
         );
         powermgm_register_loop_cb(
-            POWERMGM_WAKEUP | POWERMGM_SILENCE_WAKEUP,
+            POWERMGM_WAKEUP | POWERMGM_SILENCE_WAKEUP | POWERMGM_STANDBY,
             meshtastic_powermgm_loop_cb,
             "meshtastic loop"
         );

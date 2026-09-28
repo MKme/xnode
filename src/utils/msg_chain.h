@@ -48,7 +48,8 @@
      * @param   msg_chain   pointer to the msg_chain, if NULL a new msg_chain is make. don't forget to save the return pointer
      * @param   msg         the message to store
      * 
-     * @return  pointer     to the msg_chain structure, NULL if failed
+     * @return pointer to the chain. Allocation failure preserves the original
+     *         chain (NULL for a new chain); its entry count is unchanged.
      */
     msg_chain_t *msg_chain_add_msg( msg_chain_t *msg_chain, const char *msg );
     /**

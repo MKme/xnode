@@ -4,37 +4,42 @@
     {
       "target": "tdeck-plus",
       "file": "artifacts/xnode-tdeck-plus-field-chronometer-20260928.bin",
-      "sha256": "ad5cadfc1577fdb01663fdf9eb820a04123a688e0cde3b3ff5b7082832258e54",
-      "bytes": 3972784,
-      "log": "production-live-build.log",
-      "type": "application image; not merged full-flash installer"
+      "sha256": "d09d696ce3623bfbafaf77a5acc29c93344613ce5ddd901a509ae058fa3c7800",
+      "bytes": 3986848,
+      "log": "longfast-tdeck-build.log",
+      "type": "application image; not merged full-flash installer",
+      "repair": "GUI event ownership, CRC, standby RX, parser bounds and notification memory"
     },
     {
       "target": "t-watch2020-v3-s3",
       "file": "artifacts/xnode-t-watch2020-v3-s3-field-chronometer-20260928.bin",
-      "sha256": "159a3278365626b235b84f1cf03596b6e3ae2f0472566defa033d78eb29005ab",
-      "bytes": 3873616,
-      "log": "watch-readable-s3-final-build.log",
+      "sha256": "b8f3854fe5ef411fa13d3364aa7c85a63d118b46d03b27ba2180bd6ba448f67e",
+      "bytes": 3887248,
+      "log": "longfast-t-watch2020-v3-s3-build.log",
       "type": "application image; not merged full-flash installer",
-      "watch_layout": "separate conversation, WRITE/review and RADIO"
+      "watch_layout": "separate conversation, WRITE/review and RADIO",
+      "repair": "GUI event ownership, CRC, standby RX, parser bounds and notification memory"
     },
     {
       "target": "t-watch-ultra",
       "file": "artifacts/xnode-t-watch-ultra-field-chronometer-20260928.bin",
-      "sha256": "23af48d86802b6365d06413708da43058e0e42a13469a1e2b77f917e4c03e817",
-      "bytes": 4322896,
-      "log": "watch-readable-build.log",
+      "sha256": "3cf6de380cf329eda65e7de767eaeeb43eb0b26d4dbb7ad00150ec0aba3d0ce7",
+      "bytes": 4337280,
+      "log": "longfast-t-watch-ultra-build.log",
       "type": "application image; not merged full-flash installer",
-      "watch_layout": "separate conversation, WRITE/review and RADIO"
+      "watch_layout": "separate conversation, WRITE/review and RADIO",
+      "repair": "GUI event ownership, CRC, standby RX, parser bounds and notification memory"
     },
     {
       "target": "tdeck-pro",
       "file": "artifacts/xnode-tdeck-pro-field-chronometer-20260928.bin",
-      "sha256": "f5acff8888993f45f550137d1031af1eab2deeea2dd88ca714277e7cd9e9f9dd",
-      "bytes": 3888048,
-      "log": "production-live-build.log",
-      "type": "application image; not merged full-flash installer"
+      "sha256": "3307055d590c76ce8b523d1340660ee7d824b39744871c0f12b3e6c96e963f75",
+      "bytes": 3901664,
+      "log": "longfast-tdeck-pro-build.log",
+      "type": "application image; not merged full-flash installer",
+      "repair": "GUI event ownership, CRC, standby RX, parser bounds and notification memory"
     }
   ],
-  "description": "Production live Mesh Chat. Watch builds updated with larger text and separate reading, WRITE/review and RADIO pages. Handheld binaries remain previous validated production-live version. Application images require matching existing bootloader/partition layout."
+  "description": "Production live Mesh Chat with deferred GUI event delivery and LongFast radio repairs. Watch layouts use separate conversation, WRITE/review and RADIO pages. All four targets rebuilt from the repaired source. Application images require matching bootloader/partition layout.",
+  "validation": "Local concurrency, allocation failure, actual decoder/RX fixture and native LVGL tests passed. T-Deck Plus flashed and local Bluetooth notification/UI verified. Physical two-radio LongFast exchange and repaired watch hardware are not yet verified."
 }

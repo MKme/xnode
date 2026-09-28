@@ -46,6 +46,7 @@ static raw_img_rgb_t *raw_rgb;
 static void screenshot_disp_flush( lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p );
 
 #if (defined(LILYGO_T_DECK_PLUS) || defined(LILYGO_WATCH_ULTRA)) && !defined(NATIVE_64BIT)
+#include "app/meshtastic/meshtastic_service.h"
 void screenshot_usb_poll( void ) {
     // No network endpoint, navigation, storage writes or radio actions. An exact
     // newline-terminated request is required; overflow discards the whole line.
@@ -62,8 +63,19 @@ void screenshot_usb_poll( void ) {
         }
         command[used] = 0;
         const bool capture = !overflow && strcmp(command, "XNODE SCREENSHOT") == 0;
+        const bool status = !overflow && strcmp(command, "XNODE STATUS") == 0;
         used = 0;
         overflow = false;
+        if (status) {
+            // Read-only diagnostics: no keys, message bodies or configuration writes.
+            Serial.printf("\nXNODE_STATUS ready=%u receiving=%u frequency=%.3f history_revision=%lu heap=%u stack_min=%u status=%s\n",
+                meshtastic_service_is_ready(), meshtastic_service_is_receiving(),
+                meshtastic_service_get_frequency_mhz(),
+                (unsigned long)meshtastic_service_get_history_revision(),
+                (unsigned)ESP.getFreeHeap(), (unsigned)uxTaskGetStackHighWaterMark(NULL),
+                meshtastic_service_get_status());
+            continue;
+        }
         if (!capture) continue;
         if (!gui_take()) return;
         screenshot_take();

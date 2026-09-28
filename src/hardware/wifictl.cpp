@@ -23,6 +23,7 @@
 #include "wifictl.h"
 #include "powermgm.h"
 #include "callback.h"
+#include "deferred_events.h"
 #include "config/wifictlconfig.h"
 #include "utils/webserver/webserver.h"
 #include "utils/ftpserver/ftpserver.h"
@@ -73,8 +74,16 @@
 bool wifi_init = false;
 callback_t *wifictl_callback = NULL;
 
-void wifictl_send_event_cb( EventBits_t event, char *msg );
 bool wifictl_powermgm_event_cb( EventBits_t event, void *arg );
+static DeferredEvents wifictl_pending_events;
+static bool wifictl_drain_events( EventBits_t, void * ) {
+    DeferredEvents::Event pending;
+    for (size_t i = 0; i < DeferredEvents::CAPACITY && wifictl_pending_events.pop(pending); ++i)
+        callback_send(wifictl_callback, pending.bits, pending.argument());
+    const uint32_t dropped = wifictl_pending_events.take_overflow_count();
+    if (dropped) log_w("WiFi deferred callback overflow: %u older events dropped", (unsigned)dropped);
+    return true;
+}
 
 char *wifiname=NULL;
 char *wifipassword=NULL;
@@ -260,6 +269,8 @@ void wifictl_setup( void ) {
      */
     powermgm_register_cb_with_prio( POWERMGM_STANDBY, wifictl_powermgm_event_cb, "powermgm wifictl", CALL_CB_FIRST );
     powermgm_register_cb( POWERMGM_SILENCE_WAKEUP | POWERMGM_WAKEUP, wifictl_powermgm_event_cb, "powermgm wifictl" );
+    powermgm_register_loop_cb(POWERMGM_STANDBY | POWERMGM_SILENCE_WAKEUP | POWERMGM_WAKEUP,
+        wifictl_drain_events, "WiFi deferred callbacks");
     /*
      * set default state after init
      */
@@ -427,10 +438,10 @@ bool wifictl_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const 
 }
 
 bool wifictl_send_event_cb( EventBits_t event, void *arg ) {
-    /*
-     * call all callbacks with her event mask
-     */
-    return( callback_send( wifictl_callback, event, arg ) );
+    if (event == WIFICTL_AUTOON && arg)
+        wifictl_pending_events.push_bool(event, *static_cast<const bool *>(arg));
+    else wifictl_pending_events.push_text(event, static_cast<const char *>(arg));
+    return true;
 }
 
 bool wifictl_is_known( const char* networkname ) {

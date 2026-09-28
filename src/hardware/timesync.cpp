@@ -27,6 +27,7 @@
 #include "timesync.h"
 #include "powermgm.h"
 #include "callback.h"
+#include "deferred_events.h"
 #include "hardware/config/timesyncconfig.h"
 
 #ifdef NATIVE_64BIT
@@ -43,6 +44,15 @@
 
 timesync_config_t timesync_config;
 callback_t *timesync_callback = NULL;
+static DeferredEvents timesync_pending_events;
+static bool timesync_drain_events( EventBits_t, void * ) {
+    DeferredEvents::Event pending;
+    for (size_t i = 0; i < DeferredEvents::CAPACITY && timesync_pending_events.pop(pending); ++i)
+        callback_send(timesync_callback, pending.bits, pending.argument());
+    const uint32_t dropped = timesync_pending_events.take_overflow_count();
+    if (dropped) log_w("Time deferred callback overflow: %u older events dropped", (unsigned)dropped);
+    return true;
+}
 
 void timesync_Task( void * pvParameters );
 bool timesync_powermgm_event_cb( EventBits_t event, void *arg );
@@ -54,6 +64,8 @@ static bool timesync_apply_build_time_if_needed( void );
 #endif
 
 void timesync_setup( void ) {
+    powermgm_register_loop_cb(POWERMGM_STANDBY | POWERMGM_SILENCE_WAKEUP | POWERMGM_WAKEUP,
+        timesync_drain_events, "Time deferred callbacks");
     /*
      * load config from json
      */
@@ -97,10 +109,9 @@ bool timesync_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const
 }
 
 bool timesync_send_event_cb( EventBits_t event, void *arg ) {
-    /*
-     * call all callbacks with her event mask
-     */
-    return( callback_send( timesync_callback, event, (void*)NULL ) );
+    (void)arg; // Existing time subscribers receive no payload.
+    timesync_pending_events.push_text(event, nullptr);
+    return true;
 }
 
 static int64_t timesync_days_from_civil( int year, unsigned month, unsigned day ) {

@@ -20,6 +20,7 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 #include "config.h"
+#include <atomic>
 #include "gadgetbridge.h"
 #include "hardware/blectl.h"
 #include "hardware/callback.h"
@@ -58,6 +59,7 @@
 static blectl_msg_t gadgetbridge_msg;                                   /** @brief gadgetbridge chunk message buffer */
 static callback_t *gadgetbridge_callback = NULL;                        /** @brief gadgetbridge callback structure */
 static CharBuffer gadgetbridge_RX_msg;                                  /** @brief RX msg buffer */
+static std::atomic<bool> gadgetbridge_connect_pending(false);
 /**
  * local function declaration
  */
@@ -66,6 +68,10 @@ static void gadgetbridge_send_chunk( unsigned char *msg, int32_t len );
 static bool gadgetbridge_send_event_cb( EventBits_t event, void *arg );
 static bool gadgetbridge_powermgm_loop_cb( EventBits_t event, void *arg );
 static bool gadgetbridge_blectl_event_cb( EventBits_t event, void *arg );
+static void gadgetbridge_dispatch_pending_connect(void) {
+    if (gadgetbridge_connect_pending.exchange(false) && blectl_get_event(BLECTL_CONNECT))
+        gadgetbridge_send_event_cb(GADGETBRIDGE_CONNECT, (void *)"connected");
+}
 
 #ifdef NATIVE_64BIT
 #else
@@ -82,13 +88,17 @@ static bool gadgetbridge_blectl_event_cb( EventBits_t event, void *arg );
         };
 
         void onWrite(NimBLECharacteristic* pCharacteristic) {
-            size_t msgLen = pCharacteristic->getValue().length();
-            const char *msg = pCharacteristic->getValue().c_str();
+            // getValue() returns an owning string. Keep it alive throughout
+            // parsing instead of retaining c_str() from a destroyed temporary.
+            const std::string value = pCharacteristic->getValue();
+            const size_t msgLen = value.length();
+            const char *msg = value.c_str();
 
-            for ( int i = 0 ; i < msgLen ; i++ ) {
+            for ( size_t i = 0 ; i < msgLen ; i++ ) {
                 switch( msg[ i ] ) {
                     case EndofText:         gadgetbridge_RX_msg.clear();
-                                            gadgetbridge_send_event_cb( GADGETBRIDGE_CONNECT, (void *)"connected" );
+                                            gadgetbridge_connect_pending.store(true);
+                                            powermgm_resume();
                                             break;
                     case DataLinkEscape:    gadgetbridge_RX_msg.clear();
                                             break;
@@ -97,14 +107,20 @@ static bool gadgetbridge_blectl_event_cb( EventBits_t event, void *arg );
                                                 /*
                                                  * Duplicate message
                                                  */
-                                                char *buff = (char *)CALLOC_ASSERT( size, 1, "buff calloc failed" );
+                                                char *buff = (char *)CALLOC( size, 1 );
+                                                if (!buff) {
+                                                    log_e("Gadgetbridge RX allocation failed");
+                                                    gadgetbridge_RX_msg.clear();
+                                                    break;
+                                                }
                                                 strlcpy( buff, gadgetbridge_RX_msg.c_str(), size );
                                                 /*
                                                  * Send message
                                                  */
-                                                powermgm_resume_from_ISR();
-                                                if ( xQueueSendFromISR( gadgetbridge_msg_receive_queue, &buff, 0 ) != pdTRUE )
+                                                if ( xQueueSend( gadgetbridge_msg_receive_queue, &buff, 0 ) != pdTRUE ) {
                                                     log_e("fail to send a receive BLE msg (%d bytes)", size );
+                                                    free(buff);
+                                                } else powermgm_resume();
                                                 gadgetbridge_RX_msg.clear();
                                                 break;
                                             }
@@ -302,6 +318,8 @@ static void gadgetbridge_send_chunk ( unsigned char *msg, int32_t len ) {
  */
 static bool gadgetbridge_powermgm_loop_cb( EventBits_t event, void *arg ) {
     static uint64_t nextmillis = 0;
+    // Includes OsmAnd LVGL subscribers; dispatch only under the power-loop guard.
+    gadgetbridge_dispatch_pending_connect();
     /**
      * check if we connected
      */

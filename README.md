@@ -302,7 +302,7 @@ Current verified firmware baseline:
 | GPS in standby | Off unless an app explicitly blocks standby. GPS status no longer enables standby GPS. | Existing tracker/status behavior preserved. | Kept powered across the T-Deck display timeout path so receiver lock/debug state is not lost. | Deeper Pro standby/GPS policy is still open. |
 | WiFi at boot | Off by default after one-time config migration; dummy setup scan disabled. | Existing behavior preserved. | Existing config path preserved; not auto-enabled by the T-Deck bring-up. | Existing config path preserved; not changed by the Pro display/touch work. |
 | BLE at boot | On and advertising the XNODE bridge by default so XTOC/XCOM can discover it; standby-blocking BLE options stay off. | Existing auto-on behavior preserved unless config says otherwise. | On and advertising the XNODE bridge by default so host sync works from the browser chooser. | Existing XNODE bridge path preserved for host sync. |
-| LoRa / Meshtastic | Radio chip is put into sleep on standby; regulator rail is not cut yet to avoid a risky radio re-init path. | Existing behavior preserved. | SX1262 pins and `T_DECK` Meshtastic model are wired; radio power-cut policy is not finalized. | SX1262 pins and `T_DECK` Meshtastic model are wired; radio power-cut policy is not finalized. |
+| LoRa / Meshtastic | Keeps receiving during display standby; radio IRQ resumes processing and MCU light sleep is blocked while the radio is ready. | Same listening policy as Ultra. | Keeps receiving during display idle; pending packets survive screen wake. | Same shared receive policy; Pro power behavior still needs field validation. |
 | CPU performance mode | Active tac map and normal awake watchface use performance mode; standby handoff, hibernate, and the GPS loop do not globally pin performance. | Shared change applies; S3 build verified. | Display timeout stays in active UI mode; active apps keep normal responsiveness instead of waking into a suspended UI. | E-paper refresh stays in the active UI path; Pro-specific deeper idle policy still needs validation. |
 
 ### What changed in the Ultra audit
@@ -371,7 +371,7 @@ Turning BLE or WiFi on manually:
 
 ### Known power tradeoffs still open
 
-- Meshtastic LoRa regulator power is not cut in standby. The SX1262 is put to sleep, but cutting the rail safely needs a full radio re-init path on wake.
+- Meshtastic keeps the SX1262 receiving during display standby, and prevents whole-MCU light sleep while ready. This fixes missed screen-off traffic at the cost of additional idle power; battery runtime has not been measured for this listening policy.
 - OTA/update still uses `powermgm_set_perf_mode()` intentionally while flashing or updating.
 - `powermgm_set_lightsleep(false)` users in OTA and battery calibration still need a paired release audit, as noted in the older S3 audit.
 - Any app that explicitly enables GPS-on-standby, WiFi-on-standby, BLE always-on, or long display timeout will reduce battery life by design.

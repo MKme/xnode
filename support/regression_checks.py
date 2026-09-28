@@ -941,7 +941,7 @@ def run_checks():
         "package.json",
         "npm build covers all supported firmware targets",
         [
-            '"test": "python support/check_watch_overlay_persistence.py && python support/regression_checks.py && python support/check_home_documentation.py"',
+            '"test": "python support/check_watch_overlay_persistence.py && python support/regression_checks.py && python support/check_home_documentation.py',
             '"test:home": "python support/home_capture/capture.py --check-only"',
             "pio run -e t-watch-ultra -e t-watch2020-v3-s3 -e tdeck-plus -e tdeck-pro",
         ],

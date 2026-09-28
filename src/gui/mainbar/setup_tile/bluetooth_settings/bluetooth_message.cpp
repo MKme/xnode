@@ -679,7 +679,7 @@ bool bluetooth_message_queue_msg( BluetoothJsonRequest &doc ) {
 }
 
 bool bluetooth_message_queue_msg( const char *msg ) {
-    if ( bluetooth_message_active == false ) {
+    if ( bluetooth_message_active == false || msg == NULL ) {
         return( false );
     }
     /*
@@ -694,7 +694,17 @@ bool bluetooth_message_queue_msg( const char *msg ) {
     /*
      * add msg to the msg chain
      */
+    const int32_t previous_count = msg_chain_get_entrys( bluetooth_msg_chain );
     bluetooth_msg_chain = msg_chain_add_msg( bluetooth_msg_chain, msg );
+    if ( msg_chain_get_entrys( bluetooth_msg_chain ) <= previous_count ) {
+        log_e("Notification allocation failed; existing messages preserved");
+        return false;
+    }
+    // Notifications are an in-memory inbox, not an unbounded radio log.
+    // Evict only after the new message was successfully allocated.
+    while ( msg_chain_get_entrys( bluetooth_msg_chain ) > 32 ) {
+        msg_chain_delete_msg_entry( bluetooth_msg_chain, 0 );
+    }
     /*
      * only alert or alret and showing msg
      */

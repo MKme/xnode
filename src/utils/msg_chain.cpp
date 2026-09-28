@@ -31,6 +31,8 @@
 #endif
 
 msg_chain_t * msg_chain_add_msg( msg_chain_t *msg_chain, const char *msg ) {
+    if ( msg == NULL ) return msg_chain;
+    const bool new_chain = msg_chain == NULL;
     /*
      * add msg_chain_t head structure if not exsist
      */
@@ -38,7 +40,7 @@ msg_chain_t * msg_chain_add_msg( msg_chain_t *msg_chain, const char *msg ) {
         msg_chain = (msg_chain_t *)CALLOC( sizeof( msg_chain_t ), 1 );
         if ( msg_chain == NULL ) {
             log_e("msg_chain_t alloc failed");
-            while( true );
+            return NULL;
         }
 
         msg_chain->entrys = 0;
@@ -53,13 +55,16 @@ msg_chain_t * msg_chain_add_msg( msg_chain_t *msg_chain, const char *msg ) {
     msg_chain_entry_t *msg_chain_entry = (msg_chain_entry_t *)CALLOC( sizeof( msg_chain_entry_t ), 1 );
     if ( msg_chain_entry == NULL ) {
         log_e("msg_chain_entry_t alloc failed");
-        while( true );
+        if ( new_chain ) free( msg_chain );
+        return new_chain ? NULL : msg_chain;
     }
     else {
         msg_chain_entry->msg = (const char *)CALLOC( strlen( msg ) + 1, 1 );
         if ( msg_chain_entry->msg == NULL ) {
             log_e("msg calloc failed");
-            while( true );
+            free( msg_chain_entry );
+            if ( new_chain ) free( msg_chain );
+            return new_chain ? NULL : msg_chain;
         }
         msg_chain_entry->prev_msg = NULL;
         msg_chain_entry->next_msg = NULL;

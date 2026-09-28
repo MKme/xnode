@@ -17,9 +17,12 @@ with tempfile.TemporaryDirectory(prefix='xnode-mesh-history-', dir=ROOT / '.pio'
     subprocess.run([str(binary)], check=True)
     source = (ROOT / 'src/app/meshtastic/meshtastic_service.cpp').read_text(encoding='utf-8')
     snippets = []
-    for name in ['meshtastic_service_send_payload_internal', 'meshtastic_service_send_text_internal',
+    for name in ['meshtastic_write_varint', 'meshtastic_read_varint', 'meshtastic_skip_field',
+                 'meshtastic_encode_data_message', 'meshtastic_decode_data_message', 'meshtastic_decode_text_message',
+                 'meshtastic_find_channel_slot_for_hash', 'meshtastic_handle_rx',
+                 'meshtastic_configure_crc', 'meshtastic_service_send_payload_internal', 'meshtastic_service_send_text_internal',
                  'meshtastic_powermgm_event_cb', 'meshtastic_powermgm_loop_cb']:
-        match = re.search(r'^\s*(?:static\s+)?bool\s+' + name + r'\s*\([^;{}]*\)\s*\{', source, re.M)
+        match = re.search(r'^\s*(?:static\s+)?(?:bool|size_t|int8_t)\s+' + name + r'\s*\([^;{}]*\)\s*\{', source, re.M)
         if not match:
             raise RuntimeError('Production function not found: ' + name)
         depth, end = 1, match.end()

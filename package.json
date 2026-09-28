@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "test": "python support/check_watch_overlay_persistence.py && python support/regression_checks.py && python support/check_home_documentation.py",
+    "test": "python support/check_watch_overlay_persistence.py && python support/regression_checks.py && python support/check_home_documentation.py && python support/test_notification_memory.py && python support/test_deferred_events.py",
     "test:home": "python support/home_capture/capture.py --check-only",
     "build": "npm test && pio run -e t-watch-ultra -e t-watch2020-v3-s3 -e tdeck-plus -e tdeck-pro",
     "upload": "pio run -e t-watch-ultra -t upload --upload-port COM10",

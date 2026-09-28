@@ -29,6 +29,7 @@
 #include "pmu.h"
 #include "powermgm.h"
 #include "callback.h"
+#include "deferred_events.h"
 #include "device.h"
 #include "utils/charbuffer.h"
 #include "utils/alloc.h"
@@ -71,6 +72,16 @@ callback_t *blectl_callback = NULL;         /** @brief blectl callback structure
 
 static bool blectl_send_event_cb( EventBits_t event, void *arg );
 static bool blectl_powermgm_event_cb( EventBits_t event, void *arg );
+static DeferredEvents blectl_pending_events;
+static bool blectl_drain_events( EventBits_t, void * ) {
+    DeferredEvents::Event pending;
+    // A finite batch also bounds callbacks that enqueue more callbacks.
+    for (size_t i = 0; i < DeferredEvents::CAPACITY && blectl_pending_events.pop(pending); ++i)
+        callback_send(blectl_callback, pending.bits, pending.argument());
+    const uint32_t dropped = blectl_pending_events.take_overflow_count();
+    if (dropped) log_w("BLE deferred callback overflow: %u older events dropped", (unsigned)dropped);
+    return true;
+}
 
 #ifdef NATIVE_64BIT
 #else
@@ -245,6 +256,8 @@ static bool blectl_powermgm_event_cb( EventBits_t event, void *arg );
 #endif
 
 void blectl_setup( void ) {
+    powermgm_register_loop_cb(POWERMGM_STANDBY | POWERMGM_SILENCE_WAKEUP | POWERMGM_WAKEUP,
+        blectl_drain_events, "BLE deferred callbacks");
     #ifdef NATIVE_64BIT
     #else
         /**
@@ -340,7 +353,8 @@ bool blectl_register_cb( EventBits_t event, CALLBACK_FUNC callback_func, const c
 }
 
 static bool blectl_send_event_cb( EventBits_t event, void *arg ) {
-    return( callback_send( blectl_callback, event, arg ) );
+    blectl_pending_events.push_text(event, static_cast<const char *>(arg));
+    return true;
 }
 
 void blectl_set_enable_on_standby( bool enable_on_standby ) {        
