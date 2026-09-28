@@ -163,7 +163,7 @@ Board and upload support:
 - Uses DIO flash mode for the T-Deck Plus boot header; QIO produced reset loops on the attached unit.
 - Upload speed is set to `460800` because `921600` was unreliable on the attached unit and could drop mid-flash.
 - `support/tdeck_plus_post_upload_reset.py` runs after upload and issues a watchdog reset so the device does not stay trapped in the flasher stub.
-- GitHub Actions runs `npm run build`, which executes the regression checks and builds `t-watch-ultra`, `t-watch2020-v3-s3`, `tdeck-plus`, and `tdeck-pro`.
+- Run `npm run build` locally to execute the full test suite and build `t-watch-ultra`, `t-watch2020-v3-s3`, `tdeck-plus`, and `tdeck-pro`.
 
 Hardware mapped in the in-repo HAL:
 - ESP32-S3 with 16 MB flash and 8 MB PSRAM.
@@ -426,22 +426,19 @@ Replace `COM7` with the device's current port. The helper requires the existing 
 
 The screenshot contains whatever is visible, including any message or identifying data. Inspect the image before sharing it.
 
-## Automated CI and regression testing
+## Local regression testing
 
-The repo has a regression and firmware-build workflow at `.github/workflows/ci.yml`.
-It runs on push, pull request, and manual dispatch. The workflow installs PlatformIO `6.1.19` and runs:
-
-```powershell
-npm run build
-```
-
-The current `npm test` command runs the watch overlay persistence, structural regression and home documentation checks:
+All tests run locally. GitHub Actions is disabled for this repository and there are no hosted CI workflows.
 
 ```powershell
 npm test
 ```
 
-The current `npm run build` command runs `npm test` and then compiles:
+`npm run tests` is an alias for the same complete suite: watch overlay persistence, structural regressions, documentation checks, notification memory, deferred events, native home layouts, horizontal menus, Messages navigation, Mesh Chat history/ACK handling, and watch keyboards. Native display tests cover all four boards in both themes.
+
+Use the existing local Python, C/C++ compiler, and PlatformIO/LVGL dependencies. The tests do not install dependencies, call GitHub Actions, or flash hardware. Focused commands remain available: `test:regression`, `test:home`, `test:menus`, `test:messages`, and `test:mesh`.
+
+`npm run build` runs the complete local tests and then compiles:
 
 ```powershell
 pio run -e t-watch-ultra -e t-watch2020-v3-s3 -e tdeck-plus -e tdeck-pro
@@ -459,7 +456,7 @@ The regression gate protects the recent watch fixes:
 - The Ultra main screen keeps the generated moon phase text and visual indicator.
 - T-Deck Plus keeps the moon phase indicator, hides unsupported pedometer state, uses readable GPS status diagnostics, keeps the Serial1/L76K/u-blox GPS init path, applies GPS UTC time sync to the main clock, uses DIO flash mode, and avoids full UI standby on display timeout.
 - T-Deck Pro keeps full e-paper first paint, readable black-on-white status/main screen styling, HYN touch polling, and swipe navigation guarded by Pro-only code paths.
-- CI now builds all four supported firmware targets so Ultra, S3/Gen3, T-Deck Plus, and T-Deck Pro regressions fail before merge.
+- The local build command covers Ultra, S3/Gen3, T-Deck Plus, and T-Deck Pro firmware.
 
 If this gate fails, either restore the protected behavior or update the check in
 the same change with the intentional replacement behavior.

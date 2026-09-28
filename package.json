@@ -3,13 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "test": "python support/check_watch_overlay_persistence.py && python support/regression_checks.py && python support/check_home_documentation.py && python support/test_notification_memory.py && python support/test_deferred_events.py",
+    "test": "npm run test:regression && npm run test:home && npm run test:menus && npm run test:messages && npm run test:mesh",
     "test:home": "python support/home_capture/capture.py --check-only",
     "build": "npm test && pio run -e t-watch-ultra -e t-watch2020-v3-s3 -e tdeck-plus -e tdeck-pro",
     "upload": "pio run -e t-watch-ultra -t upload --upload-port COM10",
     "test:menus": "python support/home_capture/capture.py --navigation --check-only",
     "test:messages": "python support/home_capture/capture.py --messages --check-only",
     "test:mesh-history": "python support/test_mesh_history.py",
-    "test:mesh": "npm run test:mesh-history && python support/home_capture/capture.py --mesh --check-only"
+    "test:mesh": "npm run test:mesh-history && python support/home_capture/capture.py --mesh --check-only",
+    "test:regression": "python support/check_watch_overlay_persistence.py && python support/regression_checks.py && python support/check_home_documentation.py && python support/test_notification_memory.py && python support/test_deferred_events.py",
+    "tests": "npm test"
   }
 }
