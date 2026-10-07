@@ -1,0 +1,6 @@
+{
+  "name": "MeshCoreEd25519",
+  "version": "1.0.0",
+  "description": "MeshCore pinned Ed25519 fork; see UPSTREAM.md",
+  "build": {"flags": "-DED25519_NO_SEED=1"}
+}

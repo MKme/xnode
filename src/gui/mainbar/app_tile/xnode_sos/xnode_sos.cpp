@@ -119,7 +119,7 @@ namespace {
     void xnode_sos_send_event_cb( lv_obj_t *obj, lv_event_t event ) {
         static uint32_t last_event_ms = 0;
         if ( xnode_sos_accept_button_event( event, last_event_ms, 1000 ) ) {
-            xnode_sos_set_status( xnode_send_manual_sos() ? "SOS sent over mesh" : "SOS not sent" );
+            xnode_sos_set_status( xnode_send_manual_sos() ? "SOS queued" : "SOS not sent" );
         }
     }
 

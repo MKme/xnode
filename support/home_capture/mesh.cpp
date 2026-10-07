@@ -7,6 +7,8 @@
 #include <map>
 #include <cstdarg>
 #include "app/meshtastic/meshtastic_service.h"
+#include "app/mesh/mesh_protocol.h"
+#include "app/meshcore/meshcore_service.h"
 #include "gui/keyboard.h"
 void display_trigger_activity(){}
 struct WatchFixture {char readKeyboardChar(){return 0;}} watch;
@@ -45,6 +47,20 @@ int32_t meshtastic_service_get_last_rssi(){return -92;}
 float meshtastic_service_get_last_snr(){return 7.5f;}
 const char*meshtastic_service_get_last_message_sender(){return "ALPHA";}
 const char*meshtastic_service_get_last_message_text(){return "Native fixture message";}
+static mesh_protocol_t active_protocol = MESH_PROTOCOL_MESHTASTIC, staged_protocol = MESH_PROTOCOL_MESHTASTIC;
+static unsigned selection_saves = 0, restart_requests = 0;
+static bool selection_accepts = true, radio_staged = false;
+mesh_protocol_t mesh_protocol_get_active(){return active_protocol;}
+mesh_protocol_t mesh_protocol_get_selected(){return staged_protocol;}
+const char *mesh_protocol_name(mesh_protocol_t p){return p == MESH_PROTOCOL_MESHCORE ? "MeshCore" : "Meshtastic";}
+bool mesh_protocol_is_supported(mesh_protocol_t p){return p == MESH_PROTOCOL_MESHCORE || p == MESH_PROTOCOL_MESHTASTIC;}
+bool mesh_protocol_select(mesh_protocol_t p){if(!selection_accepts)return false;staged_protocol=p;++selection_saves;return true;}
+bool mesh_protocol_reboot_required(){return active_protocol != staged_protocol;}
+const char *meshcore_service_get_public_key_hex(){return "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";}
+bool meshcore_service_get_active_radio_config(meshcore_service_radio_config_t *c){*c={910.525f,62.5f,7,5,22};return true;}
+bool meshcore_service_radio_reboot_required(){return radio_staged;}
+#undef log_i
+#define log_i(...) (++restart_requests)
 static tm *capture_localtime(const time_t*t,tm*out){*out=*gmtime(t);return out;}
 #define localtime_r capture_localtime
 #include "app/meshtastic/meshtastic_app.cpp"
@@ -55,7 +71,8 @@ static void keyboard_click(const char *label){
 }
 static void select_channel(unsigned index){
     auto prior=active(); if(mesh_watch){mainbar_jump_to_tilenumber(meshtastic_app_tile_num+2,LV_ANIM_OFF,false);pump();}
-    click(meshtastic_channel_dropdown);pump();auto ext=(lv_dropdown_ext_t*)lv_obj_get_ext_attr(meshtastic_channel_dropdown);assert(ext->page);
+    if(mesh_watch)lv_page_focus(lv_obj_get_parent(lv_obj_get_parent(meshtastic_channel_dropdown)),meshtastic_channel_dropdown,LV_ANIM_OFF);
+    pump();click(meshtastic_channel_dropdown);pump();auto ext=(lv_dropdown_ext_t*)lv_obj_get_ext_attr(meshtastic_channel_dropdown);assert(ext->page);
     auto label=lv_obj_get_child(lv_page_get_scrl(ext->page),nullptr);assert(label);lv_area_t a;lv_obj_get_coords(label,&a);
     const int line=lv_font_get_line_height(lv_obj_get_style_text_font(label,LV_LABEL_PART_MAIN))+lv_obj_get_style_text_line_space(label,LV_LABEL_PART_MAIN);
     click_point(a.x1+12,a.y1+index*line+line/2);assert(lv_dropdown_get_selected(meshtastic_channel_dropdown)==index);
@@ -122,6 +139,30 @@ int main(int argc,char**argv){
     lv_area_t swipe_area;lv_obj_get_coords(meshtastic_timeline,&swipe_area);drag(width-30,(swipe_area.y1+swipe_area.y2)/2,30,(swipe_area.y1+swipe_area.y2)/2);assert(active()==meshtastic_app_tile_num+1);
     mainbar_jump_to_tilenumber(meshtastic_app_tile_num+mesh_radio_index(),LV_ANIM_OFF,false);pump();auto radio_scroll=lv_obj_get_parent(meshtastic_radio_label);auto radio_page=lv_obj_get_parent(radio_scroll);assert(lv_obj_get_width(radio_scroll)<=lv_obj_get_width(radio_page));save(argv[4],"radio");
     lv_area_t radio_bounds;lv_obj_get_coords(radio_page,&radio_bounds);drag(30,(radio_bounds.y1+radio_bounds.y2)/2,width-30,(radio_bounds.y1+radio_bounds.y2)/2);assert(active()==meshtastic_app_tile_num+(mesh_watch?1:0));
+    // Protocol selection is staged, cancellable and never changes radio ownership live.
+    mainbar_jump_to_tilenumber(meshtastic_app_tile_num+mesh_radio_index(),LV_ANIM_OFF,false);pump();
+    lv_page_focus(radio_page,mesh_protocol_button,LV_ANIM_OFF);pump();click(mesh_protocol_button);
+    assert(mesh_confirm_overlay && selection_saves==0 && restart_requests==0);
+    check_visible(mesh_confirm_apply_button);check_visible(mesh_confirm_cancel_button);save(argv[4],"protocol-confirm");
+    click(mesh_confirm_cancel_button);assert(!mesh_confirm_overlay&&selection_saves==0);
+    click(mesh_protocol_button);mesh_hardware_button(BUTTON_EXIT,nullptr);assert(!mesh_confirm_overlay&&selection_saves==0);
+    click(mesh_protocol_button);selection_accepts=false;click(mesh_confirm_apply_button);
+    assert(!mesh_confirm_overlay&&selection_saves==0&&!mesh_protocol_reboot_required());selection_accepts=true;
+    lv_page_focus(radio_page,mesh_protocol_button,LV_ANIM_OFF);pump();click(mesh_protocol_button);click(mesh_confirm_apply_button);pump();
+    assert(selection_saves==1&&staged_protocol==MESH_PROTOCOL_MESHCORE&&active_protocol==MESH_PROTOCOL_MESHTASTIC&&restart_requests==0);
+    assert(tree_contains(mesh_protocol_status,"Restart required")&&!lv_obj_get_hidden(mesh_restart_button));save(argv[4],"protocol-staged");
+    lv_page_focus(radio_page,mesh_restart_button,LV_ANIM_OFF);pump();click(mesh_restart_button);click(mesh_confirm_cancel_button);assert(restart_requests==0);
+    click(mesh_restart_button);staged_protocol=MESH_PROTOCOL_MESHTASTIC;click(mesh_confirm_apply_button);assert(restart_requests==0&&!mesh_confirm_overlay);
+    staged_protocol=MESH_PROTOCOL_MESHCORE;meshtastic_app_refresh();lv_page_focus(radio_page,mesh_restart_button,LV_ANIM_OFF);pump();click(mesh_restart_button);click(mesh_confirm_apply_button);
+    assert(restart_requests==1&&!mesh_confirm_overlay);
+    // Simulate the next boot only inside the fixture: full public key and honest group semantics.
+    active_protocol=MESH_PROTOCOL_MESHCORE;meshtastic_app_refresh();pump();
+    assert(tree_contains(meshtastic_radio_label,"PUBLIC KEY")&&tree_contains(meshtastic_radio_label,"Group messages have no delivery ACK"));
+    assert(!tree_contains(meshtastic_radio_label,"!ABCDEF01"));
+    assert(lv_obj_get_hidden(mesh_restart_button));radio_staged=true;meshtastic_app_refresh();assert(!lv_obj_get_hidden(mesh_restart_button));radio_staged=false;meshtastic_error[0]=0;meshtastic_app_refresh();
+    lv_page_focus(radio_page,mesh_protocol_button,LV_ANIM_OFF);pump();save(argv[4],"meshcore-radio");
+    click(mesh_protocol_button);mainbar_jump_to_maintile(LV_ANIM_OFF);pump();assert(!mesh_confirm_overlay);
+    active_protocol=staged_protocol=MESH_PROTOCOL_MESHTASTIC;meshtastic_error[0]=0;meshtastic_app_refresh();
     mainbar_jump_to_tilenumber(meshtastic_app_tile_num,LV_ANIM_OFF,false);drag(width-30,height-14,30,height-14);assert(active()==meshtastic_app_tile_num+1);
     drag(30,height-14,width-30,height-14);assert(active()==meshtastic_app_tile_num);
 
@@ -167,8 +208,9 @@ int main(int argc,char**argv){
         long_channel_names=true;meshtastic_app_refresh();
         mainbar_jump_to_tilenumber(meshtastic_app_tile_num+2,LV_ANIM_OFF,false);pump();
         assert(lv_obj_get_height(meshtastic_channel_dropdown)>=mesh_touch);
+        lv_page_focus(radio_page,meshtastic_channel_dropdown,LV_ANIM_OFF);pump();
         click(meshtastic_channel_dropdown);pump();
-        auto dropdown_ext=(lv_dropdown_ext_t*)lv_obj_get_ext_attr(meshtastic_channel_dropdown);check_visible(dropdown_ext->page);
+        auto dropdown_ext=(lv_dropdown_ext_t*)lv_obj_get_ext_attr(meshtastic_channel_dropdown);assert(dropdown_ext->page);check_visible(dropdown_ext->page);
         save(argv[4],"channel-popup");
         lv_dropdown_close(meshtastic_channel_dropdown);select_channel(1);assert(selected_channel==1);
         save(argv[4],"long-channel");

@@ -20,7 +20,7 @@ OUT = ROOT / 'site/images/home-tactical-2026-09-28'
 LVGL = ROOT / '.pio/libdeps/tdeck-plus/lvgl'
 
 def run(args):
-    p = subprocess.run([str(a) for a in args], capture_output=True, text=True)
+    p = subprocess.run([str(a) for a in args], capture_output=True, text=True, timeout=120)
     if p.returncode:
         raise RuntimeError(p.stdout + p.stderr)
 
@@ -30,6 +30,7 @@ def main():
     parser.add_argument('--navigation',action='store_true',help='Validate actual mainbar/app/setup navigation instead of the focused home test.')
     parser.add_argument('--messages',action='store_true',help='Validate actual message-open function bodies with home pointer input and real mainbar navigation.')
     parser.add_argument('--mesh',action='store_true',help='Validate actual Mesh Chat UI, history and keyboard with native LVGL.')
+    parser.add_argument('--output-dir', type=Path, help='Optional evidence directory for Mesh Chat PNGs.')
     args=parser.parse_args()
     if not args.check_only:
         from PIL import Image
@@ -42,6 +43,7 @@ def main():
     if not cc or not cxx:
         raise SystemExit('Existing C/C++ compiler required; no download attempted.')
     screenshots = []
+    (ROOT / '.pio').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='xnode-home-capture-', dir=ROOT / '.pio') as scratch:
         temp = Path(scratch)
         stubs = temp / 'stubs'
@@ -98,7 +100,7 @@ def main():
                     run([exe,width,height,theme,ppm,'legacy-examples-on'])
                 if args.mesh:
                     if not args.check_only:
-                        evidence=ROOT.parent/'vault/xnode-mesh-chat-2026-09-28'
+                        evidence=args.output_dir or ROOT.parent/'vault/xnode-mesh-chat-2026-09-28'
                         evidence.mkdir(parents=True,exist_ok=True)
                         for frame in temp.glob(ppm.name+'-*.ppm'):
                             suffix=frame.name[len(ppm.name)+1:-4]
@@ -125,11 +127,11 @@ def main():
                 print('PASS', name, theme)
     if args.mesh:
         if not args.check_only:
-            evidence=ROOT.parent/'vault/xnode-mesh-chat-2026-09-28'
+            evidence=args.output_dir or ROOT.parent/'vault/xnode-mesh-chat-2026-09-28'
             paths=['src/app/meshtastic/meshtastic_app.cpp','src/app/meshtastic/mesh_history.cpp','src/app/meshtastic/mesh_history.h','src/gui/keyboard.cpp','support/home_capture/mesh.cpp','support/home_capture/capture.py']
             record=dict(method='actual-source-native-LVGL',hardware_capture=False,
                         scope='Actual Mesh Chat UI, bounded history, mainbar navigation and software keyboard; controlled radio/service and NVS fixtures. Does not establish RF exchange or persistent-device NVS behavior.',
-                        checks=['production starts live with no examples control or preview','legacy saved examples ON ignored in fresh process','channel drafts remain separate, including external channel change','real pointer dropdown with sparse channel slots 0 and 3','failed send retains draft; accepted send clears draft; outgoing statuses have no suffix and only acknowledged records show a checkmark','24-entry rollover preserves actual visible message text and within-card pixel offset','new-history button restores latest view','long received message renders and vertical scroll works','horizontal pointer swipes over chat and radio contents and footer, both directions','real watch/Pro keyboard pointer typing, page changes, OK/Cancel without radio fallthrough','watch keyboard inherits 80-character draft limit and multiline mode; handheld retains one-line mode','watch separate reading/review/radio pages, full-width primary buttons and retained drafts on Back','all watch Mesh buttons meet minimum 48px S3 / 72px Ultra height','radio content has no horizontal overflow','navigation retains mode/history/draft'],
+                        checks=['production starts live with no examples control or preview','legacy saved examples ON ignored in fresh process','channel drafts remain separate, including external channel change','real pointer dropdown with sparse channel slots 0 and 3','failed send retains draft; accepted send clears draft; outgoing statuses have no suffix and only acknowledged records show a checkmark','24-entry rollover preserves actual visible message text and within-card pixel offset','new-history button restores latest view','long received message renders and vertical scroll works','horizontal pointer swipes over chat and radio contents and footer, both directions','real watch/Pro keyboard pointer typing, page changes, OK/Cancel without radio fallthrough','watch keyboard inherits 80-character draft limit and multiline mode; handheld retains one-line mode','watch separate reading/review/radio pages, full-width primary buttons and retained drafts on Back','all watch Mesh buttons meet minimum 48px S3 / 72px Ultra height','radio content has no horizontal overflow','navigation retains mode/history/draft','protocol save/cancel/back/save-failure stages next boot without live backend change','restart cancel, confirmation and stale-selection rejection','MeshCore full public-key and no-ACK group readout','staged radio changes expose restart action'],
                         source_sha256={p:hashlib.sha256((ROOT/p).read_bytes()).hexdigest() for p in paths},
                         variants=[dict(target=t[0],width=t[2],height=t[3],themes=['dark','light']) for t in targets])
             (evidence/'native-mesh-evidence.json').write_text(json.dumps(record,indent=2)+'\n')

@@ -1,0 +1,8 @@
+{
+  "name": "XNodeMeshCore",
+  "version": "1.10.0",
+  "description": "Pinned MeshCore core and chat helpers; see UPSTREAM.md",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "dependencies": {"rweather/Crypto": "0.4.0"}
+}

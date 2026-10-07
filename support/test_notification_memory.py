@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 
 root = Path(__file__).resolve().parents[1]
+(root / '.pio').mkdir(exist_ok=True)
 compiler = shutil.which('clang++') or shutil.which('g++')
 if not compiler:
     raise SystemExit('Existing C++ compiler required')

@@ -10,8 +10,12 @@
     "test:menus": "python support/home_capture/capture.py --navigation --check-only",
     "test:messages": "python support/home_capture/capture.py --messages --check-only",
     "test:mesh-history": "python support/test_mesh_history.py",
-    "test:mesh": "npm run test:mesh-history && python support/home_capture/capture.py --mesh --check-only",
+    "test:mesh": "npm run test:mesh-protocol && npm run test:meshcore && npm run test:mesh-ble && npm run test:mesh-history && python support/home_capture/capture.py --mesh --check-only",
     "test:regression": "python support/check_watch_overlay_persistence.py && python support/regression_checks.py && python support/check_home_documentation.py && python support/test_notification_memory.py && python support/test_deferred_events.py",
-    "tests": "npm test"
+    "tests": "npm test",
+    "test:mesh-protocol": "python support/test_mesh_protocol.py",
+    "test:meshcore": "python src/app/meshcore/test_native.py && python support/test_meshcore_radio.py",
+    "test:mesh-ble": "python support/test_mesh_ble.py",
+    "test:meshcore-crypto": "python src/app/meshcore/test_crypto.py"
   }
 }

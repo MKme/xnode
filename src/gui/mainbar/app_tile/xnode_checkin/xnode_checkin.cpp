@@ -119,7 +119,7 @@ namespace {
     void xnode_checkin_send_event_cb( lv_obj_t *obj, lv_event_t event ) {
         static uint32_t last_event_ms = 0;
         if ( xnode_checkin_accept_button_event( event, last_event_ms, 1000 ) ) {
-            xnode_checkin_set_status( xnode_send_manual_checkin() ? "Check-in sent over mesh" : "Check-in not sent" );
+            xnode_checkin_set_status( xnode_send_manual_checkin() ? "Check-in queued" : "Check-in not sent" );
         }
     }
 

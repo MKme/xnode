@@ -1,6 +1,8 @@
 #include "config.h"
 #include "meshtastic_app.h"
 #include "meshtastic_service.h"
+#include "app/mesh/mesh_protocol.h"
+#include "app/meshcore/meshcore_service.h"
 #include "gui/app.h"
 #include "gui/keyboard.h"
 #include "gui/mainbar/mainbar.h"
@@ -16,6 +18,7 @@
 #include "utils/logging.h"
 #else
 #include <Arduino.h>
+#include <SPIFFS.h>
 #endif
 
 LV_IMG_DECLARE(message_64px);
@@ -46,6 +49,11 @@ static lv_obj_t *meshtastic_channel_dropdown, *meshtastic_input, *meshtastic_sen
 static lv_obj_t *meshtastic_timeline, *meshtastic_status_label;
 static lv_obj_t *meshtastic_radio_label, *meshtastic_send_label;
 static lv_obj_t *meshtastic_latest_btn;
+static lv_obj_t *mesh_protocol_button, *mesh_restart_button, *mesh_protocol_status;
+static lv_obj_t *mesh_confirm_overlay = NULL;
+static lv_obj_t *mesh_confirm_cancel_button, *mesh_confirm_apply_button;
+static mesh_protocol_t mesh_confirm_protocol = MESH_PROTOCOL_MESHTASTIC;
+static bool mesh_confirm_restart = false;
 static bool meshtastic_active = false;
 static uint32_t meshtastic_rendered_revision = UINT32_MAX;
 static int meshtastic_rendered_slot = -2;
@@ -58,6 +66,7 @@ static uint32_t meshtastic_card_sequence[24] = {};
 static int meshtastic_card_y[24] = {};
 static size_t meshtastic_card_count = 0;
 static void meshtastic_app_refresh(void);
+static void mesh_content(lv_obj_t *obj, lv_event_t event);
 static void meshtastic_render_history(bool force_bottom = false);
 
 static lv_obj_t *mesh_label(lv_obj_t *parent, const char *text, int x, int y, int width, bool small = false) {
@@ -87,8 +96,99 @@ static lv_obj_t *mesh_button(lv_obj_t *parent, const char *text, int x, int y, i
     return button;
 }
 
+static bool mesh_restart_required() {
+    return mesh_protocol_reboot_required() || meshcore_service_radio_reboot_required();
+}
+
+static void mesh_close_confirmation() {
+    if (mesh_confirm_overlay) {
+        lv_obj_del(mesh_confirm_overlay);
+        mesh_confirm_overlay = NULL;
+    }
+}
+
+static void mesh_confirm_cancel(lv_obj_t *, lv_event_t event) {
+    if (event == LV_EVENT_CLICKED) mesh_close_confirmation();
+}
+
+static void mesh_confirm_apply(lv_obj_t *, lv_event_t event) {
+    if (event != LV_EVENT_CLICKED) return;
+    // A BLE client may have staged a different selection while this was open.
+    // Never restart into a protocol other than the one confirmed on screen.
+    if (mesh_confirm_restart) {
+        if (mesh_confirm_protocol != mesh_protocol_get_selected()) {
+            snprintf(meshtastic_error, sizeof(meshtastic_error), "Selection changed. Review RADIO.");
+        } else {
+            mesh_close_confirmation();
+#ifdef NATIVE_64BIT
+            // The native fixture records confirmation without restarting its host.
+            log_i("Mesh restart confirmed");
+#else
+            SPIFFS.end();
+            ESP.restart();
+#endif
+            return;
+        }
+    } else if (!mesh_protocol_select(mesh_confirm_protocol)) {
+        snprintf(meshtastic_error, sizeof(meshtastic_error), "Protocol could not be saved");
+    } else {
+        meshtastic_error[0] = 0;
+    }
+    mesh_close_confirmation();
+    meshtastic_app_refresh();
+    // On the 240px watch, bring the saved status/restart action into view.
+    lv_obj_t *focus = mesh_restart_required() ? mesh_restart_button : mesh_protocol_status;
+    lv_page_focus(lv_obj_get_parent(lv_obj_get_parent(focus)), focus, LV_ANIM_OFF);
+}
+
+static void mesh_show_confirmation(bool restart) {
+    if (mesh_confirm_overlay) return;
+    keyboard_hide();
+    mesh_confirm_restart = restart;
+    mesh_confirm_protocol = restart ? mesh_protocol_get_selected() :
+        mesh_protocol_get_selected() == MESH_PROTOCOL_MESHTASTIC ? MESH_PROTOCOL_MESHCORE : MESH_PROTOCOL_MESHTASTIC;
+    if (!mesh_protocol_is_supported(mesh_confirm_protocol)) return;
+    const int w = lv_disp_get_hor_res(NULL), h = lv_disp_get_ver_res(NULL);
+    mesh_confirm_overlay = lv_obj_create(lv_layer_top(), NULL);
+    lv_obj_add_style(mesh_confirm_overlay, LV_OBJ_PART_MAIN, ws_get_app_opa_style());
+    lv_obj_set_style_local_bg_opa(mesh_confirm_overlay, LV_OBJ_PART_MAIN, LV_STATE_DEFAULT, LV_OPA_COVER);
+    lv_obj_set_size(mesh_confirm_overlay, w, h);
+    lv_obj_set_pos(mesh_confirm_overlay, 0, 0);
+    char question[144];
+    snprintf(question, sizeof(question), restart ?
+        "Restart in %s?\nDrafts, history and pending sends will be lost." :
+        "Save %s?\nRestart required.\nCurrent radio stays active.",
+        mesh_protocol_name(mesh_confirm_protocol));
+    mesh_label(mesh_confirm_overlay, question, 10, 14, w - 20, true);
+    const int button_h = mesh_watch ? mesh_touch : 38;
+    const int button_w = (w - 24) / 2;
+    mesh_confirm_cancel_button = mesh_button(mesh_confirm_overlay, "Cancel", 8, h - button_h - 12, button_w, button_h, mesh_confirm_cancel);
+    mesh_confirm_apply_button = mesh_button(mesh_confirm_overlay, restart ? "Restart" : "Save", w - button_w - 8, h - button_h - 12, button_w, button_h, mesh_confirm_apply);
+}
+
+static bool mesh_radio_control_click(lv_obj_t *obj, lv_event_t event) {
+    static lv_point_t origin;
+    static bool dragged = false;
+    lv_indev_t *input = lv_indev_get_act();
+    if (input && event == LV_EVENT_PRESSED) { lv_indev_get_point(input, &origin); dragged = false; }
+    if (input && (event == LV_EVENT_PRESSING || event == LV_EVENT_RELEASED)) {
+        lv_point_t point;
+        lv_indev_get_point(input, &point);
+        if (LV_MATH_ABS(point.x - origin.x) > 15 || LV_MATH_ABS(point.y - origin.y) > 15) dragged = true;
+    }
+    if (event == LV_EVENT_PRESSED || event == LV_EVENT_RELEASED) mesh_content(lv_obj_get_parent(obj), event);
+    return event == LV_EVENT_CLICKED && !dragged;
+}
+static void mesh_choose_protocol(lv_obj_t *obj, lv_event_t event) {
+    if (mesh_radio_control_click(obj, event)) mesh_show_confirmation(false);
+}
+static void mesh_restart(lv_obj_t *obj, lv_event_t event) {
+    if (mesh_radio_control_click(obj, event) && mesh_restart_required()) mesh_show_confirmation(true);
+}
+
 static void mesh_back(lv_obj_t *obj, lv_event_t event) {
     if (event != LV_EVENT_CLICKED) return;
+    if (mesh_confirm_overlay) { mesh_close_confirmation(); return; }
     keyboard_hide();
     if (mesh_watch && obj && lv_obj_get_parent(obj) != meshtastic_app_tile)
         mainbar_jump_to_tilenumber(meshtastic_app_tile_num + (lv_obj_get_parent(obj) == meshtastic_radio_tile ? 1 : 0), LV_ANIM_OFF, false);
@@ -141,6 +241,7 @@ static void mesh_input(lv_obj_t *obj, lv_event_t event) {
     if (event == LV_EVENT_CLICKED) keyboard_set_textarea(obj);
 }
 static void mesh_channel(lv_obj_t *obj, lv_event_t event) {
+    if (mesh_watch && (event == LV_EVENT_PRESSED || event == LV_EVENT_RELEASED)) mesh_content(lv_obj_get_parent(obj), event);
     if (event != LV_EVENT_VALUE_CHANGED) return;
     keyboard_hide();
     snprintf(meshtastic_drafts[meshtastic_draft_slot], 321, "%s", lv_textarea_get_text(meshtastic_input));
@@ -299,19 +400,46 @@ static void meshtastic_app_refresh(void) {
     const int slot = meshtastic_service_get_channel_slot(meshtastic_service_get_active_channel());
     if (meshtastic_rendered_slot != slot || meshtastic_rendered_revision != meshtastic_service_get_history_revision())
         meshtastic_render_history(meshtastic_rendered_slot != slot);
-    char info[640];
-    char peer[88];
-    if (meshtastic_service_get_last_peer()) snprintf(peer, sizeof(peer), "LAST PEER  !%08" PRIX32 "\n%d dBm / %.1f dB SNR", meshtastic_service_get_last_peer(), meshtastic_service_get_last_rssi(), meshtastic_service_get_last_snr());
-    else snprintf(peer, sizeof(peer), "LAST PEER\nNo packet observed");
-    snprintf(info, sizeof(info), "LOCAL NODE\n%s (%s)\n!%08" PRIX32 "\n\nRADIO\n%s\n%s / %.3f MHz\n\n%s\n\nHISTORY\nLast 24 texts across channels.\nCleared on restart. Times are local.\nCheckmark: acknowledgment received.\nNo mark: no acknowledgment yet.\n\nREPLY\nSend broadcasts to the selected\nchannel, including after a direct RX.",
-        meshtastic_service_get_long_name(), meshtastic_service_get_short_name(), meshtastic_service_get_node_id(),
-        meshtastic_service_get_status(), meshtastic_service_get_primary_channel_name(), meshtastic_service_get_frequency_mhz(), peer);
-    if (mesh_watch) {
-        char details[800];
-        snprintf(details, sizeof(details), "CHANNEL %d\n%s\n\n%s\n\n%s", current_slot + 1,
-            meshtastic_service_get_active_channel_name(), meshtastic_service_get_status(), info);
-        lv_label_set_text(meshtastic_radio_label, details);
-    } else lv_label_set_text(meshtastic_radio_label, info);
+    const bool meshcore = mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE;
+    char info[1200], peer[112], identity[180], radio[240];
+    if (meshcore) {
+        const char *key = meshcore_service_get_public_key_hex();
+        // Split all 64 key digits into readable lines; never substitute a 32-bit node ID.
+        snprintf(identity, sizeof(identity), "PUBLIC KEY\n%.16s\n%.16s\n%.16s\n%.16s", key, key + (strlen(key) >= 16 ? 16 : 0), key + (strlen(key) >= 32 ? 32 : 0), key + (strlen(key) >= 48 ? 48 : 0));
+        snprintf(peer, sizeof(peer), "LAST SENDER\n%s\n%d dBm / %.1f dB SNR", meshtastic_service_get_last_message_sender(), meshtastic_service_get_last_rssi(), meshtastic_service_get_last_snr());
+        meshcore_service_radio_config_t active_radio = {};
+        meshcore_service_get_active_radio_config(&active_radio);
+        snprintf(radio, sizeof(radio), "%.3f MHz / %.1f kHz\nSF%u / CR4/%u / %d dBm", active_radio.frequency_mhz, active_radio.bandwidth_khz, (unsigned)active_radio.spreading_factor, (unsigned)active_radio.coding_rate, (int)active_radio.tx_power_dbm);
+    } else {
+        snprintf(identity, sizeof(identity), "NODE ID\n!%08" PRIX32, meshtastic_service_get_node_id());
+        if (meshtastic_service_get_last_peer()) snprintf(peer, sizeof(peer), "LAST PEER  !%08" PRIX32 "\n%d dBm / %.1f dB SNR", meshtastic_service_get_last_peer(), meshtastic_service_get_last_rssi(), meshtastic_service_get_last_snr());
+        else snprintf(peer, sizeof(peer), "LAST PEER\nNo packet observed");
+        snprintf(radio, sizeof(radio), "%s / %.3f MHz", meshtastic_service_get_primary_channel_name(), meshtastic_service_get_frequency_mhz());
+    }
+    snprintf(info, sizeof(info), "LOCAL %s\n%s (%s)\n%s\n\nRADIO\n%s\n%s\n\n%s\n\nHISTORY\nLast 24 texts across channels.\nCleared on restart. Times are local.\n%s\n\nREPLY\n%s", mesh_protocol_name(mesh_protocol_get_active()),
+        meshtastic_service_get_long_name(), meshtastic_service_get_short_name(), identity,
+        meshtastic_service_get_status(), radio, peer,
+        meshcore ? "Group messages have no delivery ACK. No mark does not confirm delivery." : "Checkmark: acknowledgment received.\nNo mark: no acknowledgment yet.",
+        meshcore ? "Group broadcasts only. Select a matching channel and radio profile. Direct messages are not supported." : "Send broadcasts to the selected channel, including after a direct RX.");
+    lv_label_set_text(meshtastic_radio_label, info);
+    char protocol_status[180], button_text[48];
+    snprintf(protocol_status, sizeof(protocol_status), "Active: %s\nSelected: %s\n%s%s", mesh_protocol_name(mesh_protocol_get_active()), mesh_protocol_name(mesh_protocol_get_selected()),
+        mesh_restart_required() ? "Restart required" : "Selection active", meshtastic_error[0] ? "\n" : "");
+    if (meshtastic_error[0]) strncat(protocol_status, meshtastic_error, sizeof(protocol_status) - strlen(protocol_status) - 1);
+    lv_label_set_text(mesh_protocol_status, protocol_status);
+    const mesh_protocol_t alternative = mesh_protocol_get_selected() == MESH_PROTOCOL_MESHTASTIC ? MESH_PROTOCOL_MESHCORE : MESH_PROTOCOL_MESHTASTIC;
+    snprintf(button_text, sizeof(button_text), "Use %s", mesh_protocol_name(alternative));
+    lv_label_set_text(lv_obj_get_child(mesh_protocol_button, NULL), button_text);
+    lv_obj_set_hidden(mesh_protocol_button, !mesh_protocol_is_supported(alternative));
+    lv_obj_set_hidden(mesh_restart_button, !mesh_restart_required());
+    const int control_h = mesh_watch ? mesh_touch : 36;
+    const int control_top = mesh_watch ? mesh_touch + 10 : 4;
+    lv_obj_set_y(mesh_protocol_button, control_top);
+    lv_obj_set_y(mesh_protocol_status, control_top + control_h + 8);
+    int details_y = lv_obj_get_y(mesh_protocol_status) + lv_obj_get_height(mesh_protocol_status) + 8;
+    lv_obj_set_y(mesh_restart_button, details_y);
+    if (mesh_restart_required()) details_y += control_h + 8;
+    lv_obj_set_y(meshtastic_radio_label, details_y);
     if (mesh_watch) {
         lv_label_set_text(meshtastic_watch_channel, meshtastic_service_get_active_channel_name());
         char destination[96];
@@ -321,7 +449,7 @@ static void meshtastic_app_refresh(void) {
 }
 
 static void mesh_activate(void) { meshtastic_active = true; meshtastic_app_refresh(); }
-static void mesh_hibernate(void) { meshtastic_active = false; keyboard_hide(); }
+static void mesh_hibernate(void) { meshtastic_active = false; keyboard_hide(); mesh_close_confirmation(); if (meshtastic_channel_dropdown) lv_dropdown_close(meshtastic_channel_dropdown); }
 static bool mesh_hardware_button(EventBits_t event, void *) {
     if (event == BUTTON_EXIT) mesh_back(NULL, LV_EVENT_CLICKED);
     return true;
@@ -420,9 +548,20 @@ void meshtastic_app_setup(void) {
     lv_obj_set_style_local_pad_all(radio_page, LV_PAGE_PART_BG, LV_STATE_DEFAULT, 0);
     lv_obj_set_style_local_pad_all(radio_page, LV_PAGE_PART_SCROLLABLE, LV_STATE_DEFAULT, 0);
     lv_obj_set_event_cb(lv_page_get_scrollable(radio_page), mesh_content);
-    lv_obj_set_size(radio_page, w - 8, footer - top - (mesh_watch ? mesh_touch * 2 + 14 : 36));
-    lv_obj_set_pos(radio_page, 4, top + (mesh_watch ? mesh_touch * 2 + 12 : 34));
-    meshtastic_radio_label = mesh_label(lv_page_get_scrollable(radio_page), "", 4, 4, w - 32);
+    lv_obj_set_style_local_border_width(radio_page, LV_PAGE_PART_BG, LV_STATE_DEFAULT, 0);
+    lv_obj_set_size(radio_page, w - 8, footer - top - (mesh_watch ? mesh_touch + 8 : 36));
+    lv_obj_set_pos(radio_page, 4, top + (mesh_watch ? mesh_touch + 6 : 34));
+    lv_obj_t *radio_scroll = lv_page_get_scrollable(radio_page);
+    if (mesh_watch) {
+        lv_obj_set_parent(meshtastic_channel_dropdown, radio_scroll);
+        lv_obj_set_pos(meshtastic_channel_dropdown, 4, 4);
+        lv_obj_set_width(meshtastic_channel_dropdown, w - 32);
+    }
+    const int control_h = mesh_watch ? mesh_touch : 36;
+    mesh_protocol_button = mesh_button(radio_scroll, "", 4, 4, w - 32, control_h, mesh_choose_protocol);
+    mesh_protocol_status = mesh_label(radio_scroll, "", 4, control_h + 12, w - 32, true);
+    mesh_restart_button = mesh_button(radio_scroll, "Restart", 4, 4, w - 32, control_h, mesh_restart);
+    meshtastic_radio_label = mesh_label(radio_scroll, "", 4, 4, w - 32);
     meshtastic_service_setup();
     int slot = meshtastic_service_get_channel_slot(meshtastic_service_get_active_channel());
     meshtastic_draft_slot = slot < 0 || slot > 7 ? 8 : slot;

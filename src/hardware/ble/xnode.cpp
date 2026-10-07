@@ -5,6 +5,7 @@
 #ifndef NATIVE_64BIT
 
     #include <Arduino.h>
+    #include <atomic>
     #include <ArduinoJson.h>
     #include <cmath>
     #include <errno.h>
@@ -19,6 +20,9 @@
     #include "app/osmmap/osmmap_app_main.h"
     #include "app/osmmap/config/osmmap_config.h"
     #include "app/meshtastic/meshtastic_service.h"
+    #include "app/mesh/mesh_protocol.h"
+    #include "app/meshcore/meshcore_service.h"
+    #include "utils/json_psram_allocator.h"
     #include "gui/mainbar/app_tile/xnode_notifications/xnode_notifications.h"
     #include "gui/mainbar/setup_tile/bluetooth_settings/bluetooth_message.h"
     #include "hardware/blectl.h"
@@ -31,6 +35,7 @@
         constexpr const char *XNODE_SERVICE_UUID = "7f35b8a0-8d1c-4f8b-b8d5-1f1f0c0d0001";
         constexpr const char *XNODE_CHARACTERISTIC_UUID_RX = "7f35b8a0-8d1c-4f8b-b8d5-1f1f0c0d0002";
         constexpr const char *XNODE_CHARACTERISTIC_UUID_TX = "7f35b8a0-8d1c-4f8b-b8d5-1f1f0c0d0003";
+        constexpr const char *XNODE_CHARACTERISTIC_UUID_SECURE = "7f35b8a0-8d1c-4f8b-b8d5-1f1f0c0d0004";
         #if defined( LILYGO_WATCH_ULTRA )
             constexpr const char *XNODE_OFFLINE_TILE_ROOT = "/sd/osmmap";
             constexpr const char *XNODE_OFFLINE_TILE_PREFIX = "/sd/osmmap/";
@@ -65,7 +70,16 @@
 
         typedef struct {
             char text[ XNODE_FRAME_BUFFER ];
+            uint32_t connection_epoch;
+            uint16_t connection_handle;
+            bool authenticated;
         } xnode_rx_frame_t;
+
+        // Disconnects invalidate both queued frames and partially assembled JSON.
+        std::atomic<uint32_t> xnode_connection_epoch{1};
+        uint32_t xnode_rx_connection_epoch = 0;
+        uint16_t xnode_rx_connection_handle = 0xffff;
+        bool xnode_rx_authenticated = false;
 
         char xnode_last_host_name[ 32 ] = "XTOC";
         xnode_config_t xnode_config;
@@ -98,6 +112,9 @@
             xnode_rx_total = 0;
             xnode_rx_index = 0;
             xnode_rx_encoded = "";
+            xnode_rx_connection_epoch = 0;
+            xnode_rx_connection_handle = 0xffff;
+            xnode_rx_authenticated = false;
         }
 
         bool xnode_queue_notification( const char *title, const char *body ) {
@@ -203,6 +220,113 @@
             }
 
             return( changed );
+        }
+
+        const char *xnode_protocol_id(mesh_protocol_t protocol) {
+            return protocol == MESH_PROTOCOL_MESHCORE ? "meshcore" : "meshtastic";
+        }
+
+        bool xnode_parse_protocol(JsonVariantConst value, mesh_protocol_t &protocol) {
+            if (!value.is<const char *>()) return false;
+            const char *name = value.as<const char *>();
+            if (!strcmp(name, "meshtastic")) protocol = MESH_PROTOCOL_MESHTASTIC;
+            else if (!strcmp(name, "meshcore")) protocol = MESH_PROTOCOL_MESHCORE;
+            else return false;
+            return mesh_protocol_is_supported(protocol);
+        }
+
+        bool xnode_payload_matches_active_protocol(JsonObjectConst payload) {
+            mesh_protocol_t protocol;
+            return xnode_parse_protocol(payload["protocol"], protocol) && protocol == mesh_protocol_get_active();
+        }
+
+        void xnode_fill_protocol_payload(JsonObject payload) {
+            JsonArray available = payload.createNestedArray("meshProtocolsAvailable");
+            if (mesh_protocol_is_supported(MESH_PROTOCOL_MESHTASTIC)) available.add("meshtastic");
+            if (mesh_protocol_is_supported(MESH_PROTOCOL_MESHCORE)) available.add("meshcore");
+            payload["meshProtocolActive"] = xnode_protocol_id(mesh_protocol_get_active());
+            payload["meshProtocolSelected"] = xnode_protocol_id(mesh_protocol_get_selected());
+            payload["protocolRequiresRestart"] = mesh_protocol_reboot_required();
+            payload["radioRequiresRestart"] = meshcore_service_radio_reboot_required();
+            payload["meshMode"] = mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE ? "group-broadcast" : "channel-mesh";
+            payload["nativeMeshcoreCompanion"] = false;
+            payload["meshMutationRequiresPairing"] = true;
+            payload["meshSecureConfigVersion"] = 1;
+        }
+
+        void xnode_fill_meshcore_user_payload(JsonObject payload) {
+            payload["publicKey"] = meshcore_service_get_public_key_hex();
+            payload["idType"] = "ed25519-public-key";
+            payload["longName"] = meshtastic_service_get_long_name();
+        }
+
+        void xnode_fill_meshcore_radio_payload(JsonObject payload, bool active) {
+            meshcore_service_radio_config_t config = {};
+            if (active) meshcore_service_get_active_radio_config(&config);
+            else meshcore_service_get_radio_config(&config);
+            payload["frequencyMhz"] = config.frequency_mhz;
+            payload["bandwidthKhz"] = config.bandwidth_khz;
+            payload["spreadingFactor"] = config.spreading_factor;
+            payload["codingRate"] = config.coding_rate;
+            payload["txPowerDbm"] = config.tx_power_dbm;
+        }
+
+        bool xnode_valid_mesh_name(const char *name, size_t max_bytes) {
+            if (!name || !name[0] || strlen(name) > max_bytes) return false;
+            for (const unsigned char *p = (const unsigned char *)name; *p; ++p)
+                if (*p < 0x20 || *p == ':' || *p == 0x7f) return false;
+            return true;
+        }
+
+        int xnode_hex_digit(char c) {
+            if (c >= '0' && c <= '9') return c - '0';
+            if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+            if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+            return -1;
+        }
+
+        bool xnode_parse_meshcore_channel(JsonObjectConst payload, uint8_t &slot, meshtastic_service_channel_info_t &info) {
+            if (!payload["slot"].is<unsigned>() || payload["slot"].as<unsigned>() > 7 || !payload["enabled"].is<bool>()) return false;
+            slot = payload["slot"].as<unsigned>();
+            memset(&info, 0, sizeof(info));
+            info.enabled = payload["enabled"].as<bool>();
+            info.role = info.enabled ? (slot == 0 ? MESHTASTIC_SERVICE_CHANNEL_ROLE_PRIMARY : MESHTASTIC_SERVICE_CHANNEL_ROLE_SECONDARY) : MESHTASTIC_SERVICE_CHANNEL_ROLE_DISABLED;
+            if (!info.enabled) return true;
+            const char *name = payload["name"] | "";
+            const char *key = payload["keyHex"] | "";
+            const size_t key_length = strlen(key);
+            if (!xnode_valid_mesh_name(name, sizeof(info.name) - 1) || (key_length != 32 && key_length != 64)) return false;
+            strlcpy(info.name, name, sizeof(info.name));
+            info.psk_len = key_length / 2;
+            for (size_t i = 0; i < info.psk_len; ++i) {
+                const int hi = xnode_hex_digit(key[2 * i]), lo = xnode_hex_digit(key[2 * i + 1]);
+                if (hi < 0 || lo < 0) return false;
+                info.psk[i] = (uint8_t)((hi << 4) | lo);
+            }
+            return true;
+        }
+
+        bool xnode_parse_frame_number(const char *begin, const char *end, uint16_t &out) {
+            if (!begin || !end || begin >= end || end - begin > 4) return false;
+            unsigned value = 0;
+            for (const char *p = begin; p < end; ++p) {
+                if (*p < '0' || *p > '9') return false;
+                value = value * 10 + (unsigned)(*p - '0');
+                if (value > XNODE_MAX_ENCODED) return false;
+            }
+            if (value == 0) return false;
+            out = (uint16_t)value;
+            return true;
+        }
+
+        const char *xnode_mesh_mutation_reply_type(const char *type) {
+            if (!strcmp(type, "setMeshProtocol")) return "meshProtocolAck";
+            if (!strcmp(type, "meshSend")) return "meshSendAck";
+            if (!strcmp(type, "selectMeshChannel")) return "meshChannelAck";
+            if (!strcmp(type, "setMeshcoreChannel")) return "meshChannelsAck";
+            if (!strcmp(type, "setMeshcoreUser")) return "meshcoreUserAck";
+            if (!strcmp(type, "setMeshcoreRadio")) return "meshcoreRadioAck";
+            return NULL;
         }
 
         void xnode_fill_meshtastic_user_payload( JsonObject payload ) {
@@ -527,11 +651,12 @@
         }
 
         bool xnode_send_event( const char *type, JsonVariantConst payload ) {
-            DynamicJsonDocument doc( 1536 );
+            SpiRamJsonDocument doc( XNODE_MAX_JSON );
             String json;
 
             doc[ "type" ] = type;
             doc[ "payload" ] = payload;
+            if (doc.overflowed()) return false;
             serializeJson( doc, json );
             return( xnode_send_json_text( json ) );
         }
@@ -1054,9 +1179,10 @@
         }
 
         bool xnode_send_hello_ack( void ) {
-            StaticJsonDocument< 1024 > payload;
+            SpiRamJsonDocument payload( 3072 );
             JsonArray capabilities = payload.createNestedArray( "capabilities" );
-            JsonObject mesh_user = payload.createNestedObject( "meshtasticUser" );
+            const bool meshcore = mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE;
+            xnode_fill_protocol_payload(payload.as<JsonObject>());
 
             payload[ "deviceName" ] = device_get_name();
             payload[ "protocolVersion" ] = 1;
@@ -1064,10 +1190,16 @@
             payload[ "hardware" ] = HARDWARE_NAME;
             payload[ "meshReady" ] = meshtastic_service_is_ready();
             payload[ "meshStatus" ] = meshtastic_service_get_status();
-            payload[ "nodeId" ] = meshtastic_service_get_node_id();
+            if (meshcore) {
+                xnode_fill_meshcore_user_payload(payload.createNestedObject("meshcoreUser"));
+                xnode_fill_meshcore_radio_payload(payload.createNestedObject("meshcoreRadioActive"), true);
+                xnode_fill_meshcore_radio_payload(payload.createNestedObject("meshcoreRadioSelected"), false);
+            } else {
+                payload["nodeId"] = meshtastic_service_get_node_id();
+                xnode_fill_meshtastic_user_payload(payload.createNestedObject("meshtasticUser"));
+            }
             payload[ "watchUnitId" ] = xnode_watch_unit_id;
             payload[ "sosToUnitId" ] = xnode_sos_to_unit_id;
-            xnode_fill_meshtastic_user_payload( mesh_user );
             payload[ "hasLocation" ] = xnode_has_location;
             if ( xnode_has_location ) {
                 payload[ "lat" ] = xnode_last_lat;
@@ -1075,15 +1207,19 @@
             }
             capabilities.add( "sync" );
             capabilities.add( "location" );
-            capabilities.add( "meshtastic" );
+            capabilities.add( xnode_protocol_id(mesh_protocol_get_active()) );
+            capabilities.add( "meshProtocolSelection" );
+            capabilities.add( "meshSend" );
+            capabilities.add( "meshChannels" );
             capabilities.add( "basemap" );
             capabilities.add( "mapOverlay" );
             capabilities.add( "newsNotifications" );
             capabilities.add( "manualSos" );
-            capabilities.add( "meshtasticNodeConfig" );
+            capabilities.add( meshcore ? "meshcoreNodeConfig" : "meshtasticNodeConfig" );
+            if (meshcore) capabilities.add("meshcoreRadioConfig");
             capabilities.add( "ble" );
 
-            return( xnode_send_event( "helloAck", payload ) );
+            return( !payload.overflowed() && xnode_send_event( "helloAck", payload ) );
         }
 
         bool xnode_apply_location_payload( JsonObjectConst payload, bool notify_user ) {
@@ -1153,7 +1289,7 @@
             return( true );
         }
 
-        void xnode_handle_command( DynamicJsonDocument &doc ) {
+        void xnode_handle_command( DynamicJsonDocument &doc, bool authenticated ) {
             const char *type = doc[ "type" ] | "";
             JsonObjectConst payload = doc[ "payload" ].as<JsonObjectConst>();
 
@@ -1163,6 +1299,166 @@
 
             if ( strcmp( type, "hello" ) == 0 ) {
                 xnode_send_hello_ack();
+                return;
+            }
+
+            const char *protected_reply = xnode_mesh_mutation_reply_type(type);
+            if (protected_reply && !authenticated) {
+                StaticJsonDocument<256> reply;
+                reply["requestId"] = doc["requestId"] | "";
+                reply["ok"] = false;
+                reply["error"] = "pairing-required";
+                reply["protocol"] = xnode_protocol_id(mesh_protocol_get_active());
+                xnode_send_event(protected_reply, reply);
+                return;
+            }
+
+            if (!strcmp(type, "getMeshProtocol") || !strcmp(type, "setMeshProtocol")) {
+                StaticJsonDocument<1024> reply;
+                reply["requestId"] = doc["requestId"] | "";
+                bool ok = true;
+                const char *error = "";
+                if (!strcmp(type, "setMeshProtocol")) {
+                    mesh_protocol_t requested;
+                    // Selection never restarts this device. A separate, explicit on-device
+                    // Restart confirmation applies both staged protocol and radio settings.
+                    if (payload.containsKey("reboot") && (!payload["reboot"].is<bool>() || payload["reboot"].as<bool>())) {
+                        ok = false; error = "restart-on-device-required";
+                    } else if (!xnode_parse_protocol(payload["protocol"], requested)) {
+                        ok = false; error = "unsupported-protocol";
+                    } else if (!mesh_protocol_select(requested)) {
+                        ok = false; error = "save-failed";
+                    }
+                }
+                xnode_fill_protocol_payload(reply.to<JsonObject>());
+                reply["requestId"] = doc["requestId"] | "";
+                reply["meshReady"] = meshtastic_service_is_ready();
+                reply["meshStatus"] = meshtastic_service_get_status();
+                if (mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE)
+                    xnode_fill_meshcore_user_payload(reply.createNestedObject("meshcoreUser"));
+                reply["ok"] = ok;
+                reply["error"] = error;
+                reply["restarted"] = false;
+                reply["restartAction"] = "device-radio-restart";
+                xnode_send_event("meshProtocolAck", reply);
+                return;
+            }
+
+            if (!strcmp(type, "meshSend") || !strcmp(type, "selectMeshChannel")) {
+                StaticJsonDocument<512> reply;
+                reply["requestId"] = doc["requestId"] | "";
+                bool ok = false;
+                const char *error = "protocol-mismatch";
+                if (xnode_payload_matches_active_protocol(payload)) {
+                    if (!strcmp(type, "meshSend")) {
+                        const char *text = payload["text"] | "";
+                        bool has_text = false;
+                        for (const char *p = text; *p; ++p) if (*p != ' ' && *p != '\t' && *p != '\r' && *p != '\n') has_text = true;
+                        // This command is deliberately group-only. Do not truncate a public
+                        // key or interpret a Meshtastic destination as a MeshCore identity.
+                        if (payload.containsKey("to") || payload.containsKey("dest") || payload.containsKey("destination") || payload.containsKey("toNode") || payload.containsKey("to_node") || payload.containsKey("nodeId") || payload.containsKey("publicKey")) error = "broadcast-only";
+                        else if (payload.containsKey("channel") || payload.containsKey("channelIndex") || payload.containsKey("channelSlot")) error = "select-channel-first";
+                        else if (!has_text || strlen(text) > 200) error = "invalid-text";
+                        else { ok = meshtastic_service_send_text(text); error = ok ? "" : "send-rejected"; }
+                    } else if (!payload["index"].is<unsigned>() || payload["index"].as<unsigned>() >= meshtastic_service_get_channel_count()) {
+                        error = "invalid-channel-index";
+                    } else { ok = meshtastic_service_set_active_channel(payload["index"].as<unsigned>()); error = ok ? "" : "channel-rejected"; }
+                }
+                reply["ok"] = ok;
+                reply["error"] = error;
+                reply["protocol"] = xnode_protocol_id(mesh_protocol_get_active());
+                reply["status"] = meshtastic_service_get_status();
+                reply["channelIndex"] = meshtastic_service_get_active_channel();
+                reply["channelSlot"] = meshtastic_service_get_channel_slot(meshtastic_service_get_active_channel());
+                if (!strcmp(type, "meshSend")) { reply["queued"] = ok; reply["delivered"] = false; }
+                else reply["activeIndex"] = meshtastic_service_get_active_channel();
+                xnode_send_event(!strcmp(type, "meshSend") ? "meshSendAck" : "meshChannelAck", reply);
+                return;
+            }
+
+            if (!strcmp(type, "getMeshChannels") || !strcmp(type, "setMeshcoreChannel")) {
+                SpiRamJsonDocument reply(2048);
+                reply["requestId"] = doc["requestId"] | "";
+                const bool set_channel = !strcmp(type, "setMeshcoreChannel");
+                bool ok = xnode_payload_matches_active_protocol(payload) && (!set_channel || mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE);
+                const char *error = ok ? "" : "protocol-mismatch";
+                if (ok && set_channel) {
+                    uint8_t slot = 0;
+                    meshtastic_service_channel_info_t info = {};
+                    if (!xnode_parse_meshcore_channel(payload, slot, info)) { ok = false; error = "invalid-channel"; }
+                    else if (!meshtastic_service_set_channel_info(slot, &info)) { ok = false; error = "save-failed"; }
+                }
+                reply["ok"] = ok;
+                reply["error"] = error;
+                reply["protocol"] = xnode_protocol_id(mesh_protocol_get_active());
+                reply["activeIndex"] = meshtastic_service_get_active_channel();
+                JsonArray channels = reply.createNestedArray("channels");
+                if (ok) for (uint8_t index = 0; index < meshtastic_service_get_channel_count(); ++index) {
+                    const int8_t slot = meshtastic_service_get_channel_slot(index);
+                    meshtastic_service_channel_info_t info = {};
+                    if (slot < 0 || !meshtastic_service_get_channel_info(slot, &info)) continue;
+                    JsonObject item = channels.createNestedObject();
+                    item["index"] = index; item["slot"] = slot; item["name"] = info.name;
+                    item["keyBytes"] = info.psk_len;
+                }
+                xnode_send_event("meshChannelsAck", reply);
+                return;
+            }
+
+            if (!strcmp(type, "setMeshcoreUser")) {
+                StaticJsonDocument<512> reply;
+                reply["requestId"] = doc["requestId"] | "";
+                const char *name = payload["longName"] | "";
+                bool ok = mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE;
+                const char *error = ok ? "" : "protocol-mismatch";
+                if (ok) {
+                    if (!xnode_valid_mesh_name(name, 31) || payload.containsKey("shortName") || payload.containsKey("isLicensed") || payload.containsKey("isUnmessageable") ||
+                        (payload.containsKey("broadcast") && !payload["broadcast"].is<bool>())) { ok = false; error = "invalid-user"; }
+                    else {
+                        meshtastic_service_user_info_t info = {};
+                        meshtastic_service_get_user_info(&info);
+                        strlcpy(info.long_name, name, sizeof(info.long_name));
+                        ok = meshtastic_service_set_user_info(&info);
+                        if (!ok) error = "save-failed";
+                    }
+                }
+                const bool broadcast = ok && (payload["broadcast"] | false);
+                if (broadcast) meshtastic_service_schedule_node_info_broadcast(250);
+                // The backend automatically schedules an advertisement after a name save;
+                // broadcast:true merely brings that scheduled send forward.
+                reply["ok"] = ok; reply["error"] = error; reply["broadcastQueued"] = ok;
+                if (mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE) xnode_fill_meshcore_user_payload(reply.createNestedObject("meshcoreUser"));
+                xnode_send_event("meshcoreUserAck", reply);
+                return;
+            }
+
+            if (!strcmp(type, "getMeshcoreRadio") || !strcmp(type, "setMeshcoreRadio")) {
+                StaticJsonDocument<768> reply;
+                reply["requestId"] = doc["requestId"] | "";
+                bool ok = mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE;
+                const char *error = ok ? "" : "protocol-mismatch";
+                if (ok && !strcmp(type, "setMeshcoreRadio")) {
+                    meshcore_service_radio_config_t config = {};
+                    // Check JSON types and integer bounds before narrowing them.
+                    if (!payload["frequencyMhz"].is<float>() || !payload["bandwidthKhz"].is<float>() ||
+                        !payload["spreadingFactor"].is<unsigned>() || payload["spreadingFactor"].as<unsigned>() < 7 || payload["spreadingFactor"].as<unsigned>() > 12 ||
+                        !payload["codingRate"].is<unsigned>() || payload["codingRate"].as<unsigned>() < 5 || payload["codingRate"].as<unsigned>() > 8 ||
+                        !payload["txPowerDbm"].is<int>() || payload["txPowerDbm"].as<int>() < -9 || payload["txPowerDbm"].as<int>() > 22) {
+                        ok = false; error = "invalid-radio-profile";
+                    } else {
+                        config.frequency_mhz = payload["frequencyMhz"].as<float>(); config.bandwidth_khz = payload["bandwidthKhz"].as<float>();
+                        config.spreading_factor = payload["spreadingFactor"].as<unsigned>(); config.coding_rate = payload["codingRate"].as<unsigned>(); config.tx_power_dbm = payload["txPowerDbm"].as<int>();
+                        ok = meshcore_service_set_radio_config(&config);
+                        if (!ok) error = "invalid-profile-or-save-failed";
+                    }
+                }
+                reply["ok"] = ok; reply["error"] = error; reply["restarted"] = false;
+                reply["radioRequiresRestart"] = meshcore_service_radio_reboot_required();
+                if (mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE) {
+                    xnode_fill_meshcore_radio_payload(reply.createNestedObject("active"), true);
+                    xnode_fill_meshcore_radio_payload(reply.createNestedObject("selected"), false);
+                }
+                xnode_send_event("meshcoreRadioAck", reply);
                 return;
             }
 
@@ -1179,6 +1475,12 @@
 
             if ( strcmp( type, "setMeshtasticUser" ) == 0 ) {
                 StaticJsonDocument< 384 > reply;
+                if (mesh_protocol_get_active() != MESH_PROTOCOL_MESHTASTIC) {
+                    reply["ok"] = false; reply["broadcastQueued"] = false;
+                    reply["error"] = "protocol-mismatch";
+                    xnode_send_event("meshtasticUserAck", reply);
+                    return;
+                }
                 bool broadcast_requested = false;
                 const bool saved = xnode_apply_meshtastic_user_payload( payload, &broadcast_requested );
                 JsonObject user = reply.createNestedObject( "meshtasticUser" );
@@ -1347,9 +1649,11 @@
                 return;
             }
 
-            if ( strcmp( type, "meshtasticRx" ) == 0 ) {
+            if ( strcmp( type, "meshtasticRx" ) == 0 || strcmp(type, "meshRx") == 0 ) {
+                if ((!strcmp(type, "meshtasticRx") && mesh_protocol_get_active() != MESH_PROTOCOL_MESHTASTIC) ||
+                    (!strcmp(type, "meshRx") && !xnode_payload_matches_active_protocol(payload))) return;
                 const char *text = payload[ "text" ] | "";
-                const char *from = payload[ "from" ] | "Meshtastic";
+                const char *from = payload[ "from" ] | mesh_protocol_name(mesh_protocol_get_active());
 
                 if ( text[ 0 ] ) {
                     xnode_queue_notification( from, text );
@@ -1577,7 +1881,9 @@
             }
         }
 
-        void xnode_handle_frame( const char *frame ) {
+        void xnode_handle_frame( const xnode_rx_frame_t &incoming ) {
+            if (incoming.connection_epoch != xnode_connection_epoch.load()) { xnode_reset_rx(); return; }
+            const char *frame = incoming.text;
             if ( frame && strncmp( frame, "T:", 2 ) == 0 ) {
                 xnode_handle_file_stream_frame( frame );
                 return;
@@ -1592,15 +1898,16 @@
             }
 
             char id[ sizeof( xnode_rx_id ) ];
-            const size_t id_len = min( (size_t)( first - frame ), sizeof( id ) - 1 );
+            const size_t id_len = (size_t)( first - frame );
+            if (id_len == 0 || id_len >= sizeof(id)) { xnode_reset_rx(); return; }
             memcpy( id, frame, id_len );
             id[ id_len ] = '\0';
 
-            const int index = atoi( first + 1 );
-            const int total = atoi( second + 1 );
+            uint16_t index = 0, total = 0;
             const char *chunk = third + 1;
 
-            if ( !id[ 0 ] || index < 1 || total < 1 || index > total || !chunk[ 0 ] ) {
+            if ( !xnode_parse_frame_number(first + 1, second, index) ||
+                 !xnode_parse_frame_number(second + 1, third, total) || index > total || !chunk[ 0 ] ) {
                 xnode_reset_rx();
                 return;
             }
@@ -1609,10 +1916,16 @@
                 xnode_reset_rx();
                 strlcpy( xnode_rx_id, id, sizeof( xnode_rx_id ) );
                 xnode_rx_total = total;
-                xnode_rx_encoded.reserve( min( (size_t)( total * XNODE_FRAME_CHUNK ), (size_t)XNODE_MAX_ENCODED ) );
+                xnode_rx_connection_epoch = incoming.connection_epoch;
+                xnode_rx_connection_handle = incoming.connection_handle;
+                xnode_rx_authenticated = incoming.authenticated;
+                xnode_rx_encoded.reserve( min( (size_t)total * XNODE_FRAME_CHUNK, (size_t)XNODE_MAX_ENCODED ) );
             }
 
-            if ( strcmp( id, xnode_rx_id ) != 0 || total != xnode_rx_total || index != ( xnode_rx_index + 1 ) ) {
+            if ( strcmp( id, xnode_rx_id ) != 0 || total != xnode_rx_total || index != ( xnode_rx_index + 1 ) ||
+                 incoming.connection_epoch != xnode_rx_connection_epoch ||
+                 incoming.connection_handle != xnode_rx_connection_handle ||
+                 incoming.authenticated != xnode_rx_authenticated ) {
                 xnode_reset_rx();
                 return;
             }
@@ -1631,7 +1944,9 @@
 
                 if ( xnode_base64url_decode( xnode_rx_encoded.c_str(), decoded_json ) &&
                      deserializeJson( doc, decoded_json ) == DeserializationError::Ok ) {
-                    xnode_handle_command( doc );
+                    // Authentication belongs to every fragment's actual connection,
+                    // never to a global "connected" UI/event flag.
+                    xnode_handle_command( doc, xnode_rx_authenticated && incoming.connection_epoch == xnode_connection_epoch.load() );
                 }
                 else {
                     xnode_send_status_event( "rx-json-error", "command-parse-failed", XNODE_OFFLINE_TILE_ROOT );
@@ -1645,17 +1960,24 @@
 
             while ( true ) {
                 if ( xQueueReceive( xnode_rx_queue, &frame, portMAX_DELAY ) == pdTRUE ) {
-                    xnode_handle_frame( frame.text );
+                    xnode_handle_frame( frame );
                 }
             }
         }
 
         class XnodeCallbacks: public NimBLECharacteristicCallbacks {
-            void onWrite( NimBLECharacteristic *pCharacteristic ) {
+            void onWrite( NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc ) override {
                 const std::string value = pCharacteristic->getValue();
-                xnode_rx_frame_t frame = { 0 };
+                // Input can contain channel keys. Never retain it as a readable
+                // characteristic value after copying the one incoming frame.
+                pCharacteristic->setValue((const uint8_t *)"", 0);
+                if (!desc) return;
+                xnode_rx_frame_t frame = {};
 
-                if ( !value.empty() ) {
+                if ( !value.empty() && value.size() < sizeof(frame.text) && value.find('\0') == std::string::npos ) {
+                    frame.connection_epoch = xnode_connection_epoch.load();
+                    frame.connection_handle = desc->conn_handle;
+                    frame.authenticated = desc->sec_state.encrypted && desc->sec_state.authenticated;
                     strlcpy( frame.text, value.c_str(), sizeof( frame.text ) );
                     if ( xnode_rx_queue ) {
                         xQueueSend( xnode_rx_queue, &frame, pdMS_TO_TICKS( 20 ) );
@@ -1665,6 +1987,14 @@
         };
 
         XnodeCallbacks xnode_callbacks;
+
+        class XnodeSecureCallbacks: public XnodeCallbacks {
+            void onRead(NimBLECharacteristic *characteristic, ble_gap_conn_desc *desc) override {
+                const uint8_t authenticated = desc && desc->sec_state.encrypted && desc->sec_state.authenticated ? 1 : 0;
+                characteristic->setValue(&authenticated, 1);
+            }
+        };
+        XnodeSecureCallbacks xnode_secure_callbacks;
 
         bool xnode_gpsctl_event_cb( EventBits_t event, void *arg ) {
             gps_data_t *gps_data = (gps_data_t *)arg;
@@ -1688,6 +2018,10 @@
 
     const char *xnode_ble_service_uuid( void ) {
         return( XNODE_SERVICE_UUID );
+    }
+
+    void xnode_on_disconnect(void) {
+        xnode_connection_epoch.fetch_add(1);
     }
 
     void xnode_setup( void ) {
@@ -1714,37 +2048,71 @@
 
         pXnodeRXCharacteristic = pXnodeService->createCharacteristic(
             NimBLEUUID( XNODE_CHARACTERISTIC_UUID_RX ),
-            NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::READ
+            NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR
         );
         pXnodeRXCharacteristic->setCallbacks( &xnode_callbacks );
+
+        // Access triggers the existing display/passkey pairing flow. Key-bearing
+        // commands use this protected writer, never the legacy cleartext RX.
+        NimBLECharacteristic *secure = pXnodeService->createCharacteristic(
+            NimBLEUUID(XNODE_CHARACTERISTIC_UUID_SECURE),
+            NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::READ_ENC | NIMBLE_PROPERTY::READ_AUTHEN |
+            NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_ENC | NIMBLE_PROPERTY::WRITE_AUTHEN
+        );
+        secure->setCallbacks(&xnode_secure_callbacks);
 
         pXnodeService->start();
         pAdvertising->addServiceUUID( pXnodeService->getUUID() );
     }
 
     bool xnode_send_meshtastic_rx( const char *from, const char *text ) {
-        StaticJsonDocument< 384 > payload;
+        StaticJsonDocument< 512 > payload;
 
-        payload[ "from" ] = from ? from : "Meshtastic";
+        payload[ "from" ] = from ? from : mesh_protocol_name(mesh_protocol_get_active());
         payload[ "text" ] = text ? text : "";
+        payload[ "protocol" ] = xnode_protocol_id(mesh_protocol_get_active());
+        payload[ "mode" ] = mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE ? "group-broadcast" : "channel-mesh";
         payload[ "ts" ] = (uint32_t)( millis() / 1000 );
-        return( xnode_send_event( "meshtasticRx", payload ) );
+        return( xnode_send_event( mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE ? "meshRx" : "meshtasticRx", payload ) );
     }
 
     bool xnode_send_location_update( double lat, double lon, const char *label ) {
+        // Only this device's GPS/local location may update the emergency position.
+        if (!std::isfinite(lat) || !std::isfinite(lon) || lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) return false;
         StaticJsonDocument< 320 > payload;
 
-        if ( lat >= -90.0 && lat <= 90.0 && lon >= -180.0 && lon <= 180.0 ) {
-            xnode_last_lat = lat;
-            xnode_last_lon = lon;
-            xnode_has_location = true;
-            xnode_save_persistent_location_if_due( false );
-        }
+        xnode_last_lat = lat;
+        xnode_last_lon = lon;
+        xnode_has_location = true;
+        xnode_save_persistent_location_if_due( false );
         payload[ "lat" ] = lat;
         payload[ "lon" ] = lon;
-        payload[ "label" ] = label ? label : "Meshtastic";
+        payload[ "label" ] = label ? label : mesh_protocol_name(mesh_protocol_get_active());
         payload[ "ts" ] = (uint32_t)( millis() / 1000 );
         return( xnode_send_event( "location", payload ) );
+    }
+
+    bool xnode_send_peer_location( double lat, double lon, const char *label, const char *public_key ) {
+        if (!std::isfinite(lat) || !std::isfinite(lon) || lat < -90.0 || lat > 90.0 || lon < -180.0 || lon > 180.0) return false;
+        if (public_key) {
+            if (mesh_protocol_get_active() != MESH_PROTOCOL_MESHCORE || strlen(public_key) != 64) return false;
+            for (const char *p = public_key; *p; ++p) if (xnode_hex_digit(*p) < 0) return false;
+        }
+        StaticJsonDocument< 512 > payload;
+
+        // A radio peer's position must never become our SOS/check-in position,
+        // including in older hosts that interpret the legacy location event as us.
+        payload[ "lat" ] = lat;
+        payload[ "lon" ] = lon;
+        payload[ "label" ] = label ? label : mesh_protocol_name(mesh_protocol_get_active());
+        payload[ "ts" ] = (uint32_t)( millis() / 1000 );
+        payload[ "source" ] = "mesh-peer";
+        payload[ "protocol" ] = xnode_protocol_id(mesh_protocol_get_active());
+        if (public_key) {
+            payload[ "publicKey" ] = public_key;
+            payload[ "idType" ] = "ed25519-public-key";
+        }
+        return( xnode_send_event( "meshPeerLocation", payload ) );
     }
 
     bool xnode_send_manual_sos( void ) {
@@ -1760,7 +2128,7 @@
             return( false );
         }
         if ( !meshtastic_service_is_ready() ) {
-            snprintf( body, sizeof( body ), "Meshtastic not ready: %s", meshtastic_service_get_status() );
+            snprintf( body, sizeof( body ), "%s not ready: %s", mesh_protocol_name(mesh_protocol_get_active()), meshtastic_service_get_status() );
             xnode_queue_notification( "Manual SOS", body );
             return( false );
         }
@@ -1774,7 +2142,7 @@
             return( false );
         }
 
-        snprintf( body, sizeof( body ), "Sent U%u P1 HELP to U%u.", (unsigned)xnode_watch_unit_id, (unsigned)xnode_sos_to_unit_id );
+        snprintf( body, sizeof( body ), "Queued U%u P1 HELP for U%u. Delivery unconfirmed.", (unsigned)xnode_watch_unit_id, (unsigned)xnode_sos_to_unit_id );
         xnode_queue_notification( "Manual SOS", body );
         return( true );
     }
@@ -1792,7 +2160,7 @@
             return( false );
         }
         if ( !meshtastic_service_is_ready() ) {
-            snprintf( body, sizeof( body ), "Meshtastic not ready: %s", meshtastic_service_get_status() );
+            snprintf( body, sizeof( body ), "%s not ready: %s", mesh_protocol_name(mesh_protocol_get_active()), meshtastic_service_get_status() );
             xnode_queue_notification( "CheckIn", body );
             return( false );
         }
@@ -1806,12 +2174,14 @@
             return( false );
         }
 
-        snprintf( body, sizeof( body ), "Sent U%u OK check-in.", (unsigned)xnode_watch_unit_id );
+        snprintf( body, sizeof( body ), "Queued U%u OK check-in. Delivery unconfirmed.", (unsigned)xnode_watch_unit_id );
         xnode_queue_notification( "CheckIn", body );
         return( true );
     }
 
 #else
+
+    void xnode_on_disconnect(void) {}
 
     void xnode_setup( void ) {
     }
@@ -1825,6 +2195,10 @@
     }
 
     bool xnode_send_location_update( double lat, double lon, const char *label ) {
+        return( false );
+    }
+
+    bool xnode_send_peer_location( double lat, double lon, const char *label, const char *public_key ) {
         return( false );
     }
 

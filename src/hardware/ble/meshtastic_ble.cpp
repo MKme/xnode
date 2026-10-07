@@ -4,7 +4,7 @@
 #if !defined( NATIVE_64BIT ) && ( defined( USING_TWATCH_S3 ) || defined( USING_TWATCH_ULTRA ) || defined( USING_TDECK_PLUS ) || defined( USING_TDECK_PRO ) )
 
     #include <Arduino.h>
-    #include <ESP.h>
+    #include <Esp.h>
     #include <NimBLEDevice.h>
     #include <ctype.h>
     #include <freertos/FreeRTOS.h>
@@ -13,6 +13,7 @@
     #include <string.h>
 
     #include "app/meshtastic/meshtastic_service.h"
+    #include "app/mesh/mesh_protocol.h"
     #include "hardware/blectl.h"
     #include "hardware/ble/xnode.h"
     #include "hardware/device.h"
@@ -1160,6 +1161,7 @@
 
         class MeshtasticToRadioCallbacks : public NimBLECharacteristicCallbacks {
             void onWrite( NimBLECharacteristic *pCharacteristic ) {
+                if (mesh_protocol_get_active() != MESH_PROTOCOL_MESHTASTIC) return;
                 meshtastic_ToRadio to_radio = meshtastic_ToRadio_init_zero;
                 const std::string value = pCharacteristic->getValue();
 
@@ -1229,6 +1231,8 @@
     }
 
     void meshtastic_ble_setup( void ) {
+        // Never expose the Meshtastic protobuf service for a MeshCore radio.
+        if (mesh_protocol_get_active() != MESH_PROTOCOL_MESHTASTIC) return;
         NimBLEServer *server = blectl_get_ble_server();
         NimBLEService *service = NULL;
         bool pairing_enabled = false;
@@ -1286,6 +1290,7 @@
     }
 
     bool meshtastic_ble_configure_advertising( void ) {
+        if (mesh_protocol_get_active() != MESH_PROTOCOL_MESHTASTIC) return false;
         NimBLEAdvertising *advertising = blectl_get_ble_advertising();
 
         if ( !advertising || !meshtastic_to_radio_characteristic ) {
@@ -1307,6 +1312,7 @@
 
     bool meshtastic_ble_pairing_enabled( void ) {
         return(
+            mesh_protocol_get_active() == MESH_PROTOCOL_MESHTASTIC &&
             meshtastic_ble_config_store.bluetooth.enabled &&
             meshtastic_ble_config_store.bluetooth.mode != meshtastic_Config_BluetoothConfig_PairingMode_NO_PIN
         );

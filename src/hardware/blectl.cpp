@@ -175,6 +175,7 @@ static bool blectl_drain_events( EventBits_t, void * ) {
                 blectl_send_event_cb( BLECTL_PAIRING_ABORT, (void *)"abort" );
             }
             powermgm_resume();
+            xnode_on_disconnect();
             meshtastic_ble_on_disconnect();
             blectl_pair_passkey = 0;
 

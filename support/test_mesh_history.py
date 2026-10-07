@@ -6,6 +6,7 @@ import tempfile
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
+(ROOT / '.pio').mkdir(exist_ok=True)
 compiler = shutil.which('clang++') or shutil.which('g++')
 if not compiler:
     raise SystemExit('Existing local C++ compiler required; no dependency download attempted.')

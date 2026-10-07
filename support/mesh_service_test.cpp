@@ -99,7 +99,7 @@ unsigned rx_delivery=0;
 void meshtastic_queue_notification(const char*,const char*) {assert(radio_lock_depth==0 && meshtastic_radio_receiving);++notifications;}
 void xnode_send_meshtastic_rx(const char*,const char*) {assert(radio_lock_depth==0 && meshtastic_radio_receiving);++rx_delivery;}
 void osmmap_set_external_marker(double,double,const char*) {assert(radio_lock_depth==0);}
-void xnode_send_location_update(double,double,const char*) {assert(radio_lock_depth==0);}
+void xnode_send_peer_location(double,double,const char*) {assert(radio_lock_depth==0);}
 
 #include "mesh_service_actual.inc"
 

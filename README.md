@@ -2,6 +2,10 @@
 
 Git-tracked home for the active LilyGO Watch Gen3 / T-Watch S3, T-Watch Ultra, T-Deck Plus, and T-Deck Pro XNODE firmware.
 
+## Dual-protocol firmware
+
+The four active targets can select Meshtastic or MeshCore in the RADIO page, then restart without reflashing. XNODE uses separate protocol identities/configuration and one active radio stack. See [protocol scope and switching](MESH_PROTOCOLS.md) before field use. MeshCore support is channel/group chat through XNODE, with protocol-specific limits and no group delivery ACK.
+
 Workspace paths:
 - Active project: `C:\GitHub\XNODE`
 - Archived legacy generations: `C:\GitHub\XNODE\obsolete\backup`
@@ -774,3 +778,15 @@ If the watch does not auto-reset into bootloader mode, put it into boot mode man
    - markers survive closing/reopening the map and rebooting the watch
    - a new packet/check-in sync updates markers without making existing markers vanish
    - panning moves the viewed area without affecting the rest of the watch UI
+
+## XNODE MeshCore controls
+
+Install the combined firmware for your supported XNODE board once. Then use **XTOC > XNODE > BLE > Connect** or **XCOM sidebar/mobile drawer > XNODE > Transport: BLE > Connect**. In **XNODE radio**, pair securely, inspect Active/Saved protocol, save MeshCore RF and channel settings, restart on the device and refresh after reconnect. Return to Meshtastic with the same Save/Restart workflow; each protocol retains its settings.
+
+[Complete operator steps, supported devices, chat/peers and troubleshooting](XNODE-CLIENT-RADIO.md).
+
+| XTOC desktop | XTOC tablet | XCOM mobile |
+| --- | --- | --- |
+| <img src="docs/images/meshcore/xtoc-desktop.png" width="300" alt="XTOC desktop MeshCore controls, virtual device example"> | <img src="docs/images/meshcore/xtoc-tablet.png" width="260" alt="XTOC tablet MeshCore controls, virtual device example"> | <img src="docs/images/meshcore/xcom-mobile.png" width="200" alt="XCOM mobile MeshCore controls, virtual device example"> |
+
+Rendered UI screenshots use virtual device/example data and empty replacement-key fields. MeshCore supports group broadcasts and peer position advertisements through XNODE BLE. Single-radio switching requires restart; direct messages and official MeshCore companion BLE are unsupported. Queued messages do not confirm delivery.

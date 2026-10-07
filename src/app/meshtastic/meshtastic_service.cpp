@@ -1,5 +1,17 @@
 #include "config.h"
 #include "meshtastic_service.h"
+#include "app/mesh/mesh_protocol.h"
+#include "app/meshcore/meshcore_service.h"
+
+// Keep the legacy API for existing app callers. The active protocol is fixed
+// for this boot, so dispatch can never run two stacks against the same radio.
+#if !defined(NATIVE_64BIT) && (defined(USING_TWATCH_S3) || defined(USING_TWATCH_ULTRA) || defined(USING_TDECK_PLUS) || defined(USING_TDECK_PRO))
+#define MESHCORE_RETURN(name, ...) do { if (mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE) return meshcore_service_##name(__VA_ARGS__); } while (0)
+#define MESHCORE_VOID(name, ...) do { if (mesh_protocol_get_active() == MESH_PROTOCOL_MESHCORE) { meshcore_service_##name(__VA_ARGS__); return; } } while (0)
+#else
+#define MESHCORE_RETURN(name, ...) do {} while (0)
+#define MESHCORE_VOID(name, ...) do {} while (0)
+#endif
 #include "meshtastic_channels_config.h"
 #include "meshtastic_user_config.h"
 
@@ -37,14 +49,17 @@ namespace {
 }
 
 uint32_t meshtastic_service_get_history_revision(void) {
+        MESHCORE_RETURN(get_history_revision);
     MeshHistoryLock lock;
     return mesh_history.revision();
 }
 size_t meshtastic_service_get_history_count(uint8_t channel_slot) {
+        MESHCORE_RETURN(get_history_count, channel_slot);
     MeshHistoryLock lock;
     return mesh_history.count(channel_slot);
 }
 bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, mesh_message_t *out) {
+        MESHCORE_RETURN(get_history_message, channel_slot, index, out);
     MeshHistoryLock lock;
     return mesh_history.get(channel_slot, index, out);
 }
@@ -53,7 +68,7 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
 
     #include <Arduino.h>
     #include <ArduinoJson.h>
-    #include <ESP.h>
+    #include <Esp.h>
     #include <ctype.h>
     #if defined( USING_TWATCH_ULTRA )
         #include "hardware/twatch_ultra_hal.h"
@@ -1408,7 +1423,7 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
             }
             if (delivery.position) {
                 osmmap_set_external_marker(delivery.lon, delivery.lat, delivery.sender);
-                xnode_send_location_update(delivery.lat, delivery.lon, delivery.sender);
+                xnode_send_peer_location(delivery.lat, delivery.lon, delivery.sender);
             }
 
             return( true );
@@ -1416,6 +1431,7 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
     }
 
     void meshtastic_service_setup( void ) {
+        MESHCORE_VOID(setup);
         if ( meshtastic_service_started ) {
             return;
         }
@@ -1602,14 +1618,17 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
     }
 
     bool meshtastic_service_send_text( const char *text ) {
+        MESHCORE_RETURN(send_text, text);
         return( meshtastic_service_send_text_internal( text, MESHTASTIC_BROADCAST, meshtastic_active_channel_slot ) );
     }
 
     bool meshtastic_service_send_text_to( const char *text, uint32_t dest, uint8_t channel_slot ) {
+        MESHCORE_RETURN(send_text_to, text, dest, channel_slot);
         return( meshtastic_service_send_text_internal( text, dest, channel_slot ) );
     }
 
     bool meshtastic_service_broadcast_node_info( void ) {
+        MESHCORE_RETURN(broadcast_node_info);
         uint8_t user_payload[ meshtastic_User_size ] = { 0 };
         size_t user_payload_len = 0;
 
@@ -1629,27 +1648,33 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
     }
 
     void meshtastic_service_schedule_node_info_broadcast( uint32_t delay_ms ) {
+        MESHCORE_VOID(schedule_node_info_broadcast, delay_ms);
         meshtastic_nodeinfo_due = true;
         meshtastic_nodeinfo_due_ms = millis() + delay_ms;
     }
 
     bool meshtastic_service_is_ready( void ) {
+        MESHCORE_RETURN(is_ready);
         return( meshtastic_radio_ready );
     }
 
     bool meshtastic_service_is_receiving( void ) {
+        MESHCORE_RETURN(is_receiving);
         return( meshtastic_radio_receiving );
     }
 
     const char *meshtastic_service_get_status( void ) {
+        MESHCORE_RETURN(get_status);
         return( meshtastic_status );
     }
 
     uint8_t meshtastic_service_get_channel_count( void ) {
+        MESHCORE_RETURN(get_channel_count);
         return( meshtastic_enabled_channel_count );
     }
 
     const char *meshtastic_service_get_channel_name( uint8_t channel_index ) {
+        MESHCORE_RETURN(get_channel_name, channel_index);
         const int8_t slot = meshtastic_slot_for_list_index( channel_index );
 
         if ( slot < 0 ) {
@@ -1659,16 +1684,19 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
     }
 
     int8_t meshtastic_service_get_channel_slot(uint8_t channel_index) {
+        MESHCORE_RETURN(get_channel_slot, channel_index);
         return meshtastic_slot_for_list_index(channel_index);
     }
 
     uint8_t meshtastic_service_get_active_channel( void ) {
+        MESHCORE_RETURN(get_active_channel);
         const int8_t channel_index = meshtastic_list_index_for_slot( meshtastic_active_channel_slot );
 
         return( channel_index >= 0 ? (uint8_t)channel_index : 0 );
     }
 
     bool meshtastic_service_set_active_channel( uint8_t channel_index ) {
+        MESHCORE_RETURN(set_active_channel, channel_index);
         MeshtasticRadioLock radio_lock;
         const int8_t slot = meshtastic_slot_for_list_index( channel_index );
 
@@ -1683,32 +1711,39 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
     }
 
     const char *meshtastic_service_get_active_channel_name( void ) {
+        MESHCORE_RETURN(get_active_channel_name);
         return( meshtastic_active_channel()->name );
     }
 
     const char *meshtastic_service_get_primary_channel_name( void ) {
+        MESHCORE_RETURN(get_primary_channel_name);
         return( meshtastic_primary_channel_name() );
     }
 
     float meshtastic_service_get_frequency_mhz( void ) {
+        MESHCORE_RETURN(get_frequency_mhz);
         return( meshtastic_frequency() );
     }
 
     uint32_t meshtastic_service_get_node_id( void ) {
+        MESHCORE_RETURN(get_node_id);
         return( meshtastic_node_id );
     }
 
     const char *meshtastic_service_get_long_name( void ) {
+        MESHCORE_RETURN(get_long_name);
         meshtastic_load_user();
         return( meshtastic_long_name );
     }
 
     const char *meshtastic_service_get_short_name( void ) {
+        MESHCORE_RETURN(get_short_name);
         meshtastic_load_user();
         return( meshtastic_short_name );
     }
 
     bool meshtastic_service_get_user_info( meshtastic_service_user_info_t *info ) {
+        MESHCORE_RETURN(get_user_info, info);
         if ( !info ) {
             return( false );
         }
@@ -1723,6 +1758,7 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
     }
 
     bool meshtastic_service_set_user_info( const meshtastic_service_user_info_t *info ) {
+        MESHCORE_RETURN(set_user_info, info);
         if ( !info ) {
             return( false );
         }
@@ -1745,26 +1781,32 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
     }
 
     uint32_t meshtastic_service_get_last_peer( void ) {
+        MESHCORE_RETURN(get_last_peer);
         return( meshtastic_last_peer );
     }
 
     int32_t meshtastic_service_get_last_rssi( void ) {
+        MESHCORE_RETURN(get_last_rssi);
         return( meshtastic_last_rssi );
     }
 
     float meshtastic_service_get_last_snr( void ) {
+        MESHCORE_RETURN(get_last_snr);
         return( meshtastic_last_snr );
     }
 
     const char *meshtastic_service_get_last_message_sender( void ) {
+        MESHCORE_RETURN(get_last_message_sender);
         return( meshtastic_last_message_sender );
     }
 
     const char *meshtastic_service_get_last_message_text( void ) {
+        MESHCORE_RETURN(get_last_message_text);
         return( meshtastic_last_message_text );
     }
 
     bool meshtastic_service_get_channel_info( uint8_t channel_slot, meshtastic_service_channel_info_t *info ) {
+        MESHCORE_RETURN(get_channel_info, channel_slot, info);
         uint8_t raw_psk[ MESHTASTIC_CHANNEL_PSK_B64_LEN ] = { 0 };
         size_t raw_psk_len = 0;
 
@@ -1795,6 +1837,7 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
     }
 
     bool meshtastic_service_set_channel_info( uint8_t channel_slot, const meshtastic_service_channel_info_t *info ) {
+        MESHCORE_RETURN(set_channel_info, channel_slot, info);
         MeshtasticRadioLock radio_lock;
         const float old_frequency = meshtastic_frequency();
         bool changed = false;
@@ -1856,24 +1899,29 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
     }
 
     void meshtastic_service_set_text_rx_callback( meshtastic_service_text_rx_cb_t callback ) {
+        MESHCORE_VOID(set_text_rx_callback, callback);
         meshtastic_text_rx_callback = callback;
     }
 
 #else
 
     int8_t meshtastic_service_get_channel_slot(uint8_t channel_index) {
+        MESHCORE_RETURN(get_channel_slot, channel_index);
         (void)channel_index;
         return -1;
     }
 
     void meshtastic_service_setup( void ) {
+        MESHCORE_VOID(setup);
     }
 
     bool meshtastic_service_send_text( const char *text ) {
+        MESHCORE_RETURN(send_text, text);
         return( false );
     }
 
     bool meshtastic_service_send_text_to( const char *text, uint32_t dest, uint8_t channel_slot ) {
+        MESHCORE_RETURN(send_text_to, text, dest, channel_slot);
         (void)text;
         (void)dest;
         (void)channel_slot;
@@ -1881,60 +1929,74 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
     }
 
     bool meshtastic_service_is_ready( void ) {
+        MESHCORE_RETURN(is_ready);
         return( false );
     }
 
     bool meshtastic_service_is_receiving( void ) {
+        MESHCORE_RETURN(is_receiving);
         return( false );
     }
 
     const char *meshtastic_service_get_status( void ) {
+        MESHCORE_RETURN(get_status);
         return( "Meshtastic requires T-Watch S3 hardware" );
     }
 
     uint8_t meshtastic_service_get_channel_count( void ) {
+        MESHCORE_RETURN(get_channel_count);
         return( 0 );
     }
 
     const char *meshtastic_service_get_channel_name( uint8_t channel_index ) {
+        MESHCORE_RETURN(get_channel_name, channel_index);
         (void)channel_index;
         return( "" );
     }
 
     uint8_t meshtastic_service_get_active_channel( void ) {
+        MESHCORE_RETURN(get_active_channel);
         return( 0 );
     }
 
     bool meshtastic_service_set_active_channel( uint8_t channel_index ) {
+        MESHCORE_RETURN(set_active_channel, channel_index);
         (void)channel_index;
         return( false );
     }
 
     const char *meshtastic_service_get_active_channel_name( void ) {
+        MESHCORE_RETURN(get_active_channel_name);
         return( "" );
     }
 
     const char *meshtastic_service_get_primary_channel_name( void ) {
+        MESHCORE_RETURN(get_primary_channel_name);
         return( "" );
     }
 
     float meshtastic_service_get_frequency_mhz( void ) {
+        MESHCORE_RETURN(get_frequency_mhz);
         return( 0.0f );
     }
 
     uint32_t meshtastic_service_get_node_id( void ) {
+        MESHCORE_RETURN(get_node_id);
         return( 0 );
     }
 
     const char *meshtastic_service_get_long_name( void ) {
+        MESHCORE_RETURN(get_long_name);
         return( "" );
     }
 
     const char *meshtastic_service_get_short_name( void ) {
+        MESHCORE_RETURN(get_short_name);
         return( "" );
     }
 
     bool meshtastic_service_get_user_info( meshtastic_service_user_info_t *info ) {
+        MESHCORE_RETURN(get_user_info, info);
         if ( info ) {
             memset( info, 0, sizeof( *info ) );
         }
@@ -1942,51 +2004,62 @@ bool meshtastic_service_get_history_message(uint8_t channel_slot, size_t index, 
     }
 
     bool meshtastic_service_set_user_info( const meshtastic_service_user_info_t *info ) {
+        MESHCORE_RETURN(set_user_info, info);
         (void)info;
         return( false );
     }
 
     bool meshtastic_service_broadcast_node_info( void ) {
+        MESHCORE_RETURN(broadcast_node_info);
         return( false );
     }
 
     void meshtastic_service_schedule_node_info_broadcast( uint32_t delay_ms ) {
+        MESHCORE_VOID(schedule_node_info_broadcast, delay_ms);
         (void)delay_ms;
     }
 
     uint32_t meshtastic_service_get_last_peer( void ) {
+        MESHCORE_RETURN(get_last_peer);
         return( 0 );
     }
 
     int32_t meshtastic_service_get_last_rssi( void ) {
+        MESHCORE_RETURN(get_last_rssi);
         return( 0 );
     }
 
     float meshtastic_service_get_last_snr( void ) {
+        MESHCORE_RETURN(get_last_snr);
         return( 0.0f );
     }
 
     const char *meshtastic_service_get_last_message_sender( void ) {
+        MESHCORE_RETURN(get_last_message_sender);
         return( "" );
     }
 
     const char *meshtastic_service_get_last_message_text( void ) {
+        MESHCORE_RETURN(get_last_message_text);
         return( "" );
     }
 
     bool meshtastic_service_get_channel_info( uint8_t channel_slot, meshtastic_service_channel_info_t *info ) {
+        MESHCORE_RETURN(get_channel_info, channel_slot, info);
         (void)channel_slot;
         (void)info;
         return( false );
     }
 
     bool meshtastic_service_set_channel_info( uint8_t channel_slot, const meshtastic_service_channel_info_t *info ) {
+        MESHCORE_RETURN(set_channel_info, channel_slot, info);
         (void)channel_slot;
         (void)info;
         return( false );
     }
 
     void meshtastic_service_set_text_rx_callback( meshtastic_service_text_rx_cb_t callback ) {
+        MESHCORE_VOID(set_text_rx_callback, callback);
         (void)callback;
     }
 

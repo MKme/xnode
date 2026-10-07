@@ -38,6 +38,11 @@
         const char *text
     );
 
+    // Compatibility facade used by XNODE apps. These calls operate on the
+    // boot-selected mesh protocol (see app/mesh/mesh_protocol.h). MeshCore
+    // stores independent identity, channels and volatile history. Its native
+    // 32-byte public key must never be interpreted as a Meshtastic node ID;
+    // non-broadcast uint32_t destinations are rejected in MeshCore mode.
     void meshtastic_service_setup( void );
     bool meshtastic_service_send_text( const char *text );
     bool meshtastic_service_send_text_to( const char *text, uint32_t dest, uint8_t channel_slot );

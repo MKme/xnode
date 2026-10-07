@@ -23,7 +23,7 @@ struct NimBLECharacteristic {
     std::string value;
     std::string getValue() { ++value_reads; return value; }
 };
-static size_t strlcpy(char *to, const char *from, size_t n) {
+static size_t test_strlcpy(char *to, const char *from, size_t n) {
     const size_t length = strlen(from);
     if (n) { memcpy(to, from, length < n - 1 ? length : n - 1); to[length < n - 1 ? length : n - 1] = 0; }
     return length;
@@ -44,7 +44,9 @@ static int xQueueSend(void *, char **pointer, int wait) {
 #define CALLOC checked_calloc
 #define free checked_free
 #define log_e(...) ((void)0)
+#define strlcpy test_strlcpy
 #include "gadgetbridge_actual.inc"
+#undef strlcpy
 #undef free
 
 int main() {
