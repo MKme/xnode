@@ -16,6 +16,7 @@ Install the combined firmware for your supported XNODE board once. Open **XTOC >
 
 Choose **Pair securely** and confirm the passkey displayed on XNODE. Read **Active** and **Saved** protocol, choose MeshCore and **Save protocol**. Restart on the device, reconnect and **Refresh device settings** to confirm the active protocol. Return to Meshtastic with the same Save/Restart workflow; each protocol retains its settings.
 
+<a href="docs/images/meshcore/xtoc-tablet.png">
 <picture>
   <source media="(max-width: 600px)" srcset="docs/images/meshcore/xcom-pair-detail.png">
   <img src="docs/images/meshcore/xtoc-pair-detail.png" alt="Pairing, active and saved protocol, and Save protocol controls with example device data">
@@ -28,6 +29,7 @@ Full-resolution views: [XTOC tablet](docs/images/meshcore/xtoc-tablet.png) · [X
 
 Match the MeshCore RF profile to the other radios, then **Save RF**. Restart on the device and refresh after reconnect to confirm Active RF. Choose a channel slot, enter its name and replacement key, and **Save channel**. Leave an existing channel's form untouched to preserve its key.
 
+<a href="docs/images/meshcore/xtoc-desktop.png">
 <picture>
   <source media="(max-width: 600px)" srcset="docs/images/meshcore/xcom-rf-channel-detail.png">
   <img src="docs/images/meshcore/xtoc-rf-channel-detail.png" alt="MeshCore RF settings, Save RF, channel name, replacement key and Save channel controls with example data">
@@ -40,6 +42,7 @@ Full-resolution views: [XTOC desktop](docs/images/meshcore/xtoc-desktop.png) · 
 
 Select an enabled channel, write your message and choose **Queue group message**. Read incoming traffic in **Messages this session** and peer identities and positions in **Peer advertisements this session**.
 
+<a href="docs/images/meshcore/xtoc-desktop.png">
 <picture>
   <source media="(max-width: 600px)" srcset="docs/images/meshcore/xcom-chat-detail.png">
   <img src="docs/images/meshcore/xtoc-chat-peer-detail.png" alt="Group message composer, received messages and protocol peer identity and position with example data">
