@@ -6,6 +6,8 @@ Git-tracked home for the active LilyGO Watch Gen3 / T-Watch S3, T-Watch Ultra, T
 
 The four active targets can select Meshtastic or MeshCore in the RADIO page, then restart without reflashing. XNODE uses separate protocol identities/configuration and one active radio stack. See [protocol scope and switching](MESH_PROTOCOLS.md) before field use. MeshCore support is channel/group chat through XNODE, with protocol-specific limits and no group delivery ACK.
 
+Use the [XTOC/XCOM operator guide](XNODE-CLIENT-RADIO.md) for pairing, RF/channels and restart/reconnect steps. [Client screenshots and controls](#xnode-meshcore-controls) appear below.
+
 Workspace paths:
 - Active project: `C:\GitHub\XNODE`
 - Archived legacy generations: `C:\GitHub\XNODE\obsolete\backup`
