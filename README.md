@@ -8,6 +8,48 @@ The four active targets can select Meshtastic or MeshCore in the RADIO page, the
 
 Use the [XTOC/XCOM operator guide](XNODE-CLIENT-RADIO.md) for pairing, RF/channels and restart/reconnect steps. [Client screenshots and controls](#xnode-meshcore-controls) appear below.
 
+## XNODE MeshCore controls
+
+Install the combined firmware for your supported XNODE board once. Open **XTOC > XNODE > BLE > Connect**, or **XCOM sidebar/mobile drawer > XNODE > Transport: BLE > Connect**. The controls below are in **XNODE radio**.
+
+### Pair and switch protocols
+
+Choose **Pair securely** and confirm the passkey displayed on XNODE. Read **Active** and **Saved** protocol, choose MeshCore and **Save protocol**. Restart on the device, reconnect and **Refresh device settings** to confirm the active protocol. Return to Meshtastic with the same Save/Restart workflow; each protocol retains its settings.
+
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/images/meshcore/xcom-pair-detail.png">
+  <img src="docs/images/meshcore/xtoc-pair-detail.png" alt="Pairing, active and saved protocol, and Save protocol controls with example device data">
+</picture>
+</a>
+
+Full-resolution views: [XTOC tablet](docs/images/meshcore/xtoc-tablet.png) · [XCOM mobile](docs/images/meshcore/xcom-mobile.png).
+
+### Configure RF and channels
+
+Match the MeshCore RF profile to the other radios, then **Save RF**. Restart on the device and refresh after reconnect to confirm Active RF. Choose a channel slot, enter its name and replacement key, and **Save channel**. Leave an existing channel's form untouched to preserve its key.
+
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/images/meshcore/xcom-rf-channel-detail.png">
+  <img src="docs/images/meshcore/xtoc-rf-channel-detail.png" alt="MeshCore RF settings, Save RF, channel name, replacement key and Save channel controls with example data">
+</picture>
+</a>
+
+Full-resolution views: [XTOC desktop](docs/images/meshcore/xtoc-desktop.png) · [XCOM mobile](docs/images/meshcore/xcom-mobile.png).
+
+### Group chat and peer status
+
+Select an enabled channel, write your message and choose **Queue group message**. Read incoming traffic in **Messages this session** and peer identities and positions in **Peer advertisements this session**.
+
+<picture>
+  <source media="(max-width: 600px)" srcset="docs/images/meshcore/xcom-chat-detail.png">
+  <img src="docs/images/meshcore/xtoc-chat-peer-detail.png" alt="Group message composer, received messages and protocol peer identity and position with example data">
+</picture>
+</a>
+
+Full-resolution views: [XTOC desktop](docs/images/meshcore/xtoc-desktop.png) · [XCOM mobile](docs/images/meshcore/xcom-mobile.png).
+
+[Complete operator steps, supported devices, chat/peers and troubleshooting](XNODE-CLIENT-RADIO.md).
+
 Workspace paths:
 - Active project: `C:\GitHub\XNODE`
 - Archived legacy generations: `C:\GitHub\XNODE\obsolete\backup`
@@ -780,14 +822,3 @@ If the watch does not auto-reset into bootloader mode, put it into boot mode man
    - markers survive closing/reopening the map and rebooting the watch
    - a new packet/check-in sync updates markers without making existing markers vanish
    - panning moves the viewed area without affecting the rest of the watch UI
-
-## XNODE MeshCore controls
-
-Install the combined firmware for your supported XNODE board once. Then use **XTOC > XNODE > BLE > Connect** or **XCOM sidebar/mobile drawer > XNODE > Transport: BLE > Connect**. In **XNODE radio**, pair securely, inspect Active/Saved protocol, save MeshCore RF and channel settings, restart on the device and refresh after reconnect. Return to Meshtastic with the same Save/Restart workflow; each protocol retains its settings.
-
-[Complete operator steps, supported devices, chat/peers and troubleshooting](XNODE-CLIENT-RADIO.md).
-
-| XTOC desktop | XTOC tablet | XCOM mobile |
-| --- | --- | --- |
-| <img src="docs/images/meshcore/xtoc-desktop.png" width="300" alt="XTOC desktop MeshCore controls, virtual device example"> | <img src="docs/images/meshcore/xtoc-tablet.png" width="260" alt="XTOC tablet MeshCore controls, virtual device example"> | <img src="docs/images/meshcore/xcom-mobile.png" width="200" alt="XCOM mobile MeshCore controls, virtual device example"> |
-
