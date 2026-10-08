@@ -791,4 +791,3 @@ Install the combined firmware for your supported XNODE board once. Then use **XT
 | --- | --- | --- |
 | <img src="docs/images/meshcore/xtoc-desktop.png" width="300" alt="XTOC desktop MeshCore controls, virtual device example"> | <img src="docs/images/meshcore/xtoc-tablet.png" width="260" alt="XTOC tablet MeshCore controls, virtual device example"> | <img src="docs/images/meshcore/xcom-mobile.png" width="200" alt="XCOM mobile MeshCore controls, virtual device example"> |
 
-Rendered UI screenshots use virtual device/example data and empty replacement-key fields. MeshCore supports group broadcasts and peer position advertisements through XNODE BLE. Single-radio switching requires restart; direct messages and official MeshCore companion BLE are unsupported. Queued messages do not confirm delivery.
